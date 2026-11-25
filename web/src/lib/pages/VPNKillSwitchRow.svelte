@@ -1,6 +1,6 @@
 <script lang="ts">
 import { onDestroy } from 'svelte';
-import Button from '$lib/components/ui/button/button.svelte';
+import Switch from '$lib/components/ui/switch/switch.svelte';
 import '../api/client';
 import { setVpnKillSwitch, type TunnelStatus } from '../api/gen';
 import { fetchKillSwitch } from '../api/vpn-status';
@@ -9,16 +9,14 @@ import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
-import Section from '../ui/Section.svelte';
 import SettingsRow from '../ui/SettingsRow.svelte';
-import Status from '../ui/Status.svelte';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import { controlPhase, createTunnelControl, killSwitchRefusal } from '../vpn-tunnel.svelte';
 
 let { tunnel }: { tunnel?: TunnelStatus } = $props();
 
 const state = createLoader(fetchKillSwitch, 10000);
-const control = createTunnelControl(() => state.retry(), {
+const txn = createTunnelControl(() => state.retry(), {
   submit: (enabled, signal) => setVpnKillSwitch({ body: { enabled }, signal }),
   refusal: killSwitchRefusal,
   confirmed: m.vpn_kill_confirmed,
@@ -27,12 +25,12 @@ const control = createTunnelControl(() => state.retry(), {
 });
 transactionToast(
   'vpn-killswitch',
-  () => controlPhase(control, m.vpn_kill_applying()),
-  (ok) => void control.settle(ok),
+  () => controlPhase(txn, m.vpn_kill_applying()),
+  (ok) => void txn.settle(ok),
 );
 onDestroy(() => {
   state.stop();
-  control.stop();
+  txn.stop();
 });
 const connected = $derived(tunnel?.state === 'connected' && !tunnel.stale);
 const confirm = createConfirm();
@@ -46,33 +44,32 @@ async function change(enable: boolean) {
     action: enable ? m.vpn_kill_enable() : m.vpn_kill_disable(),
     tone: enable ? 'default' : 'danger',
   });
-  if (ok) void control.set(enable);
+  if (ok) void txn.set(enable);
 }
 </script>
 
-<Section title={m.vpn_kill()} description={state.data ? (state.data.enabled ? m.vpn_kill_on_help() : m.vpn_kill_off_help()) : undefined}>
-  <LoadState status={state.status} retry={state.retry} stale={state.data !== undefined}>
-    {#if state.data}
-      {@const on = state.data.enabled}
-      <SettingsRow label={m.vpn_status_label()}>
-        {#snippet control()}
-          <Status kind={on ? 'ok' : 'neutral'}>{on ? m.vpn_kill_on() : m.vpn_kill_off()}</Status>
-        {/snippet}
-      </SettingsRow>
-    {/if}
-  </LoadState>
-  {#if state.data && !control.busy}
-    <div class="flex flex-wrap gap-2">
-      {#if state.data.enabled}
-        <Button variant="destructive" size="sm" type="button" onclick={() => change(false)}>{m.vpn_kill_disable()}</Button>
-      {:else}
-        <Button variant="outline" size="sm" type="button" disabled={!connected} onclick={() => change(true)}>{m.vpn_kill_enable()}</Button>
+<!-- One row in the VPN page's traffic rules; the switch confirms both directions. -->
+<SettingsRow
+  label={m.vpn_kill()}
+  for="vpn-kill-switch"
+  description={state.data && !state.data.enabled && !connected
+    ? m.vpn_kill_needs_tunnel()
+    : state.data?.enabled
+      ? m.vpn_kill_on_help()
+      : m.vpn_kill_off_help()}
+>
+  {#snippet control()}
+    <LoadState status={state.status} retry={state.retry} stale={state.data !== undefined}>
+      {#if state.data}
+        {@const on = state.data.enabled}
+        <Switch
+          id="vpn-kill-switch"
+          bind:checked={() => on, (value) => void change(value)}
+          disabled={txn.busy || (!on && !connected)}
+        />
       {/if}
-    </div>
-    {#if !state.data.enabled && !connected}
-      <p class="text-sm text-muted-foreground">{m.vpn_kill_needs_tunnel()}</p>
-    {/if}
-  {/if}
-</Section>
+    </LoadState>
+  {/snippet}
+</SettingsRow>
 
 <ConfirmDialog {confirm} />

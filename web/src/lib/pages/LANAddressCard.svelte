@@ -3,7 +3,6 @@ import { onDestroy } from 'svelte';
 import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import Input from '$lib/components/ui/input/input.svelte';
-import Label from '$lib/components/ui/label/label.svelte';
 import { setLanAddress } from '../api/gen';
 import {
   ANSWER_WAIT_MS,
@@ -20,6 +19,7 @@ import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
 import Section from '../ui/Section.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import { controlPhase, createTunnelControl } from '../vpn-tunnel.svelte';
 
@@ -36,7 +36,7 @@ const tick = setInterval(() => (now = performance.now()), 1000);
 
 // On the new address the pending change is adopted by the shared transaction control, which
 // shows the confirm window with Keep change / Roll back.
-const control = createTunnelControl(() => loader.retry(), {
+const txn = createTunnelControl(() => loader.retry(), {
   submit: async () => ({
     data: loader.data?.pending ? adoptedTxn(loader.data.pending) : undefined,
   }),
@@ -48,13 +48,13 @@ const control = createTunnelControl(() => loader.retry(), {
 });
 transactionToast(
   'lan',
-  () => controlPhase(control, m.lan_applying()),
-  (ok) => void control.settle(ok),
+  () => controlPhase(txn, m.lan_applying()),
+  (ok) => void txn.settle(ok),
 );
 onDestroy(() => {
   clearInterval(tick);
   request.abort();
-  control.stop();
+  txn.stop();
 });
 
 let adopted = '';
@@ -65,9 +65,9 @@ $effect(() => {
     filled = true;
     address = data.address;
   }
-  if (data.pending && data.pending.id !== adopted && !control.busy) {
+  if (data.pending && data.pending.id !== adopted && !txn.busy) {
     adopted = data.pending.id;
-    void control.set(true);
+    void txn.set(true);
   }
 });
 
@@ -101,7 +101,7 @@ async function send(next: string, old: string) {
 async function save(event: SubmitEvent) {
   event.preventDefault();
   const current = loader.data;
-  if (!current || sending || moving || control.busy) return;
+  if (!current || sending || moving || txn.busy) return;
   const next = address.trim();
   const ok = await confirm.ask({
     title: m.lan_confirm_title(),
@@ -111,6 +111,7 @@ async function save(event: SubmitEvent) {
   });
   if (ok) void send(next, current.address);
 }
+const formId = $props.id();
 </script>
 
 <Section title={m.lan_title()} description={m.lan_intro()}>
@@ -132,22 +133,24 @@ async function save(event: SubmitEvent) {
             {m.lan_pending({ address: loader.data.pending.address })}
           </Alert>
         {/if}
-        <form class="flex flex-col gap-4" onsubmit={save}>
-          <Label class="grid w-56 gap-1">
-            {m.lan_address()}
-            <Input bind:value={address} required maxlength={18} placeholder="192.168.8.1/24"
-              autocomplete="off" spellcheck={false} disabled={sending || control.busy} />
-          </Label>
-          <p class="text-sm text-muted-foreground">{m.lan_subnet({ subnet: loader.data.subnet })}</p>
-          <div>
-            <Button variant="default" type="submit" disabled={sending || control.busy}>
-              {sending ? m.lan_applying() : m.lan_apply()}
-            </Button>
-          </div>
+        <form id={formId} onsubmit={save}>
+          <SettingsRow label={m.lan_address()} for="{formId}-address" description={m.lan_subnet({ subnet: loader.data.subnet })}>
+            {#snippet control()}
+              <Input id="{formId}-address" class="w-64" bind:value={address} required maxlength={18} placeholder="192.168.8.1/24"
+                autocomplete="off" spellcheck={false} disabled={sending || txn.busy} />
+            {/snippet}
+          </SettingsRow>
         </form>
       {/if}
     </LoadState>
   {/if}
+  {#snippet footer()}
+    {#if !moving}
+      <Button variant="default" type="submit" form={formId} disabled={sending || txn.busy || !loader.data}>
+        {sending ? m.lan_applying() : m.lan_apply()}
+      </Button>
+    {/if}
+  {/snippet}
 </Section>
 
 <ConfirmDialog {confirm} />

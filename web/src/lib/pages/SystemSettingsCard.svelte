@@ -1,8 +1,7 @@
 <script lang="ts">
-import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import Input from '$lib/components/ui/input/input.svelte';
-import Label from '$lib/components/ui/label/label.svelte';
+import Switch from '$lib/components/ui/switch/switch.svelte';
 import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 import { fetchDeviceSettings, saveDeviceSettings, validHostname } from '../api/system-settings';
 import { m } from '../paraglide/messages.js';
@@ -10,6 +9,7 @@ import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
 import Section from '../ui/Section.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 
 const loader = createLoader(fetchDeviceSettings);
 let hostname = $state('');
@@ -55,40 +55,45 @@ async function save(event: SubmitEvent) {
   notify.success(m.settings_saved());
   void loader.retry();
 }
+const formId = $props.id();
 </script>
 
 <Section title={m.settings_title()}>
   <LoadState status={loader.status} retry={loader.retry} stale={loader.data !== undefined}>
     {#if loader.data}
-      <form class="flex flex-col gap-4" onsubmit={save}>
-        <Label class="grid gap-1">
-          {m.settings_hostname()}
-          <Input bind:value={hostname} required maxlength={63} autocomplete="off" spellcheck={false} disabled={busy} />
-        </Label>
-        <Label class="grid gap-1">
-          {m.settings_zone()}
-          <Input bind:value={zonename} list="travo-zonenames" required autocomplete="off" spellcheck={false} disabled={busy} />
-          <datalist id="travo-zonenames">
-            {#each loader.data.zonenames as zone (zone)}<option value={zone}></option>{/each}
-          </datalist>
-          <span class="text-sm text-muted-foreground">{m.settings_zone_hint()}</span>
-        </Label>
-        <label class="flex items-center gap-2">
-          <input type="checkbox" bind:checked={ntpEnabled} disabled={busy} />
-          {m.settings_ntp()}
-        </label>
-        <Label class="grid gap-1">
-          {m.settings_ntp_servers()}
-          <Textarea bind:value={servers} rows={4} spellcheck={false} disabled={busy} class="font-mono text-sm" />
-          <span class="text-sm text-muted-foreground">{m.settings_ntp_servers_hint()}</span>
-        </Label>
-        {#if failure}
-          <Alert class="status status-danger self-start" role="alert">{failure}</Alert>
+      <form id={formId} onsubmit={save}>
+        <SettingsRow label={m.settings_hostname()} for="{formId}-hostname">
+          {#snippet control()}
+            <Input id="{formId}-hostname" class="w-64" bind:value={hostname} required maxlength={63} autocomplete="off" spellcheck={false} disabled={busy} />
+          {/snippet}
+        </SettingsRow>
+        <SettingsRow label={m.settings_zone()} for="{formId}-zone" description={m.settings_zone_hint()}>
+          {#snippet control()}
+            <Input id="{formId}-zone" class="w-64" bind:value={zonename} list="travo-zonenames" required autocomplete="off" spellcheck={false} disabled={busy} />
+            <datalist id="travo-zonenames">
+              {#each loader.data?.zonenames ?? [] as zone (zone)}<option value={zone}></option>{/each}
+            </datalist>
+          {/snippet}
+        </SettingsRow>
+        <SettingsRow label={m.settings_ntp()} for="{formId}-ntp">
+          {#snippet control()}
+            <Switch id="{formId}-ntp" bind:checked={ntpEnabled} disabled={busy} />
+          {/snippet}
+        </SettingsRow>
+        {#if ntpEnabled}
+          <SettingsRow top label={m.settings_ntp_servers()} for="{formId}-servers" description={m.settings_ntp_servers_hint()}>
+            {#snippet control()}
+              <Textarea id="{formId}-servers" bind:value={servers} rows={3} spellcheck={false} disabled={busy} class="w-64 font-mono text-sm" />
+            {/snippet}
+          </SettingsRow>
         {/if}
-        <div>
-          <Button variant="default" type="submit" disabled={busy}>{m.settings_save()}</Button>
-        </div>
+        {#if failure}
+          <p class="text-sm text-danger" role="alert">{failure}</p>
+        {/if}
       </form>
     {/if}
   </LoadState>
+  {#snippet footer()}
+    <Button variant="default" type="submit" form={formId} disabled={busy || !loader.data}>{m.settings_save()}</Button>
+  {/snippet}
 </Section>

@@ -1,8 +1,12 @@
 <script lang="ts">
+import Plus from '@lucide/svelte/icons/plus';
+import Trash2 from '@lucide/svelte/icons/trash-2';
 import Button from '$lib/components/ui/button/button.svelte';
+import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
 import * as Dialog from '$lib/components/ui/dialog';
 import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
+import Switch from '$lib/components/ui/switch/switch.svelte';
 import {
   dayName,
   daysLabel,
@@ -28,6 +32,7 @@ import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
 import SelectField from '../ui/SelectField.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 import Status from '../ui/Status.svelte';
 
 const schedule = createLoader(fetchSchedule);
@@ -135,42 +140,30 @@ async function remove(rule: WiFiScheduleRule) {
     {#if view.rules.length === 0}
       <p class="mt-3 text-muted-foreground">{m.wifi_schedule_empty()}</p>
     {:else}
-      <ul class="mt-3 divide-y divide-border" aria-label={m.wifi_schedule_title()}>
+      <div class="mt-1" role="group" aria-label={m.wifi_schedule_title()}>
         {#each view.rules as rule (rule.id)}
           {@const run = lastRun(view.runs, rule.id)}
-          <li class="flex flex-wrap items-center gap-2 py-2">
-            <span class="min-w-0 flex-1">
-              <span class="block break-all font-medium">{apName(rule.section)}</span>
-              <span class="block text-sm text-muted-foreground">
-                {m.wifi_schedule_window({ off: rule.off, on: rule.on, days: daysLabel(rule.days) })}
-              </span>
-              {#if run}
-                <span class="block text-xs text-muted-foreground">
-                  {m.wifi_schedule_last({ time: runTime(run.at, view.zone), action: run.action, outcome: outcomeLabel(run.outcome) })}
-                </span>
-              {/if}
-            </span>
-            <Status kind={rule.enabled ? 'ok' : 'neutral'}>
-              {rule.enabled ? m.wifi_schedule_active() : m.wifi_schedule_paused_badge()}
-            </Status>
-            <span class="flex gap-2">
+          <SettingsRow
+            label={apName(rule.section)}
+            description={[m.wifi_schedule_window({ off: rule.off, on: rule.on, days: daysLabel(rule.days) }), run ? m.wifi_schedule_last({ time: runTime(run.at, view.zone), action: run.action, outcome: outcomeLabel(run.outcome) }) : ''].filter(Boolean).join(' · ')}
+          >
+            {#snippet control()}
               <Button variant="outline" size="sm" type="button" disabled={saving}
                 aria-label={m.wifi_schedule_edit_name({ ssid: apName(rule.section) })}
                 onclick={() => edit(rule)}>{m.wifi_ap_edit()}</Button>
-              <Button variant="outline" size="sm" type="button" disabled={saving} onclick={() => pause(rule)}>
-                {rule.enabled ? m.wifi_schedule_pause() : m.wifi_schedule_resume()}
-              </Button>
-              <Button variant="outline" size="sm" type="button" disabled={saving}
+              <Switch aria-label={rule.enabled ? m.wifi_schedule_pause() : m.wifi_schedule_resume()} disabled={saving}
+                bind:checked={() => rule.enabled, () => pause(rule)} />
+              <Button variant="ghost" size="icon" type="button" disabled={saving}
                 aria-label={m.wifi_schedule_delete_name({ ssid: apName(rule.section) })}
-                onclick={() => remove(rule)}>{m.wifi_schedule_delete()}</Button>
-            </span>
-          </li>
+                onclick={() => remove(rule)}><Trash2 aria-hidden="true" size={16} /></Button>
+            {/snippet}
+          </SettingsRow>
         {/each}
-      </ul>
+      </div>
     {/if}
     <Button variant="outline" size="sm" type="button" class="mt-3 w-fit"
       disabled={saving || view.aps.length === 0 || view.rules.length >= 16} onclick={add}>
-      {m.wifi_schedule_add()}
+      <Plus aria-hidden="true" />{m.wifi_schedule_add()}
     </Button>
   {/if}
 </LoadState>
@@ -200,8 +193,8 @@ async function remove(rule: WiFiScheduleRule) {
       <div class="flex flex-wrap gap-3">
         {#each weekOrder as day (day)}
           <label class="flex items-center gap-1 text-sm">
-            <input type="checkbox" checked={form.days.includes(day)} disabled={saving}
-              onchange={(e) => toggleDay(day, e.currentTarget.checked)} />
+            <Checkbox checked={form.days.includes(day)} disabled={saving}
+              onCheckedChange={(on) => toggleDay(day, on === true)} />
             {dayName(day)}
           </label>
         {/each}
@@ -213,7 +206,7 @@ async function remove(rule: WiFiScheduleRule) {
     {/if}
     <div class="flex justify-end gap-2">
       <Button variant="outline" type="button" onclick={() => (open = false)}>{m.wifi_join_cancel()}</Button>
-      <Button variant="outline" type="submit" disabled={saving || problem !== undefined}>{m.wifi_ap_save()}</Button>
+      <Button type="submit" disabled={saving || problem !== undefined}>{m.wifi_ap_save()}</Button>
     </div>
   </form>
 </Dialog.Content>

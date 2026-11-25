@@ -1,7 +1,9 @@
 <script lang="ts">
+import RotateCw from '@lucide/svelte/icons/rotate-cw';
 import Shield from '@lucide/svelte/icons/shield';
 import { onDestroy } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
+import * as Table from '$lib/components/ui/table';
 import {
   fetchInterfaces,
   fetchZones,
@@ -72,32 +74,48 @@ async function restart(name: Restartable) {
       <p class="mt-2" role="note"><Status kind="warn">{m.netview_partial()}</Status></p>
     {/if}
     {#if ifaces.data}
-      <ul class="divide-y divide-border" aria-label={m.netview_interfaces()}>
-        {#each ifaces.data.interfaces as it (it.name)}
-          {@const state = interfaceStatus(it)}
-          {@const addrs = interfaceAddresses(it)}
-          <li class="flex flex-col gap-1 py-3">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="font-medium">{it.name}</span>
-              <Status kind={state.kind}>{state.label}</Status>
-              {#if it.uplink}<Status kind="info">{m.netview_uplink()}</Status>{/if}
-              {#if it.zone}<span class="text-sm text-muted-foreground">{m.netview_zone({ zone: it.zone })}</span>{/if}
-            </div>
-            <p class="font-mono text-sm break-words text-muted-foreground">
-              {it.proto}{#if it.device} · {it.device}{/if}{#if addrs} · {addrs}{/if}
-            </p>
-            {#if it.dns_servers.length}
-              <p class="break-all text-sm text-muted-foreground">{m.netview_dns({ servers: it.dns_servers.join(', ') })}</p>
-            {/if}
-            {#if restartable(it.name)}
-              {@const name = it.name}
-              <Button variant="destructive" size="sm" type="button" class="self-start" disabled={restarting !== undefined}
-                aria-label={m.netview_restart_name({ name })}
-                onclick={() => restart(name)}>{m.netview_restart()}</Button>
-            {/if}
-          </li>
-        {/each}
-      </ul>
+      <Table.Root aria-label={m.netview_interfaces()}>
+        <Table.Header>
+          <Table.Row>
+            <Table.Head>{m.netview_col_interface()}</Table.Head>
+            <Table.Head>{m.netview_col_status()}</Table.Head>
+            <Table.Head class="max-md:hidden">{m.netview_col_protocol()}</Table.Head>
+            <Table.Head class="max-sm:hidden">{m.netview_col_addresses()}</Table.Head>
+            <Table.Head class="w-12"><span class="sr-only">{m.table_actions()}</span></Table.Head>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {#each ifaces.data.interfaces as it (it.name)}
+            {@const state = interfaceStatus(it)}
+            {@const addrs = interfaceAddresses(it)}
+            <Table.Row>
+              <Table.Cell class="whitespace-normal">
+                <span class="font-medium">{it.name}</span>
+                {#if it.zone}<span class="block text-xs text-muted-foreground">{m.netview_zone({ zone: it.zone })}</span>{/if}
+              </Table.Cell>
+              <Table.Cell class="whitespace-normal">
+                <div class="flex flex-wrap gap-1">
+                  <Status kind={state.kind}>{state.label}</Status>
+                  {#if it.uplink}<Status kind="info">{m.netview_uplink()}</Status>{/if}
+                </div>
+              </Table.Cell>
+              <Table.Cell class="font-mono text-xs max-md:hidden">{it.proto}{#if it.device}<span class="block text-muted-foreground">{it.device}</span>{/if}</Table.Cell>
+              <Table.Cell class="font-mono text-xs break-all whitespace-normal max-sm:hidden">
+                {addrs || '–'}
+                {#if it.dns_servers.length}<span class="block font-sans text-muted-foreground">{m.netview_dns({ servers: it.dns_servers.join(', ') })}</span>{/if}
+              </Table.Cell>
+              <Table.Cell class="text-right">
+                {#if restartable(it.name)}
+                  {@const name = it.name}
+                  <Button variant="ghost" size="icon" type="button" disabled={restarting !== undefined}
+                    aria-label={m.netview_restart_name({ name })}
+                    onclick={() => restart(name)}><RotateCw aria-hidden="true" size={16} /></Button>
+                {/if}
+              </Table.Cell>
+            </Table.Row>
+          {/each}
+        </Table.Body>
+      </Table.Root>
     {/if}
   </LoadState>
 </Section>
@@ -107,23 +125,30 @@ async function restart(name: Restartable) {
     {#if zones.data?.length === 0}
       <EmptyState icon={Shield} title={m.netview_zones_empty()} />
     {:else if zones.data}
-      <ul class="divide-y divide-border" aria-label={m.netview_zones()}>
-        {#each zones.data as z (z.name)}
-          <li class="flex flex-col gap-1 py-3">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="font-medium">{z.name}</span>
-              {#if z.masq}<Status kind="info">{m.netview_masq()}</Status>{/if}
-            </div>
-            <p class="font-mono text-sm text-muted-foreground">
-              {m.netview_policies({ input: z.input, output: z.output, forward: z.forward })}
-            </p>
-            <p class="break-all text-sm text-muted-foreground">
-              {m.netview_networks({ networks: z.networks.join(', ') || '–' })}
-              {#if z.forwards_to.length} · {m.netview_forwards({ zones: z.forwards_to.join(', ') })}{/if}
-            </p>
-          </li>
-        {/each}
-      </ul>
+      <Table.Root aria-label={m.netview_zones()}>
+        <Table.Header>
+          <Table.Row>
+            <Table.Head>{m.netview_col_zone()}</Table.Head>
+            <Table.Head>{m.netview_col_policy()}</Table.Head>
+            <Table.Head class="max-sm:hidden">{m.netview_col_networks()}</Table.Head>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {#each zones.data as z (z.name)}
+            <Table.Row>
+              <Table.Cell class="whitespace-normal">
+                <span class="font-medium">{z.name}</span>
+                {#if z.masq}<Status kind="info">{m.netview_masq()}</Status>{/if}
+              </Table.Cell>
+              <Table.Cell class="font-mono text-xs whitespace-normal">{m.netview_policies({ input: z.input, output: z.output, forward: z.forward })}</Table.Cell>
+              <Table.Cell class="text-sm whitespace-normal text-muted-foreground max-sm:hidden">
+                {z.networks.join(', ') || '–'}
+                {#if z.forwards_to.length}<span class="block">{m.netview_forwards({ zones: z.forwards_to.join(', ') })}</span>{/if}
+              </Table.Cell>
+            </Table.Row>
+          {/each}
+        </Table.Body>
+      </Table.Root>
     {/if}
   </LoadState>
 </Section>

@@ -6,7 +6,6 @@ import { setUsbTether } from '../api/gen';
 import { m } from '../paraglide/messages.js';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
-import EmptyState from '../ui/EmptyState.svelte';
 import GroupHeading from '../ui/GroupHeading.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
@@ -93,26 +92,35 @@ async function change(enable: boolean, device = '', kind = '') {
 </script>
 
 <Section title={m.usbtether_title()}>
+  {#snippet actions()}
+    {#if usb.data}
+      {@const st = usb.data}
+      {#if st.install_blocked}<Status kind="warn">{m.usbtether_install_blocked()}</Status>{/if}
+      {#if st.configured && st.up}
+        <Status kind="ok">{m.usbtether_state_up({ device: st.device, ipv4: st.ipv4 || '—' })}</Status>
+      {:else if st.configured}
+        <Status kind="warn">{m.usbtether_state_down({ device: st.device })}</Status>
+      {:else}
+        <Status kind="neutral">{m.usbtether_state_off()}</Status>
+      {/if}
+    {/if}
+  {/snippet}
   <LoadState status={usb.status} retry={usb.retry} stale={usb.data !== undefined}>
     {#if usb.data}
       {@const st = usb.data}
-      <div class="flex flex-wrap items-center gap-2">
-        {#if st.configured && st.up}
-          <Status kind="ok">{m.usbtether_state_up({ device: st.device, ipv4: st.ipv4 || '—' })}</Status>
-        {:else if st.configured}
-          <Status kind="warn">{m.usbtether_state_down({ device: st.device })}</Status>
-        {:else}
-          <Status kind="neutral">{m.usbtether_state_off()}</Status>
-        {/if}
-        {#if st.install_blocked}<Status kind="warn">{m.usbtether_install_blocked()}</Status>{/if}
-      </div>
       {#if boundLinkMissing(st)}
         <p class="text-muted-foreground">{m.usbtether_bound_missing({ device: st.device })}</p>
       {/if}
 
       <GroupHeading label={m.usbtether_phones()} />
       {#if st.links.length === 0}
-        <EmptyState icon={Smartphone} title={m.usbtether_no_phone()} />
+        <div class="flex items-start gap-3 py-2">
+          <Smartphone aria-hidden="true" size={18} class="mt-0.5 shrink-0 text-muted-foreground" />
+          <div>
+            <p class="text-sm font-medium">{m.usbtether_no_phone_title()}</p>
+            <p class="text-sm text-muted-foreground">{m.usbtether_no_phone()}</p>
+          </div>
+        </div>
       {:else}
         <div>
           {#each st.links as link (link.name)}

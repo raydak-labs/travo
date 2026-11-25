@@ -1,7 +1,6 @@
 <script lang="ts">
 import { onDestroy } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
-import * as Collapsible from '$lib/components/ui/collapsible';
 import { topologyRefusal } from '../api/adguard';
 import { setAdGuardTopology } from '../api/gen';
 import { m } from '../paraglide/messages.js';
@@ -20,7 +19,7 @@ let {
   refresh,
 }: { expert: boolean; hosts?: string[]; busy?: boolean; refresh: () => unknown } = $props();
 
-const control = createTunnelControl(() => refresh(), {
+const txn = createTunnelControl(() => refresh(), {
   submit: (on, signal) => setAdGuardTopology({ body: { mode: on ? 'expert' : 'default' }, signal }),
   refusal: topologyRefusal,
   confirmed: m.adguard_topology_confirmed,
@@ -30,40 +29,36 @@ const control = createTunnelControl(() => refresh(), {
 });
 transactionToast(
   'adguard-topology',
-  () => controlPhase(control, m.adguard_topology_applying()),
-  (ok) => void control.settle(ok),
+  () => controlPhase(txn, m.adguard_topology_applying()),
+  (ok) => void txn.settle(ok),
 );
 const confirm = createConfirm();
-onDestroy(() => control.stop());
+onDestroy(() => txn.stop());
 
 async function toggle(on: boolean) {
-  if (control.busy) return;
+  if (txn.busy) return;
   const ok = await confirm.ask({
     title: on ? m.adguard_topology_confirm_on_title() : m.adguard_topology_confirm_off_title(),
     description: on ? m.adguard_topology_confirm_on() : m.adguard_topology_confirm_off(),
     action: on ? m.adguard_topology_turn_on() : m.adguard_topology_turn_off(),
     tone: on ? 'danger' : 'default',
   });
-  if (ok) void control.set(on);
+  if (ok) void txn.set(on);
 }
 </script>
 
-<Section title={m.adguard_topology_title()}>
-  <Collapsible.Root open={expert}>
-    <Collapsible.Trigger class="cursor-pointer font-medium">{m.adguard_topology_disclosure()}</Collapsible.Trigger>
-    <Collapsible.Content>
-      <p class="text-muted-foreground">{m.adguard_topology_intro()}</p>
-      <div class="flex flex-wrap items-center gap-3">
-        <Status kind={expert ? 'warn' : 'neutral'}>{expert ? m.adguard_topology_state_expert() : m.adguard_topology_state_default()}</Status>
-        <Button variant="outline" type="button" disabled={control.busy || busy} onclick={() => toggle(!expert)}>
-          {control.applying ? m.adguard_topology_applying() : expert ? m.adguard_topology_turn_off() : m.adguard_topology_turn_on()}
-        </Button>
-      </div>
-      {#if expert && hosts.length > 0}
-        <p class="text-sm text-muted-foreground">{m.adguard_topology_hosts({ hosts: hosts.join(', ') })}</p>
-      {/if}
-    </Collapsible.Content>
-  </Collapsible.Root>
+<Section title={m.adguard_topology_title()} description={m.adguard_topology_intro()}>
+  {#snippet actions()}
+    <Status kind={expert ? 'warn' : 'neutral'}>{expert ? m.adguard_topology_state_expert() : m.adguard_topology_state_default()}</Status>
+  {/snippet}
+  {#snippet footer()}
+    <Button variant="outline" type="button" disabled={txn.busy || busy} onclick={() => toggle(!expert)}>
+      {txn.applying ? m.adguard_topology_applying() : expert ? m.adguard_topology_turn_off() : m.adguard_topology_turn_on()}
+    </Button>
+  {/snippet}
+  {#if expert && hosts.length > 0}
+    <p class="text-sm text-muted-foreground">{m.adguard_topology_hosts({ hosts: hosts.join(', ') })}</p>
+  {/if}
 </Section>
 
 <ConfirmDialog {confirm} />

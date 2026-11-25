@@ -7,17 +7,21 @@ const sources = import.meta.glob(
     './Network*.svelte',
     '!./NetworkInterfacesCard.svelte',
     './System.svelte',
-    './SystemLEDs.svelte',
+    './SystemHardware.svelte',
     './SystemLogs.svelte',
     './SystemUpdates.svelte',
-    './SystemTokens.svelte',
+    './SystemAccess.svelte',
     './SystemReset.svelte',
     './Services.svelte',
+    './AdGuard.svelte',
+    './VPN.svelte',
+    './WireGuard.svelte',
+    './Tailscale.svelte',
   ],
   { query: '?raw', import: 'default', eager: true },
 ) as Record<string, string>;
 
-// Cards and inline sections the Network and System pages rendered before the nav split.
+// Cards and sections each page group renders; each must sit on exactly one page.
 const CARD_COMPONENTS = [
   'WANCard',
   'USBTetherCard',
@@ -40,14 +44,14 @@ const CARD_COMPONENTS = [
   'SystemFirmwareCard',
   'SystemSSHKeysCard',
   'SystemFactoryResetCard',
+  'PasswordCard',
+  'DoHCard',
+  'AdGuardTopologyCard',
+  'VPNKillSwitchRow',
+  'VPNSplitRow',
+  'VPNDNSRow',
 ];
-const INLINE_CARDS = [
-  'm.system_device()',
-  'm.system_backup()',
-  'm.reboot_title()',
-  'm.system_about()',
-  'm.password_change_title()',
-];
+const INLINE_CARDS = ['m.system_details()', 'm.tokens_yours()', 'm.vpn_saved_profiles()'];
 
 function pagesWith(needle: string): string[] {
   return Object.entries(sources)
@@ -55,9 +59,9 @@ function pagesWith(needle: string): string[] {
     .map(([path]) => path);
 }
 
-describe('card placement after the nav split', () => {
+describe('card placement', () => {
   it('loads the expected page modules', () => {
-    expect(Object.keys(sources)).toHaveLength(14);
+    expect(Object.keys(sources)).toHaveLength(18);
   });
 
   it.each(CARD_COMPONENTS)('%s renders on exactly one page', (name) => {
@@ -68,8 +72,9 @@ describe('card placement after the nav split', () => {
     expect(pagesWith(`<Section title={${title}}`)).toHaveLength(1);
   });
 
-  it('drops the link cards the nav replaces', () => {
-    expect(pagesWith('tokens_open')).toEqual([]);
-    expect(pagesWith('logs_open')).toEqual([]);
+  it('drops the cards the header menu and the nav replace', () => {
+    for (const gone of ['tokens_open', 'logs_open', 'reboot_title', 'system_about']) {
+      expect(pagesWith(gone)).toEqual([]);
+    }
   });
 });

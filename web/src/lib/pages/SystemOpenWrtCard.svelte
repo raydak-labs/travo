@@ -1,4 +1,5 @@
 <script lang="ts">
+import ExternalLink from '@lucide/svelte/icons/external-link';
 import Button from '$lib/components/ui/button/button.svelte';
 import type { OpenWrtCheck } from '../api/gen';
 import {
@@ -11,6 +12,7 @@ import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
 import Section from '../ui/Section.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 
 const last = createLoader(fetchOpenWrtUpdates);
 let fresh = $state<OpenWrtCheck>();
@@ -34,44 +36,48 @@ async function check(refreshLists: boolean) {
 }
 </script>
 
+{#snippet fact(label: string, value: string)}
+  <SettingsRow {label}>{#snippet control()}<span class="text-sm">{value}</span>{/snippet}</SettingsRow>
+{/snippet}
+
 <Section title={m.osupdate_title()} description={m.osupdate_intro()}>
+  {#snippet actions()}
+    <Button variant="ghost" size="sm" href={luci} target="_blank" rel="noopener noreferrer">{m.osupdate_open_luci()}<ExternalLink aria-hidden="true" /></Button>
+  {/snippet}
   <LoadState status={last.status} retry={last.retry} stale={last.data !== undefined}>
     {#if result?.checked_at}
-      <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
-        <dt class="text-muted-foreground">{m.osupdate_running()}</dt>
-        <dd>{result.current} <span class="text-muted-foreground">{result.target}</span></dd>
-        <dt class="text-muted-foreground">{m.osupdate_in_series()}</dt>
-        <dd>{result.in_series || m.osupdate_none()}</dd>
-        <dt class="text-muted-foreground">{m.osupdate_next_series()}</dt>
-        <dd>{result.next_series || m.osupdate_none()}</dd>
-        <dt class="text-muted-foreground">{m.osupdate_packages()}</dt>
-        <dd>
-          {#if !result.packages_read}
-            {m.osupdate_packages_unread()}
-          {:else if result.packages.length === 0}
-            {result.lists_refreshed ? m.osupdate_packages_none() : m.osupdate_packages_none_stale()}
-          {:else}
-            <details>
-              <summary class="cursor-pointer">{m.osupdate_packages_count({ count: result.packages.length })}</summary>
-              <ul class="text-sm">
-                {#each result.packages as p (p.name)}
-                  <li class="break-all"><span class="font-medium">{p.name}</span> <span class="text-muted-foreground">{p.installed} → {p.available}</span></li>
-                {/each}
-              </ul>
-            </details>
-          {/if}
-        </dd>
-        <dt class="text-muted-foreground">{m.osupdate_checked()}</dt>
-        <dd>{new Date(result.checked_at).toLocaleString()}</dd>
-      </dl>
+      <div class="border-t border-border">
+        {@render fact(m.osupdate_running(), `${result.current} ${result.target}`)}
+        {@render fact(m.osupdate_in_series(), result.in_series || m.osupdate_none())}
+        {@render fact(m.osupdate_next_series(), result.next_series || m.osupdate_none())}
+        <SettingsRow label={m.osupdate_packages()}>
+          {#snippet control()}
+            <span class="text-sm">
+              {#if !result?.packages_read}
+                {m.osupdate_packages_unread()}
+              {:else if result.packages.length === 0}
+                {result.lists_refreshed ? m.osupdate_packages_none() : m.osupdate_packages_none_stale()}
+              {:else}
+                <details>
+                  <summary class="cursor-pointer">{m.osupdate_packages_count({ count: result.packages.length })}</summary>
+                  <ul class="text-sm">
+                    {#each result.packages as p (p.name)}
+                      <li class="break-all"><span class="font-medium">{p.name}</span> <span class="text-muted-foreground">{p.installed} → {p.available}</span></li>
+                    {/each}
+                  </ul>
+                </details>
+              {/if}
+            </span>
+          {/snippet}
+        </SettingsRow>
+        {@render fact(m.osupdate_checked(), new Date(result.checked_at).toLocaleString())}
+      </div>
     {:else}
-      <p class="text-muted-foreground">{m.osupdate_never()}</p>
+      <div class="border-t border-border">{@render fact(m.osupdate_checked(), m.osupdate_never_short())}</div>
     {/if}
   </LoadState>
-  <p class="text-sm text-muted-foreground">{m.osupdate_luci_hint()}</p>
-  <div class="flex flex-wrap gap-2">
-    <Button variant="default" type="button" disabled={busy} onclick={() => check(false)}>{m.osupdate_check()}</Button>
+  {#snippet footer()}
     <Button variant="outline" type="button" disabled={busy} onclick={() => check(true)}>{m.osupdate_check_refresh()}</Button>
-    <Button variant="outline" href={luci} target="_blank" rel="noopener noreferrer">{m.osupdate_open_luci()}</Button>
-  </div>
+    <Button variant="default" type="button" disabled={busy} onclick={() => check(false)}>{m.osupdate_check()}</Button>
+  {/snippet}
 </Section>

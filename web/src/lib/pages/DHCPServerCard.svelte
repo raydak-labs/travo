@@ -1,8 +1,7 @@
 <script lang="ts">
-import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import Input from '$lib/components/ui/input/input.svelte';
-import Label from '$lib/components/ui/label/label.svelte';
+import Switch from '$lib/components/ui/switch/switch.svelte';
 import { type DhcpView, fetchDHCP, saveDHCP, turnsOff, validLeaseTime } from '../api/dhcp';
 import { m } from '../paraglide/messages.js';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
@@ -11,6 +10,7 @@ import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
 import Section from '../ui/Section.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 
 const loader = createLoader(fetchDHCP);
 const confirm = createConfirm();
@@ -72,47 +72,36 @@ async function save(event: SubmitEvent) {
   notify.success(m.dhcp_saved());
   void loader.retry();
 }
+const formId = $props.id();
 </script>
 
 <Section title={m.dhcp_title()} description={m.dhcp_intro()}>
   <LoadState status={loader.status} retry={loader.retry} stale={loader.data !== undefined}>
     {#if loader.data}
-      <form class="flex flex-col gap-4" onsubmit={save}>
-        <label class="flex items-center gap-2">
-          <input type="checkbox" bind:checked={enabled} disabled={busy} />
-          {m.dhcp_enabled()}
-        </label>
-        <div class="flex flex-wrap gap-3">
-          <Label class="grid w-36 gap-1">
-            {m.dhcp_start()}
-            <Input type="number" bind:value={start} min={1} max={254} required disabled={busy} />
-          </Label>
-          <Label class="grid w-36 gap-1">
-            {m.dhcp_limit()}
-            <Input type="number" bind:value={limit} min={1} max={254} required disabled={busy} />
-          </Label>
-          <Label class="grid w-40 gap-1">
-            {m.dhcp_leasetime()}
-            <Input bind:value={leasetime} required maxlength={16} autocomplete="off" spellcheck={false}
-              disabled={busy} aria-invalid={failure !== undefined} />
-          </Label>
-        </div>
-        <span class="text-sm text-muted-foreground">{m.dhcp_leasetime_hint()}</span>
-        {#if loader.data.subnet && loader.data.first && loader.data.last}
-          <p class="text-sm">{m.dhcp_pool({ first: loader.data.first, last: loader.data.last, subnet: loader.data.subnet })}</p>
-        {/if}
-        {#if !loader.data.enabled}
-          <Alert class="status status-warn self-start">{m.dhcp_off()}</Alert>
-        {/if}
-        {#if failure}
-          <Alert class="status status-danger self-start" role="alert">{failure}</Alert>
-        {/if}
-        <div>
-          <Button variant="default" type="submit" disabled={busy}>{busy ? m.dhcp_saving() : m.dhcp_save()}</Button>
-        </div>
+      {#if !loader.data.enabled}
+        <p class="text-sm text-warn" role="status">{m.dhcp_off()}</p>
+      {/if}
+      <form id={formId} onsubmit={save}>
+        <SettingsRow label={m.dhcp_enabled()} for="{formId}-on"
+          description={loader.data.subnet && loader.data.first && loader.data.last ? m.dhcp_pool({ first: loader.data.first, last: loader.data.last, subnet: loader.data.subnet }) : undefined}>
+          {#snippet control()}<Switch id="{formId}-on" bind:checked={enabled} disabled={busy} />{/snippet}
+        </SettingsRow>
+        <SettingsRow label={m.dhcp_start()} for="{formId}-start">
+          {#snippet control()}<Input id="{formId}-start" class="w-28" type="number" bind:value={start} min={1} max={254} required disabled={busy} />{/snippet}
+        </SettingsRow>
+        <SettingsRow label={m.dhcp_limit()} for="{formId}-limit">
+          {#snippet control()}<Input id="{formId}-limit" class="w-28" type="number" bind:value={limit} min={1} max={254} required disabled={busy} />{/snippet}
+        </SettingsRow>
+        <SettingsRow label={m.dhcp_leasetime()} for="{formId}-lease" description={m.dhcp_leasetime_hint()}>
+          {#snippet control()}<Input id="{formId}-lease" class="w-28" bind:value={leasetime} required maxlength={16} autocomplete="off" spellcheck={false} disabled={busy} aria-invalid={failure !== undefined} />{/snippet}
+        </SettingsRow>
+        {#if failure}<p class="text-sm text-danger" role="alert">{failure}</p>{/if}
       </form>
     {/if}
   </LoadState>
+  {#snippet footer()}
+    <Button variant="default" type="submit" form={formId} disabled={busy || !loader.data}>{busy ? m.dhcp_saving() : m.dhcp_save()}</Button>
+  {/snippet}
 </Section>
 
 <ConfirmDialog {confirm} />

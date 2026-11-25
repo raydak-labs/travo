@@ -4,6 +4,7 @@ import Button from '$lib/components/ui/button/button.svelte';
 import * as Dialog from '$lib/components/ui/dialog';
 import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
+import Switch from '$lib/components/ui/switch/switch.svelte';
 import type { TxnBody } from '../api/gen';
 import { fetchAccessPoints, fetchGuest, updateAccessPoint, updateGuest } from '../api/wifi';
 import { m } from '../paraglide/messages.js';
@@ -84,12 +85,9 @@ function save(event: SubmitEvent) {
       {#each aps.data.filter((ap) => ap.section !== 'guest') as ap (ap.section)}
         <SettingsRow label={ap.ssid} description={ap.guest ? `${bandLabel(ap.band)} · ${m.wifi_ap_guest()}` : bandLabel(ap.band)}>
           {#snippet control()}
-            <Status kind={ap.enabled ? 'ok' : 'neutral'}>{ap.enabled ? m.wifi_up() : m.wifi_disabled()}</Status>
             <Button variant="outline" size="sm" type="button" disabled={busy} onclick={() => edit(ap.section, ap.ssid, ap.enabled)}>{m.wifi_ap_edit()}</Button>
-            <Button variant="outline" size="sm" type="button" disabled={busy}
-              onclick={() => toggle(ap.section, ap.ssid, ap.enabled)}>
-              {ap.enabled ? m.wifi_ap_disable() : m.wifi_ap_enable()}
-            </Button>
+            <Switch id="ap-{ap.section}" aria-label={m.wifi_ap_switch({ ssid: ap.ssid })} disabled={busy}
+              bind:checked={() => ap.enabled, () => toggle(ap.section, ap.ssid, ap.enabled)} />
           {/snippet}
         </SettingsRow>
       {/each}
@@ -105,12 +103,9 @@ function save(event: SubmitEvent) {
       <SettingsRow label={g.configured ? g.ssid : m.wifi_guest_none()} description={m.wifi_guest_hint({ subnet: g.subnet })}>
         {#snippet control()}
           {#if g.configured}
-            <Status kind={g.enabled ? 'ok' : 'neutral'}>{g.enabled ? m.wifi_up() : m.wifi_disabled()}</Status>
             <Button variant="outline" size="sm" type="button" disabled={busy} onclick={() => edit('guest', g.ssid, g.enabled)}>{m.wifi_ap_edit()}</Button>
-            <Button variant="outline" size="sm" type="button" disabled={busy}
-              onclick={() => toggle('guest', g.ssid, g.enabled)}>
-              {g.enabled ? m.wifi_ap_disable() : m.wifi_ap_enable()}
-            </Button>
+            <Switch id="ap-guest" aria-label={m.wifi_ap_switch({ ssid: g.ssid })} disabled={busy}
+              bind:checked={() => g.enabled, () => toggle('guest', g.ssid, g.enabled)} />
           {:else}
             <Button variant="outline" size="sm" type="button" disabled={busy} onclick={() => edit('guest', '', true)}>{m.wifi_guest_setup()}</Button>
           {/if}
@@ -137,7 +132,7 @@ function save(event: SubmitEvent) {
     </Label>
     <div class="flex justify-end gap-2">
       <Button variant="outline" type="button" onclick={() => (open = false)}>{m.wifi_join_cancel()}</Button>
-      <Button variant="outline" type="submit" disabled={busy}>{m.wifi_ap_save()}</Button>
+      <Button type="submit" disabled={busy}>{m.wifi_ap_save()}</Button>
     </div>
   </form>
 </Dialog.Content>

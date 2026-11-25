@@ -25,8 +25,9 @@ describe('WAN card', () => {
       device: 'wan',
     };
     const body = render(WANCard).body;
+    // The protocol is a select; its closed trigger shows the current choice.
     expect(body).toContain('DHCP (automatic)');
-    expect(body).toContain('PPPoE');
+    expect(body).toContain('data-slot="select-trigger"');
     expect(body).toContain('Runs on port wan.');
     expect(body).toContain('Apply WAN settings');
   });

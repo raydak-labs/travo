@@ -1,5 +1,6 @@
 <script lang="ts">
 import Radar from '@lucide/svelte/icons/radar';
+import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 import { onDestroy, onMount } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import {
@@ -36,18 +37,14 @@ import { transactionToast } from '../ui/transaction-toast.svelte';
 import { wifiScanErrorMessage } from '../wifi';
 import { type JoinState, joinPhase, reduceJoin } from '../wifi-join';
 import { savedChangeError, saveError } from '../wifi-profiles';
-import { lazyPage } from './lazy';
-import PageHost from './PageHost.svelte';
-
+import WiFiAccessPoints from './WiFiAccessPoints.svelte';
+import WiFiJoinDialog from './WiFiJoinDialog.svelte';
 import WiFiReconnect from './WiFiReconnect.svelte';
 import WiFiSavedUplinks from './WiFiSavedUplinks.svelte';
 import WiFiScanList from './WiFiScanList.svelte';
+import WiFiScheduleCard from './WiFiScheduleCard.svelte';
 import WiFiSummary from './WiFiSummary.svelte';
-
-const joinDialog = lazyPage(() => import('./WiFiJoinDialog.svelte'));
-const accessPoints = lazyPage(() => import('./WiFiAccessPoints.svelte'));
-const uplinkMAC = lazyPage(() => import('./WiFiUplinkMAC.svelte'));
-const schedule = lazyPage(() => import('./WiFiScheduleCard.svelte'));
+import WiFiUplinkMAC from './WiFiUplinkMAC.svelte';
 
 const idle: LoadStatus = { state: 'ready' };
 let {
@@ -284,7 +281,7 @@ async function scan() {
     {#snippet actions()}
       {#if summary.status.state === 'ready'}
         <Button variant="outline" size="sm" type="button" onclick={summary.retry}>
-          {m.wifi_refresh()}
+          <RefreshCw aria-hidden="true" />{m.wifi_refresh()}
         </Button>
       {/if}
     {/snippet}
@@ -345,22 +342,22 @@ async function scan() {
 
   <Section title={m.wifi_aps_title()}>
     {#key apVersion}
-      <PageHost load={accessPoints} props={{ busy, apply: submitAP }} />
+      <WiFiAccessPoints {...{ busy, apply: submitAP }} />
     {/key}
   </Section>
 
   <Section title={m.wifi_mac_title()} description={m.wifi_mac_description()}>
     {#key apVersion}
-      <PageHost load={uplinkMAC} props={{ busy, apply: submitChange }} />
+      <WiFiUplinkMAC {...{ busy, apply: submitChange }} />
     {/key}
   </Section>
 
   <Section title={m.wifi_schedule_title()}>
-    <PageHost load={schedule} />
+    <WiFiScheduleCard />
   </Section>
 </div>
 
 {#if selected}
-  <PageHost load={joinDialog} props={{ network: selected, summary: summary.data, returnFocus: joinTrigger, busy: joining.state === 'joining', submit: submitJoin, save: saveProfile, close: () => { selected = undefined; } }} />
+  <WiFiJoinDialog {...{ network: selected, summary: summary.data, returnFocus: joinTrigger, busy: joining.state === 'joining', submit: submitJoin, save: saveProfile, close: () => { selected = undefined; } }} />
 {/if}
 <ConfirmDialog confirm={dialog} />

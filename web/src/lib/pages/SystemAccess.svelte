@@ -1,9 +1,12 @@
 <script lang="ts">
 import KeyRound from '@lucide/svelte/icons/key-round';
-import Alert from '$lib/components/ui/alert/alert.svelte';
+import Plus from '@lucide/svelte/icons/plus';
+import Trash2 from '@lucide/svelte/icons/trash-2';
 import Button from '$lib/components/ui/button/button.svelte';
+import * as Dialog from '$lib/components/ui/dialog';
 import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
+import * as Table from '$lib/components/ui/table';
 import type { ApiTokenCreated, Token } from '../api/gen';
 import {
   createToken,
@@ -14,7 +17,6 @@ import {
   tokenName,
 } from '../api/tokens';
 import { m } from '../paraglide/messages.js';
-import { href } from '../router';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import EmptyState from '../ui/EmptyState.svelte';
@@ -24,6 +26,8 @@ import { notify } from '../ui/notify';
 import PageHeader from '../ui/PageHeader.svelte';
 import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
+import PasswordCard from './PasswordCard.svelte';
+import SystemSSHKeysCard from './SystemSSHKeysCard.svelte';
 import TokenSecretDialog from './TokenSecretDialog.svelte';
 
 const tokens = createLoader(fetchTokens);
@@ -33,6 +37,15 @@ let busy = $state(false);
 let failure = $state<string>();
 let created = $state<ApiTokenCreated>();
 const confirm = createConfirm();
+const formId = $props.id();
+let creating = $state(false);
+
+function openCreate() {
+  name = '';
+  scope = 'read';
+  failure = undefined;
+  creating = true;
+}
 
 const scopes: { value: TokenScope; label: () => string; hint: () => string }[] = [
   { value: 'read', label: () => m.tokens_scope_read(), hint: () => m.tokens_scope_read_hint() },
@@ -68,6 +81,7 @@ async function create(event: SubmitEvent) {
   }
   name = '';
   scope = 'read';
+  creating = false;
   created = result.created;
   void tokens.retry();
 }
@@ -90,38 +104,60 @@ async function revoke(token: Token) {
 </script>
 
 <div class="flex flex-col gap-6">
-  <PageHeader title={m.nav_system_tokens()} description={m.system_tokens_description()} />
+  <PageHeader title={m.nav_system_access()} description={m.system_access_description()} />
 
   <Section title={m.tokens_yours()} description={m.tokens_intro()}>
+    {#snippet actions()}
+      <Button variant="outline" size="sm" type="button" disabled={busy} onclick={openCreate}><Plus aria-hidden="true" />{m.tokens_create()}</Button>
+    {/snippet}
     <LoadState status={tokens.status} retry={tokens.retry} stale={tokens.data !== undefined}>
       {#if tokens.data?.length === 0}
         <EmptyState icon={KeyRound} title={m.tokens_empty()} />
       {:else if tokens.data}
-        <ul class="divide-y divide-border" aria-label={m.tokens_title()}>
-          {#each tokens.data as token (token.id)}
-            <li class="flex flex-wrap items-center gap-2 py-2">
-              <span class="break-all font-medium">{token.name}</span>
-              <Status kind={token.scope === 'admin' ? 'warn' : 'neutral'}>{scopeLabel(token.scope)}</Status>
-              <span class="text-sm text-muted-foreground">
-                {m.tokens_created_at({ date: createdLabel(token.created_at) })}
-              </span>
-              <Button variant="destructive" size="sm" class="ml-auto" type="button" disabled={busy}
-                aria-label={m.tokens_revoke_name({ name: token.name })}
-                onclick={() => revoke(token)}>{m.tokens_revoke()}</Button>
-            </li>
-          {/each}
-        </ul>
+        <Table.Root aria-label={m.tokens_title()}>
+          <Table.Header>
+            <Table.Row>
+              <Table.Head>{m.tokens_name()}</Table.Head>
+              <Table.Head>{m.tokens_scope_label()}</Table.Head>
+              <Table.Head class="max-sm:hidden">{m.tokens_created()}</Table.Head>
+              <Table.Head class="w-12"><span class="sr-only">{m.table_actions()}</span></Table.Head>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {#each tokens.data as token (token.id)}
+              <Table.Row>
+                <Table.Cell class="font-medium break-all whitespace-normal">{token.name}</Table.Cell>
+                <Table.Cell><Status kind={token.scope === 'admin' ? 'warn' : 'neutral'}>{scopeLabel(token.scope)}</Status></Table.Cell>
+                <Table.Cell class="text-muted-foreground max-sm:hidden">{createdLabel(token.created_at)}</Table.Cell>
+                <Table.Cell class="text-right">
+                  <Button variant="ghost" size="icon" type="button" disabled={busy}
+                    aria-label={m.tokens_revoke_name({ name: token.name })}
+                    onclick={() => revoke(token)}><Trash2 aria-hidden="true" size={16} /></Button>
+                </Table.Cell>
+              </Table.Row>
+            {/each}
+          </Table.Body>
+        </Table.Root>
       {/if}
     </LoadState>
   </Section>
 
-  <Section title={m.tokens_new()}>
-    <form class="flex flex-col gap-4" onsubmit={create}>
-      <Label class="grid gap-1">
-        {m.tokens_name()}
-        <Input bind:value={name} required maxlength={256} autocomplete="off" disabled={busy}
+  <SystemSSHKeysCard />
+  <PasswordCard />
+</div>
+
+<Dialog.Root bind:open={creating}>
+  <Dialog.Content portalProps={{ disabled: typeof window === 'undefined' }}>
+    <Dialog.Header>
+      <Dialog.Title level={2}>{m.tokens_new()}</Dialog.Title>
+      <Dialog.Description>{m.tokens_intro()}</Dialog.Description>
+    </Dialog.Header>
+    <form id={formId} class="flex flex-col gap-4" onsubmit={create}>
+      <div class="grid gap-2">
+        <Label for="{formId}-name">{m.tokens_name()}</Label>
+        <Input id="{formId}-name" bind:value={name} required maxlength={256} autocomplete="off" disabled={busy}
           placeholder={m.tokens_name_hint()} />
-      </Label>
+      </div>
       <fieldset class="grid gap-2" disabled={busy}>
         <legend class="mb-1 text-sm font-medium">{m.tokens_scope_label()}</legend>
         {#each scopes as option (option.value)}
@@ -135,16 +171,15 @@ async function revoke(token: Token) {
         {/each}
       </fieldset>
       {#if failure}
-        <Alert class="status status-danger self-start" role="alert">{failure}</Alert>
+        <p class="text-sm text-danger" role="alert">{failure}</p>
       {/if}
-      <div>
-        <Button variant="default" type="submit" disabled={busy}>
-          {busy ? m.tokens_creating() : m.tokens_create()}
-        </Button>
-      </div>
     </form>
-  </Section>
-</div>
+    <Dialog.Footer>
+      <Button variant="outline" type="button" onclick={() => { creating = false; }}>{m.dialog_cancel()}</Button>
+      <Button type="submit" form={formId} disabled={busy}>{busy ? m.tokens_creating() : m.tokens_create()}</Button>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>
 
 <TokenSecretDialog {created} close={() => { created = undefined; }} />
 

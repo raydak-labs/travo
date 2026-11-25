@@ -55,7 +55,7 @@ describe('USB tethering card', () => {
   it('polls the status and explains how to connect a phone', () => {
     const body = card({});
     expect(createLoader).toHaveBeenCalledWith(fetchUsbTether, 5000);
-    expect(body).toContain('No tethered phone detected');
+    expect(body).toContain('No phone connected');
     expect(body).toContain('Not used as an uplink');
     expect(body.match(/>Install</g)?.length).toBe(2);
   });

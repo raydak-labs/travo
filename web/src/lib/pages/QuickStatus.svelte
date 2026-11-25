@@ -5,13 +5,14 @@ import { m } from '../paraglide/messages.js';
 import { href } from '../router';
 import type { TopologyModel } from '../topology';
 import { internetChip, tailscaleChip } from '../topology-labels';
-import GroupHeading from '../ui/GroupHeading.svelte';
+import LinkRow from '../ui/LinkRow.svelte';
+import LoadState from '../ui/LoadState.svelte';
 import type { LoadStatus } from '../ui/loader.svelte';
 import Section from '../ui/Section.svelte';
 import SettingsRow from '../ui/SettingsRow.svelte';
 import Status from '../ui/Status.svelte';
-import type { TunnelControl } from '../vpn-tunnel.svelte';
-import VPNTunnelPanel from './VPNTunnelPanel.svelte';
+import { type TunnelControl, tunnelStates } from '../vpn-tunnel.svelte';
+import VPNTunnelSwitch from './VPNTunnelSwitch.svelte';
 
 // The things people check and toggle most: clients, live traffic, Tailscale, the VPN tunnel.
 type Part = 'connectivity' | 'clients' | 'throughput' | 'tailscale';
@@ -81,10 +82,19 @@ const stale = (part: Part, known: boolean) => known && status[part].state !== 'r
         {/snippet}
       </SettingsRow>
     {/if}
-  </div>
-  <div class="flex flex-col gap-2 border-t border-border pt-4">
-    <GroupHeading label={m.dashboard_vpn()} />
-    <VPNTunnelPanel status={vpn} control={tunnel} canEnable={(snapshot) => snapshot.state === 'configured'} />
-    <a href={href('vpn')} class="self-start text-sm text-muted-foreground underline-offset-4 hover:underline">{m.dashboard_vpn_settings()}</a>
+    <LinkRow
+      href={href('vpn')}
+      label={m.dashboard_vpn()}
+      description={vpn.data ? (vpn.data.state === 'disabled' ? `${tunnelStates.disabled.label()} · ${m.vpn_no_profile()}` : tunnelStates[vpn.data.state].label()) : undefined}
+    >
+      {#snippet control()}
+        <LoadState status={vpn.status} retry={vpn.retry} stale={vpn.data !== undefined}>
+          {#if vpn.data}
+            <VPNTunnelSwitch id="dashboard-vpn-switch" snapshot={vpn.data} control={tunnel}
+              canEnable={vpn.data.state === 'configured'} />
+          {/if}
+        </LoadState>
+      {/snippet}
+    </LinkRow>
   </div>
 </Section>

@@ -75,9 +75,9 @@ describe('TopologyDiagram', () => {
     expect(sourceItem(body, 'not_configured')).toContain('href="#/internet"');
     expect(body).toContain('topology-link topology-link-active');
     expect(body).toContain('topology-link topology-link-down');
-    // A source that is not set up gets no connector.
+    // A source that is not set up gets no connector:
     // usbtether is not set up, so it has no link: two source links plus the two client links.
-    expect(body.match(/<path d="M 0 /g)).toHaveLength(4);
+    expect(body.match(/<path d="M /g)).toHaveLength(4);
   });
 
   it('draws standby dashed and unknown with text', () => {
@@ -104,8 +104,8 @@ describe('TopologyDiagram', () => {
     const body = html(full);
     const part = body.slice(body.indexOf('data-part="clients"'));
     expect(part.match(/<a href="#\/clients"/g)).toHaveLength(2);
-    expect(part).toMatch(/>1<\/span>[\s\S]*?WiFi clients/);
-    expect(part).toMatch(/>1<\/span>[\s\S]*?Wired clients/);
+    expect(part).toContain('1 on WiFi');
+    expect(part).toContain('1 wired');
     expect(body).not.toContain('Incomplete');
     const partial = topologyModel({ clients: { ...clients, partial: true } });
     expect(html(partial)).toContain('Incomplete');
@@ -145,7 +145,7 @@ describe('TopologyDiagram', () => {
     const part = body.slice(body.indexOf('data-part="clients"'));
     expect(part).toContain('opacity-60');
     expect(part).toContain('status-stale');
-    expect(part).toContain('WiFi clients');
+    expect(part).toContain('1 on WiFi');
     expect(body.slice(0, body.indexOf('data-part="router"'))).not.toContain('status-stale');
   });
 

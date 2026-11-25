@@ -1,8 +1,9 @@
 <script lang="ts">
 import ChartColumn from '@lucide/svelte/icons/chart-column';
 import Button from '$lib/components/ui/button/button.svelte';
+import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
 import Input from '$lib/components/ui/input/input.svelte';
-import Label from '$lib/components/ui/label/label.svelte';
+import Switch from '$lib/components/ui/switch/switch.svelte';
 import {
   clearDataBudget,
   type DataUsageBudget,
@@ -30,6 +31,7 @@ import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
 import Section from '../ui/Section.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 import Sparkline from '../ui/Sparkline.svelte';
 import Status from '../ui/Status.svelte';
 import type { StatusKind } from '../ui/status';
@@ -127,6 +129,7 @@ async function reset() {
   });
   if (ok && !busy) void finish(clearDataBudget, m.usage_reset_done());
 }
+const formId = $props.id();
 </script>
 
 <Section title={m.usage_title()} description={m.usage_intro()}>
@@ -177,38 +180,6 @@ async function reset() {
           </dl>
         {/if}
 
-        <form class="flex flex-col gap-3 border-t border-border pt-4" onsubmit={save}>
-          <GroupHeading label={m.usage_budget()} />
-          <label class="flex items-center gap-2">
-            <input type="checkbox" bind:checked={form.enabled} disabled={busy} />
-            {m.usage_budget_enabled()}
-          </label>
-          <div class="flex flex-wrap gap-3">
-            <Label class="grid w-32 gap-1">
-              {m.usage_limit_gib()}
-              <Input type="number" min={0.01} step={0.01} bind:value={form.gib} required={form.enabled} disabled={busy || !form.enabled} />
-            </Label>
-            <Label class="grid w-32 gap-1">
-              {m.usage_warn_percent()}
-              <Input type="number" min={1} max={100} bind:value={form.warn} required disabled={busy} />
-            </Label>
-            <Label class="grid w-32 gap-1">
-              {m.usage_start_day()}
-              <Input type="number" min={1} max={28} bind:value={form.startDay} required disabled={busy} />
-            </Label>
-          </div>
-          <fieldset class="flex flex-wrap gap-3 text-sm">
-            <legend class="mb-1">{m.usage_counted()}</legend>
-            {#each ALL_UPLINKS as u (u)}
-              <label class="flex items-center gap-1">
-                <input type="checkbox" value={u} bind:group={form.uplinks} disabled={busy} />{u}
-              </label>
-            {/each}
-          </fieldset>
-          <p class="text-sm text-muted-foreground">{m.usage_budget_note()}</p>
-          <div><Button type="submit" disabled={busy || form.uplinks.length === 0}>{m.usage_save()}</Button></div>
-        </form>
-
         <div class="flex flex-col gap-2 border-t border-border pt-4">
           <GroupHeading label={m.usage_uptime_title({ days: Math.round(v.retention_hours / 24) })} />
           {#each v.uptime.availability as a (a.name)}
@@ -233,5 +204,36 @@ async function reset() {
       </div>
     {/if}
   </LoadState>
+</Section>
+
+<Section title={m.usage_budget()} description={m.usage_budget_note()}>
+  {#if loader.data}
+    <form id={formId} onsubmit={save}>
+      <SettingsRow label={m.usage_budget_enabled()} for="{formId}-on">
+        {#snippet control()}<Switch id="{formId}-on" bind:checked={form.enabled} disabled={busy} />{/snippet}
+      </SettingsRow>
+      <SettingsRow label={m.usage_limit_gib()} for="{formId}-gib">
+        {#snippet control()}<Input id="{formId}-gib" class="w-28" type="number" min={0.01} step={0.01} bind:value={form.gib} required={form.enabled} disabled={busy || !form.enabled} />{/snippet}
+      </SettingsRow>
+      <SettingsRow label={m.usage_warn_percent()} for="{formId}-warn">
+        {#snippet control()}<Input id="{formId}-warn" class="w-28" type="number" min={1} max={100} bind:value={form.warn} required disabled={busy} />{/snippet}
+      </SettingsRow>
+      <SettingsRow label={m.usage_start_day()} for="{formId}-day">
+        {#snippet control()}<Input id="{formId}-day" class="w-28" type="number" min={1} max={28} bind:value={form.startDay} required disabled={busy} />{/snippet}
+      </SettingsRow>
+      <SettingsRow label={m.usage_counted()}>
+        {#snippet control()}
+          {#each ALL_UPLINKS as u (u)}
+            <label class="flex items-center gap-2 text-sm">
+              <Checkbox bind:checked={() => form.uplinks.includes(u), (on) => { form.uplinks = on ? [...form.uplinks, u] : form.uplinks.filter((x) => x !== u); }} disabled={busy} />{u}
+            </label>
+          {/each}
+        {/snippet}
+      </SettingsRow>
+    </form>
+  {/if}
+  {#snippet footer()}
+    <Button type="submit" form={formId} disabled={busy || !loader.data || form.uplinks.length === 0}>{m.usage_save()}</Button>
+  {/snippet}
 </Section>
 <ConfirmDialog {confirm} />

@@ -43,8 +43,9 @@ describe('port forwards card', () => {
     const body = render(PortForwardsCard).body;
     expect(body).toContain('aria-label="Remove forward NAS"');
     expect(body).not.toContain('aria-label="Remove forward cfg0ab"');
-    expect(body).toContain('both 8080 → 192.168.1.50:80');
-    expect(body).toContain('tcp 22001 → router:22');
+    const text = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    expect(text).toContain('both 8080 192.168.1.50:80');
+    expect(text).toContain('tcp 22001 router:22');
     expect(body).toContain('LuCI');
     expect(body).toContain('Off');
   });

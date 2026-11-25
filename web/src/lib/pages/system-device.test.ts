@@ -16,23 +16,25 @@ const info = {
   app: { version: 'dev', build_time: '' },
 };
 
-describe('System Device card', () => {
+describe('System overview', () => {
   it('renders the fixture values once the loader is ready', async () => {
     vi.doMock('../theme.svelte', () => ({ theme: { value: 'light', toggle: () => {} } }));
     // A server render never runs effects, so hand the page a loader that is already ready.
     vi.doMock('../ui/loader.svelte', () => ({
       createLoader: () => ({ status: { state: 'ready' }, data: info, retry: async () => {} }),
     }));
-    // Lazy cards have their own tests; here the host would get the system info as a component.
-    vi.doMock('./PageHost.svelte', () => ({ default: () => {} }));
+    // The settings and SSH key cards have their own tests.
+    vi.doMock('./SystemSettingsCard.svelte', () => ({ default: () => {} }));
+    vi.doMock('./SystemSSHKeysCard.svelte', () => ({ default: () => {} }));
     const { default: System } = await import('./System.svelte');
     const { body } = render(System);
     vi.unstubAllGlobals();
     vi.doUnmock('../ui/loader.svelte');
-    vi.doUnmock('./PageHost.svelte');
+    vi.doUnmock('./SystemSettingsCard.svelte');
+    vi.doUnmock('./SystemSSHKeysCard.svelte');
     for (const text of [
-      'Device',
-      'Hardware',
+      'System',
+      'Download backup',
       'GL.iNet GL-AXT1800',
       'OpenWrt',
       '25.12.6',

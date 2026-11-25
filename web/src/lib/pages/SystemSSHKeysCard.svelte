@@ -1,8 +1,11 @@
 <script lang="ts">
 import KeySquare from '@lucide/svelte/icons/key-square';
-import Alert from '$lib/components/ui/alert/alert.svelte';
+import Plus from '@lucide/svelte/icons/plus';
+import Trash2 from '@lucide/svelte/icons/trash-2';
 import Button from '$lib/components/ui/button/button.svelte';
+import * as Dialog from '$lib/components/ui/dialog';
 import Label from '$lib/components/ui/label/label.svelte';
+import * as Table from '$lib/components/ui/table';
 import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 import type { PublicKey } from '../api/gen';
 import { addSSHKey, fetchSSHKeys, pastedKey, removeSSHKey } from '../api/ssh-keys';
@@ -39,6 +42,7 @@ async function add(event: SubmitEvent) {
     return;
   }
   text = '';
+  adding = false;
   notify.success(m.ssh_added({ name: label(result.key) }));
   void keys.retry();
 }
@@ -58,46 +62,66 @@ async function remove(key: PublicKey) {
   else notify.success(m.ssh_removed({ name: label(key) }));
   void keys.retry();
 }
+const formId = $props.id();
+let adding = $state(false);
 </script>
 
 <Section title={m.ssh_title()} description={m.ssh_intro()}>
+  {#snippet actions()}
+    <Button variant="outline" size="sm" type="button" disabled={busy} onclick={() => { text = ''; invalid = false; adding = true; }}><Plus aria-hidden="true" />{m.ssh_add()}</Button>
+  {/snippet}
   <LoadState status={keys.status} retry={keys.retry} stale={keys.data !== undefined}>
     {#if keys.data}
       {#if keys.data.keys.length === 0}
         <EmptyState icon={KeySquare} title={m.ssh_empty()} />
       {:else}
-        <ul class="divide-y divide-border" aria-label={m.ssh_title()}>
-          {#each keys.data.keys as key (key.id)}
-            <li class="flex flex-wrap items-center gap-2 py-2">
-              <span class="min-w-0 flex-1">
-                <span class="block break-all font-medium">{label(key)}</span>
-                <span class="block break-all font-mono text-xs text-muted-foreground">{key.type} {key.fingerprint}</span>
-              </span>
-              <Button variant="destructive" size="sm" type="button" disabled={busy}
-                aria-label={m.ssh_remove_name({ name: label(key) })}
-                onclick={() => remove(key)}>{m.ssh_remove()}</Button>
-            </li>
-          {/each}
-        </ul>
+        <Table.Root aria-label={m.ssh_title()}>
+          <Table.Header>
+            <Table.Row>
+              <Table.Head>{m.ssh_key()}</Table.Head>
+              <Table.Head class="max-sm:hidden">{m.ssh_fingerprint()}</Table.Head>
+              <Table.Head class="w-12"><span class="sr-only">{m.table_actions()}</span></Table.Head>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {#each keys.data.keys as key (key.id)}
+              <Table.Row>
+                <Table.Cell class="font-medium break-all whitespace-normal">{label(key)}</Table.Cell>
+                <Table.Cell class="font-mono text-xs break-all whitespace-normal text-muted-foreground max-sm:hidden">{key.type} {key.fingerprint}</Table.Cell>
+                <Table.Cell class="text-right">
+                  <Button variant="ghost" size="icon" type="button" disabled={busy}
+                    aria-label={m.ssh_remove_name({ name: label(key) })}
+                    onclick={() => remove(key)}><Trash2 aria-hidden="true" size={16} /></Button>
+                </Table.Cell>
+              </Table.Row>
+            {/each}
+          </Table.Body>
+        </Table.Root>
       {/if}
       {#if keys.data.unmanaged > 0}
         <p class="text-sm text-muted-foreground">{m.ssh_unmanaged({ count: keys.data.unmanaged })}</p>
       {/if}
     {/if}
   </LoadState>
-  <form class="flex flex-col gap-3" onsubmit={add}>
-    <Label class="grid gap-1">
-      {m.ssh_add_label()}
-      <Textarea bind:value={text} rows={3} spellcheck={false} autocomplete="off" disabled={busy}
-        class="font-mono text-xs" placeholder="ssh-ed25519 AAAA… you@laptop" aria-invalid={invalid} />
-    </Label>
-    {#if invalid}
-      <Alert class="status status-danger self-start" role="alert">{m.ssh_err_invalid()}</Alert>
-    {/if}
-    <div>
-      <Button variant="default" type="submit" disabled={busy}>{m.ssh_add()}</Button>
-    </div>
-  </form>
 </Section>
+
+<Dialog.Root bind:open={adding}>
+  <Dialog.Content portalProps={{ disabled: typeof window === 'undefined' }}>
+    <Dialog.Header>
+      <Dialog.Title level={2}>{m.ssh_add()}</Dialog.Title>
+      <Dialog.Description>{m.ssh_intro()}</Dialog.Description>
+    </Dialog.Header>
+    <form id={formId} class="grid gap-2" onsubmit={add}>
+      <Label for="{formId}-key">{m.ssh_add_label()}</Label>
+      <Textarea id="{formId}-key" bind:value={text} rows={4} spellcheck={false} autocomplete="off" disabled={busy}
+        class="font-mono text-xs" placeholder="ssh-ed25519 AAAA… you@laptop" aria-invalid={invalid} />
+      {#if invalid}<p class="text-sm text-danger" role="alert">{m.ssh_err_invalid()}</p>{/if}
+    </form>
+    <Dialog.Footer>
+      <Button variant="outline" type="button" onclick={() => { adding = false; }}>{m.dialog_cancel()}</Button>
+      <Button type="submit" form={formId} disabled={busy || !text.trim()}>{m.ssh_add()}</Button>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>
 
 <ConfirmDialog {confirm} />

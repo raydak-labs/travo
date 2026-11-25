@@ -1,4 +1,5 @@
 <script lang="ts">
+import CircleAlert from '@lucide/svelte/icons/circle-alert';
 import type { Snippet } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
@@ -35,7 +36,10 @@ let {
     {#if stale}
       <Status kind="stale">{m.load_stale()}</Status>
     {/if}
-    <Status kind="danger">{m.load_error({ cause: status.message })}</Status>
+    <span class="flex min-w-0 items-start gap-1.5 text-sm text-danger">
+      <CircleAlert aria-hidden="true" size={16} class="mt-0.5 shrink-0" />
+      <span class="min-w-0">{m.load_error({ cause: status.message })}</span>
+    </span>
     <Button variant="outline" size="sm"
       type="button"
       class="text-sm"

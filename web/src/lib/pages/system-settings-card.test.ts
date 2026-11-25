@@ -37,6 +37,8 @@ describe('Device settings card', () => {
     loader.status = { state: 'error', message: 'Device settings are unavailable' };
     const body = render(SystemSettingsCard).body;
     expect(body).toContain('Device settings are unavailable');
-    expect(body).not.toContain('Save settings');
+    // The form is gone; its Save in the card footer stays but cannot submit.
+    expect(body).not.toContain('Time servers');
+    expect(body.replace(/<!--.*?-->/g, '')).toMatch(/<button[^>]*disabled[^>]*>Save settings/);
   });
 });

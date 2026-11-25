@@ -1,10 +1,13 @@
 <script lang="ts">
+import Plus from '@lucide/svelte/icons/plus';
 import Tag from '@lucide/svelte/icons/tag';
-import Alert from '$lib/components/ui/alert/alert.svelte';
+import Trash2 from '@lucide/svelte/icons/trash-2';
 import Badge from '$lib/components/ui/badge/badge.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
+import * as Dialog from '$lib/components/ui/dialog';
 import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
+import * as Table from '$lib/components/ui/table';
 import { addDNSName, type DnsName, fetchDNSNames, removeDNSName } from '../api/dhcp';
 import { m } from '../paraglide/messages.js';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
@@ -40,6 +43,7 @@ async function add(event: SubmitEvent) {
   }
   name = '';
   ip = '';
+  adding = false;
   notify.success(m.dns_names_added({ name: label(result.entry), ip: result.entry.ip }));
   void names.retry();
 }
@@ -59,50 +63,72 @@ async function remove(entry: DnsName) {
   else notify.success(m.dns_names_removed({ name: label(entry) }));
   void names.retry();
 }
+const formId = $props.id();
+let adding = $state(false);
 </script>
 
 <Section title={m.dns_names_title()} description={m.dns_names_intro()}>
+  {#snippet actions()}
+    <Button variant="outline" size="sm" type="button" disabled={busy} onclick={() => { invalid = false; adding = true; }}><Plus aria-hidden="true" />{m.dns_names_add()}</Button>
+  {/snippet}
   <LoadState status={names.status} retry={names.retry} stale={names.data !== undefined}>
     {#if names.data}
       {#if names.data.names.length === 0}
         <EmptyState icon={Tag} title={m.dns_names_empty()} />
       {:else}
-        <ul class="divide-y divide-border" aria-label={m.dns_names_title()}>
-          {#each names.data.names as entry (entry.id)}
-            <li class="flex flex-wrap items-center gap-2 py-2">
-              <span class="min-w-0 flex-1">
-                <span class="block break-all font-medium">{label(entry)}</span>
-                <span class="block break-all font-mono text-xs text-muted-foreground">{entry.ip}</span>
-              </span>
-              {#if entry.owned}
-                <Button variant="destructive" size="sm" type="button" disabled={busy}
-                  aria-label={m.dns_names_remove_name({ name: label(entry) })}
-                  onclick={() => remove(entry)}>{m.dns_names_remove()}</Button>
-              {:else}
-                <Badge variant="outline">{m.dns_names_luci()}</Badge>
-              {/if}
-            </li>
-          {/each}
-        </ul>
+        <Table.Root aria-label={m.dns_names_title()}>
+          <Table.Header>
+            <Table.Row>
+              <Table.Head>{m.dns_names_name()}</Table.Head>
+              <Table.Head>{m.dns_names_ip()}</Table.Head>
+              <Table.Head class="w-12"><span class="sr-only">{m.table_actions()}</span></Table.Head>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {#each names.data.names as entry (entry.id)}
+              <Table.Row>
+                <Table.Cell class="font-medium break-all whitespace-normal">{label(entry)}</Table.Cell>
+                <Table.Cell class="font-mono text-xs">{entry.ip}</Table.Cell>
+                <Table.Cell class="text-right">
+                  {#if entry.owned}
+                    <Button variant="ghost" size="icon" type="button" disabled={busy}
+                      aria-label={m.dns_names_remove_name({ name: label(entry) })}
+                      onclick={() => remove(entry)}><Trash2 aria-hidden="true" size={16} /></Button>
+                  {:else}
+                    <Badge variant="outline">{m.dns_names_luci()}</Badge>
+                  {/if}
+                </Table.Cell>
+              </Table.Row>
+            {/each}
+          </Table.Body>
+        </Table.Root>
       {/if}
     {/if}
   </LoadState>
-  <form class="flex flex-wrap items-end gap-3" onsubmit={add}>
-    <Label class="grid min-w-40 flex-1 gap-1">
-      {m.dns_names_name()}
-      <Input bind:value={name} maxlength={253} autocomplete="off" autocapitalize="off" spellcheck={false}
-        disabled={busy} placeholder="nas" aria-invalid={invalid} />
-    </Label>
-    <Label class="grid min-w-40 flex-1 gap-1">
-      {m.dns_names_ip()}
-      <Input bind:value={ip} maxlength={45} autocomplete="off" autocapitalize="off" spellcheck={false}
-        disabled={busy} placeholder="192.168.1.20" class="font-mono" aria-invalid={invalid} />
-    </Label>
-    <Button variant="outline" type="submit" disabled={busy}>{m.dns_names_add()}</Button>
-  </form>
-  {#if invalid}
-    <Alert class="status status-danger self-start" role="alert">{m.dns_names_err_input()}</Alert>
-  {/if}
 </Section>
+
+<Dialog.Root bind:open={adding}>
+  <Dialog.Content portalProps={{ disabled: typeof window === 'undefined' }}>
+    <Dialog.Header>
+      <Dialog.Title level={2}>{m.dns_names_add()}</Dialog.Title>
+      <Dialog.Description>{m.dns_names_intro()}</Dialog.Description>
+    </Dialog.Header>
+    <form id={formId} class="grid gap-4" onsubmit={add}>
+      <div class="grid gap-2">
+        <Label for="{formId}-name">{m.dns_names_name()}</Label>
+        <Input id="{formId}-name" bind:value={name} maxlength={253} autocomplete="off" autocapitalize="off" spellcheck={false} disabled={busy} placeholder="nas" aria-invalid={invalid} />
+      </div>
+      <div class="grid gap-2">
+        <Label for="{formId}-ip">{m.dns_names_ip()}</Label>
+        <Input id="{formId}-ip" bind:value={ip} maxlength={45} autocomplete="off" autocapitalize="off" spellcheck={false} disabled={busy} placeholder="192.168.1.20" class="font-mono" aria-invalid={invalid} />
+      </div>
+      {#if invalid}<p class="text-sm text-danger" role="alert">{m.dns_names_err_input()}</p>{/if}
+    </form>
+    <Dialog.Footer>
+      <Button variant="outline" type="button" onclick={() => { adding = false; }}>{m.dialog_cancel()}</Button>
+      <Button type="submit" form={formId} disabled={busy}>{m.dns_names_add()}</Button>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>
 
 <ConfirmDialog {confirm} />

@@ -28,7 +28,6 @@ describe('Buttons card', () => {
     const body = render(SystemButtonsCard).body;
     expect(body).toContain('Stock behaviour');
     expect(body).toContain('factory reset');
-    expect(body).toContain('Switch action');
     // The action list opens in a popover; the closed trigger shows the current action.
     expect(body).toContain('data-slot="select-trigger"');
     expect(body).not.toContain('Last slide');

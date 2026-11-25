@@ -13,6 +13,10 @@ const { createLoader, fetchWifi, fetchWifiProfiles, fetchWifiReconnect, fetchWif
   }));
 vi.mock('../ui/loader.svelte', () => ({ createLoader }));
 vi.mock('../api/wifi', () => ({ fetchWifi, fetchWifiProfiles, fetchWifiReconnect, fetchWifiScan }));
+// The access point, uplink MAC and schedule cards have their own tests.
+vi.mock('./WiFiAccessPoints.svelte', () => ({ default: () => {} }));
+vi.mock('./WiFiUplinkMAC.svelte', () => ({ default: () => {} }));
+vi.mock('./WiFiScheduleCard.svelte', () => ({ default: () => {} }));
 
 const summary = { radios: [], stas: [], aps: [] };
 // HomeUplink and Neighbor2 are the mock device's scan fixtures.

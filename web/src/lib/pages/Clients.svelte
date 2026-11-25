@@ -1,8 +1,12 @@
 <script lang="ts">
 import Bookmark from '@lucide/svelte/icons/bookmark';
+import EllipsisVertical from '@lucide/svelte/icons/ellipsis-vertical';
 import Laptop from '@lucide/svelte/icons/laptop';
+import Trash2 from '@lucide/svelte/icons/trash-2';
 import { onDestroy } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
+import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+import * as Table from '$lib/components/ui/table';
 import {
   blockRefusal,
   clientName,
@@ -154,42 +158,75 @@ async function removeReservation(r: Reservation) {
       {#if list.data?.clients.length === 0}
         <EmptyState icon={Laptop} title={m.clients_empty()} />
       {:else if list.data}
-        <ul class="divide-y divide-border" aria-label={m.clients_title()}>
-          {#each list.data.clients as c (c.mac)}
-            {@const conn = connectionStatus(c)}
-            <li class="flex flex-col gap-2 py-3 sm:flex-row sm:items-center">
-              <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="break-all font-medium">{clientName(c)}</span>
+        <Table.Root aria-label={m.clients_title()}>
+          <Table.Header class="max-sm:hidden">
+            <Table.Row>
+              <Table.Head>{m.clients_device()}</Table.Head>
+              <Table.Head class="max-sm:hidden">{m.clients_connection()}</Table.Head>
+              <Table.Head class="max-md:hidden">{m.clients_address()}</Table.Head>
+              <Table.Head class="w-28"><span class="sr-only">{m.table_actions()}</span></Table.Head>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {#each list.data.clients as c (c.mac)}
+              {@const conn = connectionStatus(c)}
+              <Table.Row>
+                <Table.Cell class="whitespace-normal">
+                  <div class="flex flex-wrap items-center gap-2">
+                    {#if c.alias || c.hostname}
+                      <span class="font-medium break-words">{clientName(c)}</span>
+                    {:else}
+                      <span class="text-muted-foreground">{m.clients_unknown()}</span>
+                    {/if}
+                    {#if c.reserved}<Status kind="info">{m.clients_reserved()}</Status>{/if}
+                    {#if c.blocked}<Status kind="danger">{m.clients_blocked()}</Status>{/if}
+                  </div>
+                  <div class="font-mono text-xs text-muted-foreground md:hidden">{c.ip ?? c.mac}</div>
+                  <div class="mt-1 flex flex-wrap items-center gap-1 sm:hidden">
+                    <Status kind={conn.kind}>{conn.label}</Status>
+                    {#if c.ssid}<span class="text-xs text-muted-foreground">{m.clients_on_ssid({ ssid: c.ssid })}</span>{/if}
+                  </div>
+                </Table.Cell>
+                <Table.Cell class="whitespace-normal max-sm:hidden">
                   <Status kind={conn.kind}>{conn.label}</Status>
-                  {#if c.reserved}<Status kind="info">{m.clients_reserved()}</Status>{/if}
-                  {#if c.blocked}<Status kind="danger">{m.clients_blocked()}</Status>{/if}
-                </div>
-                <p class="font-mono text-sm break-words text-muted-foreground">
-                  {c.ip ? m.clients_details({ ip: c.ip, mac: c.mac }) : c.mac}
-                  {#if c.ssid}<span class="font-sans whitespace-nowrap"> {m.clients_on_ssid({ ssid: c.ssid })}</span>{/if}
-                </p>
-              </div>
-              <div class="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" type="button" disabled={busy}
-                  aria-label={m.clients_edit_name({ name: clientName(c) })}
-                  onclick={() => { editing = c; }}>{m.clients_edit()}</Button>
-                {#if c.connection === 'offline'}
-                  <Button variant="outline" size="sm" type="button" disabled={busy}
-                    aria-label={m.clients_wake_name({ name: clientName(c) })}
-                    onclick={() => wakeUp(c.mac, clientName(c))}>{m.clients_wake()}</Button>
-                {/if}
-                <!-- Danger actions last: disconnect and block cut the device off. -->
-                {#if c.connection === 'wifi'}
-                  <Button variant="destructive" size="sm" type="button" disabled={busy}
-                    onclick={() => disconnect(c)}>{m.clients_kick()}</Button>
-                {/if}
-                <Button variant={c.blocked ? 'outline' : 'destructive'} size="sm" type="button" disabled={busy || block.busy}
-                  onclick={() => toggleBlock(c)}>{c.blocked ? m.clients_unblock() : m.clients_block()}</Button>
-              </div>
-            </li>
-          {/each}
-        </ul>
+                  {#if c.ssid}<span class="block text-xs text-muted-foreground">{m.clients_on_ssid({ ssid: c.ssid })}</span>{/if}
+                </Table.Cell>
+                <Table.Cell class="font-mono text-xs text-muted-foreground max-md:hidden">
+                  {#if c.ip}<span class="block">{c.ip}</span>{/if}<span class="block">{c.mac}</span>
+                </Table.Cell>
+                <Table.Cell class="text-right whitespace-nowrap">
+                  {#if c.blocked}
+                    <Button variant="outline" size="sm" type="button" disabled={busy || block.busy}
+                      onclick={() => toggleBlock(c)}>{m.clients_unblock()}</Button>
+                  {/if}
+                  <DropdownMenu.Root>
+                    <DropdownMenu.Trigger>
+                      {#snippet child({ props })}
+                        <Button {...props} variant="ghost" size="icon" disabled={busy}
+                          aria-label={m.table_row_menu({ name: clientName(c) })}>
+                          <EllipsisVertical aria-hidden="true" size={16} />
+                        </Button>
+                      {/snippet}
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Content align="end">
+                      <DropdownMenu.Item onSelect={() => { editing = c; }}>{m.clients_edit()}</DropdownMenu.Item>
+                      {#if c.connection === 'offline'}
+                        <DropdownMenu.Item onSelect={() => wakeUp(c.mac, clientName(c))}>{m.clients_wake()}</DropdownMenu.Item>
+                      {/if}
+                      <DropdownMenu.Separator />
+                      {#if c.connection === 'wifi'}
+                        <DropdownMenu.Item variant="destructive" onSelect={() => disconnect(c)}>{m.clients_kick()}</DropdownMenu.Item>
+                      {/if}
+                      {#if !c.blocked}
+                        <DropdownMenu.Item variant="destructive" disabled={block.busy} onSelect={() => toggleBlock(c)}>{m.clients_block()}</DropdownMenu.Item>
+                      {/if}
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Root>
+                </Table.Cell>
+              </Table.Row>
+            {/each}
+          </Table.Body>
+        </Table.Root>
       {/if}
     </LoadState>
   </Section>
@@ -199,20 +236,31 @@ async function removeReservation(r: Reservation) {
       {#if reservations.data?.length === 0}
         <EmptyState icon={Bookmark} title={m.clients_reservations_empty()} />
       {:else if reservations.data}
-        <ul class="divide-y divide-border" aria-label={m.clients_reservations()}>
-          {#each reservations.data as r (r.mac)}
-            <li class="flex flex-wrap items-center gap-2 py-2">
-              <span class="break-all font-medium">{reservationName(r)}</span>
-              <span class="font-mono text-sm break-words text-muted-foreground">{r.ip ? m.clients_details({ ip: r.ip, mac: r.mac }) : r.mac}</span>
-              <Button variant="outline" size="sm" class="ml-auto" type="button" disabled={busy}
-                aria-label={m.clients_wake_name({ name: reservationName(r) })}
-                onclick={() => wakeUp(r.mac, reservationName(r))}>{m.clients_wake()}</Button>
-              <Button variant="destructive" size="sm" type="button" disabled={busy}
-                aria-label={m.clients_reservation_remove_name({ name: reservationName(r) })}
-                onclick={() => removeReservation(r)}>{m.clients_reservation_remove()}</Button>
-            </li>
-          {/each}
-        </ul>
+        <Table.Root aria-label={m.clients_reservations()}>
+          <Table.Header>
+            <Table.Row>
+              <Table.Head>{m.clients_device()}</Table.Head>
+              <Table.Head>{m.clients_address()}</Table.Head>
+              <Table.Head class="w-28"><span class="sr-only">{m.table_actions()}</span></Table.Head>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {#each reservations.data as r (r.mac)}
+              <Table.Row>
+                <Table.Cell class="font-medium break-all whitespace-normal">{reservationName(r)}</Table.Cell>
+                <Table.Cell class="font-mono text-xs text-muted-foreground">{#if r.ip}<span class="block">{r.ip}</span>{/if}<span class="block">{r.mac}</span></Table.Cell>
+                <Table.Cell class="text-right whitespace-nowrap">
+                  <Button variant="outline" size="sm" type="button" disabled={busy}
+                    aria-label={m.clients_wake_name({ name: reservationName(r) })}
+                    onclick={() => wakeUp(r.mac, reservationName(r))}>{m.clients_wake()}</Button>
+                  <Button variant="ghost" size="icon" type="button" disabled={busy}
+                    aria-label={m.clients_reservation_remove_name({ name: reservationName(r) })}
+                    onclick={() => removeReservation(r)}><Trash2 aria-hidden="true" size={16} /></Button>
+                </Table.Cell>
+              </Table.Row>
+            {/each}
+          </Table.Body>
+        </Table.Root>
       {/if}
     </LoadState>
   </Section>

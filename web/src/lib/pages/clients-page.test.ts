@@ -70,7 +70,8 @@ describe('Clients page', () => {
     expect(html).toContain('on TravelAP');
     expect(html).toContain('Reserved IP');
     expect(html).toContain('Unblock');
-    expect(html.match(/Disconnect/g)).toHaveLength(1); // only the WiFi station
+    // Edit, wake and disconnect sit in each row's menu (rendered on open).
+    expect(html).toContain('aria-label="Actions for phone"');
     expect(html).toContain('Remove the reservation for phone');
   });
 

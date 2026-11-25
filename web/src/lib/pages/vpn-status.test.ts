@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TunnelStatus } from '../api/gen';
 import { fetchKillSwitch, fetchSplit, fetchVpnDns, fetchVpnStatus } from '../api/vpn-status';
 import type { LoadStatus } from '../ui/loader.svelte';
-import VPN from './VPN.svelte';
+import WireGuard from './WireGuard.svelte';
 
 const { createLoader, dns, kill, profiles, tunnel } = vi.hoisted(() => ({
   dns: { status: { state: 'loading' }, data: undefined, retry: vi.fn(), stop: vi.fn() },
@@ -11,7 +11,7 @@ const { createLoader, dns, kill, profiles, tunnel } = vi.hoisted(() => ({
   createLoader: vi.fn(),
   profiles: {
     status: { state: 'ready' },
-    data: { profiles: [], selected_id: null },
+    data: { profiles: [{ id: 'p1', name: 'Home' }], selected_id: 'p1' },
     retry: vi.fn(),
     stop: vi.fn(),
   },
@@ -26,7 +26,7 @@ vi.mock('../ui/loader.svelte', () => ({ createLoader }));
 
 function vpn(status: TunnelStatus) {
   tunnel.data = status;
-  return render(VPN).body;
+  return render(WireGuard).body;
 }
 
 function snapshot(state: TunnelStatus['state']): TunnelStatus {
@@ -38,7 +38,7 @@ function snapshot(state: TunnelStatus['state']): TunnelStatus {
   };
 }
 
-describe('VPN tunnel status', () => {
+describe('WireGuard tunnel status', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     tunnel.status = { state: 'ready' };

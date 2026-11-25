@@ -3,8 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { KillSwitchState, TunnelStatus } from '../api/gen';
 import { fetchKillSwitch } from '../api/vpn-status';
 import type { LoadStatus } from '../ui/loader.svelte';
+import { switchState } from '../ui/switch-html.test-helper';
 import { killSwitchRefusal } from '../vpn-tunnel.svelte';
-import VPNKillSwitchCard from './VPNKillSwitchCard.svelte';
+import VPNKillSwitchRow from './VPNKillSwitchRow.svelte';
 
 const { createLoader, kill } = vi.hoisted(() => ({
   createLoader: vi.fn(),
@@ -26,15 +27,12 @@ const tunnel = (state: TunnelStatus['state'], stale = false): TunnelStatus => ({
 
 function card(data: KillSwitchState | undefined, status?: TunnelStatus) {
   kill.data = data;
-  return render(VPNKillSwitchCard, { props: { tunnel: status } }).body.replace(/<!--.*?-->/g, '');
+  return render(VPNKillSwitchRow, { props: { tunnel: status } }).body.replace(/<!--.*?-->/g, '');
 }
 
-const enabledButton = (label: string) =>
-  new RegExp(`<button(?![^>]*disabled="")[^>]*>${label}</button>`);
-const disabledButton = (label: string) =>
-  new RegExp(`<button[^>]*disabled=""[^>]*>${label}</button>`);
+const kill_ = (body: string) => switchState(body, 'vpn-kill-switch');
 
-describe('VPN kill switch card', () => {
+describe('VPN kill switch row', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createLoader.mockReturnValue(kill);
@@ -45,25 +43,26 @@ describe('VPN kill switch card', () => {
     expect(createLoader).toHaveBeenCalledWith(fetchKillSwitch, 10000);
   });
 
-  it('offers Enable only with a connected, fresh tunnel', () => {
-    expect(card({ enabled: false, zone: false }, tunnel('connected'))).toMatch(
-      enabledButton('Enable kill switch'),
-    );
+  it('can be switched on only with a connected, fresh tunnel', () => {
+    expect(kill_(card({ enabled: false, zone: false }, tunnel('connected')))).toEqual({
+      checked: false,
+      disabled: false,
+    });
     for (const status of [
       tunnel('no_handshake'),
       tunnel('disabled'),
       tunnel('connected', true),
       undefined,
     ]) {
-      expect(card({ enabled: false, zone: true }, status)).toMatch(
-        disabledButton('Enable kill switch'),
-      );
+      const body = card({ enabled: false, zone: true }, status);
+      expect(kill_(body)).toEqual({ checked: false, disabled: true });
+      expect(body).toContain('Connect the tunnel');
     }
   });
 
-  it('always offers Disable when on and explains the effect', () => {
+  it('can always be switched off when on and explains the effect', () => {
     const body = card({ enabled: true, zone: true }, tunnel('disabled'));
-    expect(body).toMatch(enabledButton('Disable kill switch'));
+    expect(kill_(body)).toEqual({ checked: true, disabled: false });
     expect(body).toContain('only through the tunnel');
   });
 

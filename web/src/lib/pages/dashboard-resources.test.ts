@@ -91,7 +91,7 @@ describe('Dashboard resources', () => {
 
   it('shows initial failure and retry', () => {
     const body = dashboard({ state: 'error', message: 'Device request failed' });
-    expect(body).toContain('Could not load this data: Device request failed');
+    expect(body).toContain('Device request failed');
     expect(body).toContain('Retry');
     expect(body).not.toContain('Last known value');
   });

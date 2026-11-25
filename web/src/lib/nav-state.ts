@@ -3,10 +3,10 @@ import { type NavGroup, navGroup, type Route } from './router';
 /** Which nav groups are open. Stored per browser; a convenience, never required. */
 export type NavState = Record<NavGroup, boolean>;
 
-export const NAV_STATE_KEY = 'nav:v1';
-const VERSION = 1;
+export const NAV_STATE_KEY = 'nav:v2';
+const VERSION = 2;
 
-const COLLAPSED: NavState = { network: false, system: false };
+const COLLAPSED: NavState = { vpn: false, services: false, network: false, system: false };
 
 /** Reads the stored value; a missing, malformed or other-version value gives the first-visit state. */
 export function parseNavState(raw: string | null): NavState {
@@ -17,7 +17,12 @@ export function parseNavState(raw: string | null): NavState {
     const { version, open } = value as { version?: unknown; open?: unknown };
     if (version !== VERSION || typeof open !== 'object' || open === null) return { ...COLLAPSED };
     const groups = open as Record<string, unknown>;
-    return { network: groups.network === true, system: groups.system === true };
+    return {
+      vpn: groups.vpn === true,
+      services: groups.services === true,
+      network: groups.network === true,
+      system: groups.system === true,
+    };
   } catch {
     return { ...COLLAPSED };
   }

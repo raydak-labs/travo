@@ -38,6 +38,6 @@ describe('OpenWrt updates card', () => {
 
   it('says when no check ran yet', () => {
     loader.data = { ...checked, checked_at: null, packages: [] };
-    expect(render(SystemOpenWrtCard).body).toContain('Not checked since');
+    expect(render(SystemOpenWrtCard).body).toContain('Not since the service started');
   });
 });

@@ -36,14 +36,14 @@ Changes that can cut you off (WiFi, VPN, firewall, LAN address, WAN) are applied
 
 | Page | What it does |
 |---|---|
-| Dashboard | Network map of uplinks, router and clients with live rates and Internet/VPN/Tailscale state; uplink cards with WAN protocol, gateway, WiFi band and signal; hotel WiFi login with automatic click-through; CPU, memory, uptime and version tiles; VPN toggle; per-interface traffic; 24 h / 7 day history |
+| Dashboard | Network map of uplinks, router and clients with live rates and Internet/VPN/Tailscale state, details (WAN protocol, gateway, WiFi band and signal) on hover; uplink cards on phones; hotel WiFi login with automatic click-through; CPU, memory, uptime and version tiles; VPN toggle; per-interface traffic; 24 h / 7 day history |
 | Internet | USB tethering, failover across two or three uplinks, data usage with a monthly budget |
 | WiFi | Scan and join uplinks, saved uplinks by priority, capped automatic reconnect, access point and guest network settings, uplink MAC address, on/off schedule |
-| VPN & Tailscale | WireGuard profiles, split tunnel, kill switch, DNS check; Tailscale with exit node, LAN sharing and SSH |
+| VPN → WireGuard, Tailscale | Overview with each VPN and the traffic rules (kill switch, split tunnel, DNS check); WireGuard profiles (add by paste or file) and tunnel switch; Tailscale with exit node, LAN sharing and SSH |
 | Clients | Connected devices; name, reserve an address, block, disconnect, wake |
-| Services | AdGuard Home (default DNS, DNS over HTTPS, expert topology on port 53); optional SQM, Cloudflare Tunnel, vnStat, Watchcat, speedtestcpp |
+| Services → AdGuard Home | Overview of installed and available services; AdGuard Home (default DNS, DNS over HTTPS, expert topology on port 53); optional SQM, Cloudflare Tunnel, vnStat, Watchcat, speedtestcpp |
 | Network → WAN, LAN, DHCP & DNS names, Port forwards, IPv6 & DDNS, Diagnostics | WAN (DHCP, static, PPPoE); LAN address with interfaces and firewall zones (read-only); DHCP server and local DNS names; port forwards; IPv6 and dynamic DNS; ping/traceroute/DNS lookup and Wake-on-LAN |
-| System → Device, LEDs & switch, Logs, Updates & firmware, API tokens, Factory reset | Hardware facts, device settings, backup, SSH keys, restart; LEDs and night schedule, hardware buttons and slide switch; system log; Travo updates, OpenWrt release check and firmware upgrade; API tokens; factory reset |
+| System → Hardware, Logs, Updates & firmware, Access, Factory reset | Overview with router facts, device settings and backup; LEDs, night mode and the slide switch; system log; Travo updates, OpenWrt release check and firmware upgrade; API tokens, SSH keys and the admin password; factory reset. Restart and Log out are in the header menu |
 
 A banner above every page names conditions that need you, such as a guard left by an interrupted operation, AdGuard Home bypassed, or low memory, and links to the page that fixes them.
 
@@ -55,7 +55,7 @@ Firmware: **System → Updates & firmware → OpenWrt updates** checks downloads
 
 ## Automation
 
-Scripts on the LAN use an API token instead of the browser login. Create one under System → API tokens, or with `POST /api/v1/auth/tokens` (`{"name":"ci","scope":"read"}` or `"admin"`) from a signed-in session. The token is shown once. `read` tokens can only GET, and no token can manage tokens, change the password or flash firmware ([ADR 0008](docs/adr/0008-auth-and-trust-boundary.md)). The OpenAPI spec is served at `/api/openapi.json`.
+Scripts on the LAN use an API token instead of the browser login. Create one under System → Access, or with `POST /api/v1/auth/tokens` (`{"name":"ci","scope":"read"}` or `"admin"`) from a signed-in session. The token is shown once. `read` tokens can only GET, and no token can manage tokens, change the password or flash firmware ([ADR 0008](docs/adr/0008-auth-and-trust-boundary.md)). The OpenAPI spec is served at `/api/openapi.json`.
 
 ```sh
 curl -H "Authorization: Bearer tgt_..." http://192.168.8.1/api/v1/system/info
@@ -63,7 +63,7 @@ curl -H "Authorization: Bearer tgt_..." http://192.168.8.1/api/v1/system/info
 
 ## Known issues
 
-- GL-AXT1800 on OpenWrt 25.12.6: the kernel's available memory drifts down over hours while Travo and AdGuard Home stay flat ([device facts](docs/device-facts.md)). System → Device warns below 15 MiB and the banner shows below 8 MiB; a reboot frees it.
+- GL-AXT1800 on OpenWrt 25.12.6: the kernel's available memory drifts down over hours while Travo and AdGuard Home stay flat ([device facts](docs/device-facts.md)). The dashboard's System card warns below 15 MiB and the banner shows below 8 MiB; a reboot frees it.
 
 ## Development
 

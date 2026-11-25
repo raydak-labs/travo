@@ -10,7 +10,6 @@ import {
   tailscalePhase,
 } from '../api/tailscale';
 import { m } from '../paraglide/messages.js';
-import { href } from '../router';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
@@ -21,6 +20,7 @@ import Section from '../ui/Section.svelte';
 import SettingsRow from '../ui/SettingsRow.svelte';
 import Status from '../ui/Status.svelte';
 import TailscaleOptions from './TailscaleOptions.svelte';
+import { tailscaleStates } from './tailscale-states';
 
 const request = new AbortController();
 const ts = createLoader(fetchTailscale, 10000);
@@ -59,22 +59,11 @@ async function logout() {
   if (ok) void change('logout');
 }
 
-const phaseStatus = {
-  absent: { kind: 'neutral', label: m.tailscale_state_absent },
-  stopped: { kind: 'warn', label: m.tailscale_state_stopped },
-  login: { kind: 'warn', label: m.tailscale_state_login },
-  connected: { kind: 'ok', label: m.tailscale_state_connected },
-  off: { kind: 'neutral', label: m.tailscale_state_off },
-  starting: { kind: 'info', label: m.tailscale_state_starting },
-} as const;
+const phaseStatus = tailscaleStates;
 </script>
 
 <div class="flex flex-col gap-6">
-  <PageHeader title={m.tailscale_title()} description={m.tailscale_page_description()}>
-    {#snippet actions()}
-      <Button variant="outline" size="sm" href={href('vpn')}>{m.tailscale_back()}</Button>
-    {/snippet}
-  </PageHeader>
+  <PageHeader title={m.tailscale_title()} description={m.tailscale_page_description()} />
   <Section title={m.tailscale_status_title()}>
     <LoadState status={ts.status} retry={ts.retry} stale={ts.data !== undefined}>
       {#if ts.data}

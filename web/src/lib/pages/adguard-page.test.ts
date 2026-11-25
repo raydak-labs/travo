@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { adguardError, adguardUrl, fetchAdGuard } from '../api/adguard';
 import type { AdGuardStatus } from '../api/gen';
 import type { LoadStatus } from '../ui/loader.svelte';
-import Services from './Services.svelte';
+import { switchState } from '../ui/switch-html.test-helper';
+import AdGuard from './AdGuard.svelte';
 
 const { createLoader, loader } = vi.hoisted(() => ({
   createLoader: vi.fn(),
@@ -15,8 +16,9 @@ const { createLoader, loader } = vi.hoisted(() => ({
   },
 }));
 vi.mock('../ui/loader.svelte', () => ({ createLoader }));
-// The lazy DoH card has its own test (network-extras.test.ts).
-vi.mock('./PageHost.svelte', () => ({ default: () => {} }));
+// The DoH and DNS setup cards have their own tests.
+vi.mock('./DoHCard.svelte', () => ({ default: () => {} }));
+vi.mock('./AdGuardTopologyCard.svelte', () => ({ default: () => {} }));
 
 const installed: AdGuardStatus = {
   installed: true,
@@ -33,10 +35,10 @@ const installed: AdGuardStatus = {
 function page(status: AdGuardStatus) {
   loader.data = status;
   vi.stubGlobal('window', { location: { protocol: 'http:', hostname: '192.168.1.1' } });
-  return render(Services).body;
+  return render(AdGuard).body;
 }
 
-describe('Services page: AdGuard Home', () => {
+describe('AdGuard Home page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createLoader.mockImplementation(() => loader);
@@ -50,33 +52,31 @@ describe('Services page: AdGuard Home', () => {
       default_dns: false,
       version: '',
     });
-    expect(body).toContain('Not installed');
     expect(body).toContain('Install AdGuard Home');
     expect(body).not.toContain('Open AdGuard Home');
     expect(createLoader).toHaveBeenCalledWith(fetchAdGuard, 10000);
   });
 
-  it('installed and stopped: start, no DNS toggle', () => {
+  it('installed and stopped: the running switch is off, default DNS waits for it', () => {
     const body = page({ ...installed, running: false, default_dns: false });
     expect(body).toContain('Stopped');
-    expect(body).toContain('Start');
-    expect(body).not.toContain('Use as default DNS');
+    expect(switchState(body, 'adguard-running')).toEqual({ checked: false, disabled: false });
+    expect(switchState(body, 'adguard-default-dns')).toEqual({ checked: false, disabled: true });
+    expect(body).toContain('Start AdGuard Home first.');
   });
 
-  it('running as default DNS: proxy link and toggle', () => {
+  it('running as default DNS: both switches on and the proxy link', () => {
     const body = page(installed);
-    expect(body).toContain('Running');
-    expect(body).toContain('Stop using as default DNS');
-    expect(body).toContain('>Stop<');
+    expect(switchState(body, 'adguard-running')).toEqual({ checked: true, disabled: false });
+    expect(switchState(body, 'adguard-default-dns')).toEqual({ checked: true, disabled: false });
     expect(body).toContain('href="http://192.168.1.1:3001/"');
     expect(body).not.toContain('role="alert"');
   });
 
-  it('expert topology: no stop and no default-DNS toggle, proxy link stays', () => {
+  it('expert topology: running cannot be switched off, no default-DNS switch, proxy link stays', () => {
     const body = page({ ...installed, default_dns: false, topology: 'expert' });
-    expect(body).toContain('Running');
-    expect(body).not.toContain('>Stop<');
-    expect(body).not.toContain('Use as default DNS');
+    expect(switchState(body, 'adguard-running')).toEqual({ checked: true, disabled: true });
+    expect(switchState(body, 'adguard-default-dns')).toBeNull();
     expect(body).toContain('href="http://192.168.1.1:3001/"');
   });
 

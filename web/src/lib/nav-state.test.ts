@@ -8,7 +8,7 @@ import {
   withRoute,
 } from './nav-state';
 
-const collapsed = { network: false, system: false };
+const collapsed = { vpn: false, services: false, network: false, system: false };
 
 describe('nav state', () => {
   it('starts collapsed on a first visit', () => {
@@ -17,30 +17,32 @@ describe('nav state', () => {
   });
 
   it('opens the group of a child route and leaves everyday routes alone', () => {
-    expect(withRoute(collapsed, 'network-dhcp')).toEqual({ network: true, system: false });
-    expect(withRoute(collapsed, 'system-tokens')).toEqual({ network: false, system: true });
+    expect(withRoute(collapsed, 'network-dhcp')).toEqual({ ...collapsed, network: true });
+    expect(withRoute(collapsed, 'system-access')).toEqual({ ...collapsed, system: true });
+    expect(withRoute(collapsed, 'vpn-tailscale')).toEqual({ ...collapsed, vpn: true });
+    expect(withRoute(collapsed, 'services')).toEqual({ ...collapsed, services: true });
     expect(withRoute(collapsed, 'wifi')).toBe(collapsed);
-    expect(withRoute(collapsed, 'vpn-tailscale')).toBe(collapsed);
   });
 
   it('returns the same state when the group is already open', () => {
-    const open = { network: true, system: false };
+    const open = { ...collapsed, network: true };
     expect(withRoute(open, 'network-wan')).toBe(open);
   });
 
   it('restores the stored state', () => {
-    const stored = serializeNavState({ network: false, system: true });
+    const stored = serializeNavState({ ...collapsed, vpn: true, system: true });
     expect(loadNavState({ getItem: (key) => (key === NAV_STATE_KEY ? stored : null) })).toEqual({
-      network: false,
+      ...collapsed,
+      vpn: true,
       system: true,
     });
   });
 
   it.each([
     ['not json', '{'],
-    ['other version', JSON.stringify({ version: 2, open: { network: true, system: true } })],
+    ['other version', JSON.stringify({ version: 1, open: { network: true, system: true } })],
     ['no version', JSON.stringify({ open: { network: true } })],
-    ['wrong shape', JSON.stringify({ version: 1, open: 'network' })],
+    ['wrong shape', JSON.stringify({ version: 2, open: 'network' })],
     ['array', '[1]'],
     ['null', 'null'],
   ])('ignores a %s value', (_name, raw) => {
@@ -49,11 +51,8 @@ describe('nav state', () => {
 
   it('treats non-boolean group values as closed', () => {
     expect(
-      parseNavState(JSON.stringify({ version: 1, open: { network: 'yes', system: true } })),
-    ).toEqual({
-      network: false,
-      system: true,
-    });
+      parseNavState(JSON.stringify({ version: 2, open: { network: 'yes', system: true } })),
+    ).toEqual({ ...collapsed, system: true });
   });
 
   it('survives storage that throws', () => {
@@ -74,8 +73,13 @@ describe('nav state', () => {
     const writes: [string, string][] = [];
     saveNavState(
       { setItem: (key, value) => writes.push([key, value]) },
-      { network: true, system: false },
+      { ...collapsed, network: true },
     );
-    expect(writes).toEqual([['nav:v1', '{"version":1,"open":{"network":true,"system":false}}']]);
+    expect(writes).toEqual([
+      [
+        'nav:v2',
+        '{"version":2,"open":{"vpn":false,"services":false,"network":true,"system":false}}',
+      ],
+    ]);
   });
 });

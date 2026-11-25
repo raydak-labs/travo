@@ -1,5 +1,5 @@
 import { render } from 'svelte/server';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import Login from './Login.svelte';
 import Setup from './Setup.svelte';
 
@@ -20,15 +20,11 @@ describe('auth pages', () => {
     expect(body.match(/autocomplete="new-password"/g)).toHaveLength(2);
   });
 
-  it('System: change-password card and log-out button', async () => {
-    // Supply the theme boundary without pretending SSR has a browser document.
-    vi.doMock('../theme.svelte', () => ({ theme: { value: 'light', toggle: () => {} } }));
-    const { default: System } = await import('./System.svelte');
-    const { body } = render(System);
-    vi.unstubAllGlobals();
+  it('Access: the change-password card (Log out is in the header menu)', async () => {
+    const { default: PasswordCard } = await import('./PasswordCard.svelte');
+    const { body } = render(PasswordCard);
     expect(body).toContain('for="password-current"');
     expect(body).toContain('autocomplete="current-password"');
     expect(body.match(/autocomplete="new-password"/g)).toHaveLength(2);
-    expect(body).toContain('Log out');
   });
 });

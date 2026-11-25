@@ -1,4 +1,6 @@
 <script lang="ts">
+import ChevronRight from '@lucide/svelte/icons/chevron-right';
+import Button from '$lib/components/ui/button/button.svelte';
 import Progress from '$lib/components/ui/progress/progress.svelte';
 import { alertMessage } from '../alerts';
 import type { Alert, SystemInfoBody } from '../api/gen';
@@ -30,7 +32,7 @@ const memoryWarning = $derived(alerts.find((a) => a.code === 'memory_low'));
 
 <Section title={m.dashboard_resources()}>
   {#snippet actions()}
-    <a href={href('system')} class="text-sm text-muted-foreground underline-offset-4 hover:underline">{m.dashboard_system_open()}</a>
+    <Button variant="ghost" size="sm" href={href('system')}>{m.dashboard_system_open()}<ChevronRight aria-hidden="true" /></Button>
   {/snippet}
   <LoadState status={resources.status} retry={resources.retry} stale={resources.data !== undefined}>
     {#if resources.data}

@@ -224,8 +224,9 @@ body {
   background: var(--neutral);
   opacity: 0.5;
 }
-.topology-icon-active {
+.topology-node-active {
   color: var(--ok);
+  border-color: color-mix(in oklab, var(--ok) 60%, transparent);
 }
 
 /* Toast close button sits inside the toast's top-right corner, not off its top-left edge.

@@ -56,9 +56,14 @@ async function clickWhenReady(chrome, scope, text) {
 const DIALOG = '[role="alertdialog"]';
 const TOAST = '[data-sonner-toast]';
 
+/** Restart lives in the header menu; the confirm dialog is the shot. */
 async function rebootDialog(chrome, base, vp, shoot) {
-  await chrome.open(`${base}/#/system`, vp);
-  await clickWhenReady(chrome, 'main', 'Restart router');
+  await openHeaderMenu(chrome, base, vp);
+  await chrome.evaluate(`(() => {
+    const item = [...document.querySelectorAll('[data-slot="dropdown-menu-item"]')]
+      .find((el) => el.textContent.includes('Restart router'));
+    item?.click();
+  })()`);
   await waitFor(chrome, `!!document.querySelector('${DIALOG}')`, 'reboot dialog');
   await sleep(300);
   await shoot('system-reboot-dialog');
@@ -66,7 +71,15 @@ async function rebootDialog(chrome, base, vp, shoot) {
 
 async function apDisableFlow(chrome, base, vp, shoot) {
   await chrome.open(`${base}/#/wifi`, vp);
-  await clickWhenReady(chrome, 'main', 'Disable');
+  // Each access point row has a switch; turning one off asks first.
+  await waitFor(
+    chrome,
+    `!!document.querySelector('main [id^="ap-"][aria-checked="true"]:not([disabled])')`,
+    'AP switch',
+  );
+  await chrome.evaluate(
+    `document.querySelector('main [id^="ap-"][aria-checked="true"]:not([disabled])').click()`,
+  );
   await waitFor(chrome, `!!document.querySelector('${DIALOG}')`, 'AP dialog');
   await sleep(300);
   await shoot('wifi-ap-disable-dialog');
@@ -103,8 +116,7 @@ async function navSheet(chrome, base, vp, shoot) {
   await shoot('nav-sheet');
 }
 
-/** The header menu (version, theme on phones, log out, restart). */
-async function headerMenu(chrome, base, vp, shoot) {
+async function openHeaderMenu(chrome, base, vp) {
   await chrome.open(`${base}/#/`, vp);
   await waitFor(
     chrome,
@@ -119,14 +131,22 @@ async function headerMenu(chrome, base, vp, shoot) {
   })()`);
   await waitFor(chrome, `!!document.querySelector('[data-slot="dropdown-menu-content"]')`, 'menu');
   await sleep(300);
+}
+
+/** The header menu (version, theme on phones, log out, restart). */
+async function headerMenu(chrome, base, vp, shoot) {
+  await openHeaderMenu(chrome, base, vp);
   await shoot('header-menu');
 }
 
 async function resultToast(chrome, base, vp, shoot) {
-  await chrome.open(`${base}/#/vpn`, vp);
+  await chrome.open(`${base}/#/vpn/wireguard`, vp);
+  await clickWhenReady(chrome, 'main', 'Add profile');
+  await waitFor(chrome, `!!document.querySelector('[role="dialog"] form')`, 'add profile dialog');
+  await sleep(300);
+  await shoot('wireguard-add-dialog');
   await chrome.evaluate(`(() => {
-    const forms = [...document.querySelectorAll('main form')];
-    const form = forms[forms.length - 1];
+    const form = document.querySelector('[role="dialog"] form');
     const set = (el, value) => { el.value = value; el.dispatchEvent(new Event('input', { bubbles: true })); };
     set(form.querySelector('input'), 'Office');
     set(form.querySelector('textarea'), '[Interface]');

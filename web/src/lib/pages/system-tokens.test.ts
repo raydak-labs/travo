@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Token } from '../api/gen';
 import { fetchTokens } from '../api/tokens';
 import type { LoadStatus } from '../ui/loader.svelte';
-import SystemTokens from './SystemTokens.svelte';
+import SystemTokens from './SystemAccess.svelte';
 import TokenSecretDialog from './TokenSecretDialog.svelte';
 
 const { createLoader, loader } = vi.hoisted(() => ({
@@ -30,7 +30,7 @@ function page(tokens: Token[] | undefined, status: LoadStatus = { state: 'ready'
   return render(SystemTokens).body;
 }
 
-describe('API tokens page', () => {
+describe('Access page: API tokens', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createLoader.mockImplementation(() => loader);
@@ -41,12 +41,10 @@ describe('API tokens page', () => {
     expect(createLoader).toHaveBeenCalledWith(fetchTokens);
   });
 
-  it('empty: says so and offers the create form with read preselected', () => {
+  it('empty: says so and offers Create token (the form opens in a dialog)', () => {
     const body = page([]);
     expect(body).toContain('No API tokens yet.');
     expect(body).toContain('Create token');
-    expect(body).toMatch(/value="read"[^>]*checked/);
-    expect(body).not.toMatch(/value="admin"[^>]*checked/);
   });
 
   it('lists tokens with scope and a labelled revoke, never a secret', () => {
@@ -57,9 +55,9 @@ describe('API tokens page', () => {
     expect(body).not.toContain('tgt_');
   });
 
-  it('opens with its page header, without a back link (the nav reaches System)', () => {
+  it('opens with the Access page header, without a back link (the nav reaches System)', () => {
     const body = page([]);
-    expect(body).toMatch(/<h1[^>]*>API tokens<\/h1>/);
+    expect(body).toMatch(/<h1[^>]*>Access<\/h1>/);
     expect(body).not.toContain('href="#/system"');
   });
 

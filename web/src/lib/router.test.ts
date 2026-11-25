@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   type AuthState,
+  GROUP_OVERVIEW,
   guard,
   href,
   NAV_GROUPS,
@@ -9,7 +10,6 @@ import {
   parseHash,
   ROUTE_LIST,
   type Route,
-  section,
 } from './router';
 
 const PATHS: [string, Route][] = [
@@ -19,9 +19,11 @@ const PATHS: [string, Route][] = [
   ['#/internet', 'internet'],
   ['#/wifi', 'wifi'],
   ['#/vpn', 'vpn'],
+  ['#/vpn/wireguard', 'vpn-wireguard'],
   ['#/vpn/tailscale', 'vpn-tailscale'],
   ['#/clients', 'clients'],
   ['#/services', 'services'],
+  ['#/services/adguard', 'services-adguard'],
   ['#/network/wan', 'network-wan'],
   ['#/network/lan', 'network-lan'],
   ['#/network/dhcp', 'network-dhcp'],
@@ -29,10 +31,10 @@ const PATHS: [string, Route][] = [
   ['#/network/ipv6', 'network-ipv6'],
   ['#/network/diagnostics', 'network-diagnostics'],
   ['#/system', 'system'],
-  ['#/system/leds', 'system-leds'],
+  ['#/system/hardware', 'system-hardware'],
   ['#/system/logs', 'system-logs'],
   ['#/system/updates', 'system-updates'],
-  ['#/system/tokens', 'system-tokens'],
+  ['#/system/access', 'system-access'],
   ['#/system/reset', 'system-reset'],
 ];
 
@@ -61,10 +63,9 @@ describe('router', () => {
     expect(parseHash('#/network/nope')).toBe('dashboard');
   });
 
-  it('highlights the parent for a child page that is not in the nav', () => {
-    expect(section('vpn-tailscale')).toBe('vpn');
-    expect(section('system-tokens')).toBe('system-tokens');
-    expect(section('wifi')).toBe('wifi');
+  it('keeps the old LED and token paths working', () => {
+    expect(parseHash('#/system/leds')).toBe('system-hardware');
+    expect(parseHash('#/system/tokens')).toBe('system-access');
   });
 
   it.each(
@@ -72,26 +73,20 @@ describe('router', () => {
       NAV_GROUPS[group].map((route) => [route, group] as const),
     ),
   )('puts %s in the %s group', (route, group) => {
-    expect(navGroup(section(route))).toBe(group);
+    expect(navGroup(route)).toBe(group);
+  });
+
+  it('puts each overview in its group and has none for Network', () => {
+    expect(navGroup('vpn')).toBe('vpn');
+    expect(navGroup('services')).toBe('services');
+    expect(navGroup('system')).toBe('system');
+    expect(GROUP_OVERVIEW.network).toBeNull();
   });
 
   it('keeps everyday pages out of the groups', () => {
-    for (const route of [
-      'dashboard',
-      'internet',
-      'wifi',
-      'vpn',
-      'vpn-tailscale',
-      'clients',
-      'services',
-    ] as const) {
+    for (const route of ['dashboard', 'internet', 'wifi', 'clients'] as const) {
       expect(navGroup(route)).toBeNull();
     }
-  });
-
-  it('starts each group with its default page', () => {
-    expect(NAV_GROUPS.network[0]).toBe('network-wan');
-    expect(NAV_GROUPS.system[0]).toBe('system');
   });
 });
 

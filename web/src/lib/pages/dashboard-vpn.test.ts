@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TunnelStatus } from '../api/gen';
 import { fetchVpnStatus } from '../api/vpn-status';
 import type { LoadStatus } from '../ui/loader.svelte';
+import { switchState } from '../ui/switch-html.test-helper';
 import Dashboard from './Dashboard.svelte';
 
 const { createLoader, dashboardEvents, vpn } = vi.hoisted(() => {
@@ -65,32 +66,32 @@ describe('Dashboard VPN quick action', () => {
     expect(createLoader).toHaveBeenCalledWith(fetchVpnStatus, 10000);
   });
 
-  it('offers Enable when a profile is ready', () => {
+  it('can switch the tunnel on when a profile is ready', () => {
     const body = dashboard('configured');
     expect(body).toContain('Profile ready');
-    expect(body).toMatch(button('Enable tunnel'));
-    expect(body).not.toMatch(disabledButton('Enable tunnel'));
+    expect(switchState(body, 'dashboard-vpn-switch')).toEqual({ checked: false, disabled: false });
   });
 
-  it('disables Enable without a selected profile and links to VPN settings', () => {
+  it('cannot switch on without a selected profile, says why and links to VPN', () => {
     const body = dashboard('disabled');
-    expect(body).toMatch(disabledButton('Enable tunnel'));
-    expect(body).toMatch(/<a[^>]*href="#\/vpn"[^>]*>VPN settings<\/a>/);
+    expect(switchState(body, 'dashboard-vpn-switch')).toEqual({ checked: false, disabled: true });
+    expect(body).toContain('No profile yet');
+    expect(body).toContain('href="#/vpn"');
   });
 
   it.each(['enabled_not_up', 'no_handshake', 'connected'] as const)(
-    'offers Disable when %s',
+    'can switch the tunnel off when %s',
     (state) => {
-      const body = dashboard(state);
-      expect(body).toMatch(button('Disable tunnel'));
-      expect(body).not.toContain('Apply selected profile');
+      expect(switchState(dashboard(state), 'dashboard-vpn-switch')).toEqual({
+        checked: true,
+        disabled: false,
+      });
     },
   );
 
   it('shows unavailable status without a toggle', () => {
     const body = dashboard(undefined, { state: 'error', message: 'Tunnel status unavailable' });
     expect(body).toContain('Tunnel status unavailable');
-    expect(body).not.toContain('Enable tunnel');
-    expect(body).not.toContain('Disable tunnel');
+    expect(switchState(body, 'dashboard-vpn-switch')).toBeNull();
   });
 });

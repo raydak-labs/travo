@@ -1,4 +1,5 @@
 <script lang="ts">
+import FileUp from '@lucide/svelte/icons/file-up';
 import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import Input from '$lib/components/ui/input/input.svelte';
@@ -20,6 +21,7 @@ import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
 import Section from '../ui/Section.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 import Status from '../ui/Status.svelte';
 
 const status = createLoader(fetchFirmware);
@@ -88,16 +90,15 @@ async function flash(event: SubmitEvent) {
     <LoadState status={status.status} retry={status.retry} stale={status.data !== undefined}>
       <form class="flex flex-col gap-3" onsubmit={upload}>
         <!-- The native picker shows the browser's language; the button and file name are ours. -->
-        <div class="grid gap-1">
-          <Label for="firmware-file">{m.firmware_file({ max: formatBytes(maxBytes) })}</Label>
-          <input id="firmware-file" type="file" accept=".bin,.img,.itb" class="sr-only" bind:this={fileInput} bind:files disabled={busy} />
-          <div class="flex flex-wrap items-center gap-2">
-            <Button variant="outline" type="button" disabled={busy} onclick={() => fileInput?.click()}>{m.firmware_choose()}</Button>
-            <span class="text-sm break-all text-muted-foreground">{files?.[0]?.name ?? m.firmware_no_file()}</span>
-          </div>
-        </div>
-        <div>
-          <Button variant="outline" type="submit" disabled={busy || !files?.length}>
+        <SettingsRow label={m.firmware_image()} description={m.firmware_file({ max: formatBytes(maxBytes) })} for="firmware-file">
+          {#snippet control()}
+            <input id="firmware-file" type="file" accept=".bin,.img,.itb" class="sr-only" bind:this={fileInput} bind:files disabled={busy} />
+            <span class="text-sm break-all text-muted-foreground">{files?.[0] ? `${files[0].name} · ${formatBytes(files[0].size)}` : m.firmware_no_file()}</span>
+            <Button variant="outline" size="sm" type="button" disabled={busy} onclick={() => fileInput?.click()}><FileUp aria-hidden="true" />{m.firmware_choose()}</Button>
+          {/snippet}
+        </SettingsRow>
+        <div class="flex justify-end">
+          <Button variant={files?.length ? 'default' : 'outline'} type="submit" disabled={busy || !files?.length}>
             {busy && !image ? m.firmware_uploading() : m.firmware_upload()}
           </Button>
         </div>

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DnsStatus } from '../api/gen';
 import { fetchVpnDns } from '../api/vpn-status';
 import type { LoadStatus } from '../ui/loader.svelte';
-import VPNDNSCard from './VPNDNSCard.svelte';
+import VPNDNSCard from './VPNDNSRow.svelte';
 
 const { createLoader, dns } = vi.hoisted(() => ({
   createLoader: vi.fn(),

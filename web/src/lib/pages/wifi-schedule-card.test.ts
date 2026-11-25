@@ -52,8 +52,10 @@ describe('wifi schedule card', () => {
     expect(body).toContain('Off 23:00, on 07:00, Sat and Sun');
     expect(body).toContain('Last: Mon 23:00, off, done');
     expect(body).toContain('aria-label="Edit schedule for Home"');
-    expect(body).toContain('Paused');
-    expect(body).toContain('Resume');
+    // A paused rule shows its switch off, labelled with the action it offers.
+    expect(body).toMatch(
+      /aria-label="Resume"[^>]*aria-checked="false"|aria-checked="false"[^>]*aria-label="Resume"/,
+    );
     expect(body).not.toContain('cron service is not running');
   });
 

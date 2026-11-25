@@ -56,3 +56,28 @@ export async function saveLEDSchedule(schedule: LedSchedule): Promise<Result> {
     return { error: ledsError(undefined) };
   }
 }
+
+const LED_FUNCTIONS: Record<string, () => string> = {
+  run: m.leds_fn_power,
+  power: m.leds_fn_power,
+  system: m.leds_fn_system,
+  status: m.leds_fn_status,
+  wlan: m.leds_fn_wifi,
+  wifi: m.leds_fn_wifi,
+  internet: m.leds_fn_internet,
+  wan: m.leds_fn_internet,
+  lan: m.leds_fn_lan,
+  usb: m.leds_fn_usb,
+  vpn: m.leds_fn_vpn,
+};
+
+/**
+ * A readable name for a kernel LED (`color:function`, e.g. `blue:run` → "Power (blue)"). The raw
+ * name stays visible as the hint; an unknown function keeps its own word.
+ */
+export function ledLabel(name: string): string {
+  const [color, fn] = name.includes(':') ? name.split(':', 2) : ['', name];
+  const key = (fn ?? '').split(/[-_]/)[0]?.toLowerCase() ?? '';
+  const word = LED_FUNCTIONS[key]?.() ?? (key ? key.charAt(0).toUpperCase() + key.slice(1) : name);
+  return color ? m.leds_named({ name: word, color }) : word;
+}

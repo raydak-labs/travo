@@ -1,6 +1,5 @@
 <script lang="ts">
 import { onDestroy } from 'svelte';
-import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import '../api/client';
 import { type DnsVerification, verifyVpndns } from '../api/gen';
@@ -8,7 +7,6 @@ import { fetchVpnDns } from '../api/vpn-status';
 import { m } from '../paraglide/messages.js';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
-import Section from '../ui/Section.svelte';
 import SettingsRow from '../ui/SettingsRow.svelte';
 import Status from '../ui/Status.svelte';
 
@@ -56,30 +54,27 @@ async function verify() {
 }
 </script>
 
-<Section title={m.vpn_dns()}>
-  <LoadState status={dns.status} retry={dns.retry} stale={dns.data !== undefined}>
-    {#if dns.data}
-      {@const info = dns.data}
-      {@const layer = layers[info.layer]}
-      <div class="flex flex-wrap items-center gap-2">
+<!-- One row in the VPN page's traffic rules: the DNS layer state, its resolvers and a check. -->
+<SettingsRow
+  label={m.vpn_dns()}
+  description={dns.data ? `${m.vpn_dns_resolvers()}: ${dns.data.resolvers?.length ? dns.data.resolvers.join(', ') : m.vpn_dns_none()}` : undefined}
+>
+  {#snippet control()}
+    <LoadState status={dns.status} retry={dns.retry} stale={dns.data !== undefined}>
+      {#if dns.data}
+        {@const info = dns.data}
+        {@const layer = layers[info.layer]}
         <Status kind={layer.kind}>{layer.label()}</Status>
         {#if info.layer === 'active' && info.top && info.top !== 'vpn'}
           <Status kind="warn">{m.vpn_dns_overridden({ layer: info.top })}</Status>
         {/if}
-      </div>
-      <SettingsRow label={m.vpn_dns_resolvers()}>
-        {#snippet control()}
-          <span class="break-all">{info.resolvers?.length ? info.resolvers.join(', ') : m.vpn_dns_none()}</span>
-        {/snippet}
-      </SettingsRow>
+      {/if}
+    </LoadState>
+    {#if verified && !verifying}
+      {@const result = results[verified]}
+      <span role="status"><Status kind={result.kind}>{result.label()}</Status></span>
     {/if}
-  </LoadState>
-  <Button variant="outline" size="sm" type="button" class="w-fit" disabled={verifying} onclick={verify}>{m.vpn_dns_verify()}</Button>
-  {#if verifying}
-    <p role="status">{m.vpn_dns_verifying()}</p>
-  {:else if verified}
-    {@const result = results[verified]}
-    <p role="status"><Status kind={result.kind}>{result.label()}</Status></p>
-  {/if}
-  {#if verifyError}<Alert class="text-danger">{verifyError}</Alert>{/if}
-</Section>
+    <Button variant="outline" size="sm" type="button" disabled={verifying} onclick={verify}>{verifying ? m.vpn_dns_verifying() : m.vpn_dns_verify()}</Button>
+  {/snippet}
+</SettingsRow>
+{#if verifyError}<p role="alert" class="text-sm text-danger">{verifyError}</p>{/if}

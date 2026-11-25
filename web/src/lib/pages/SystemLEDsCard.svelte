@@ -2,15 +2,16 @@
 import Lightbulb from '@lucide/svelte/icons/lightbulb';
 import Button from '$lib/components/ui/button/button.svelte';
 import Input from '$lib/components/ui/input/input.svelte';
-import Label from '$lib/components/ui/label/label.svelte';
+import Switch from '$lib/components/ui/switch/switch.svelte';
 import type { LedSchedule } from '../api/gen';
-import { fetchLEDs, saveLEDSchedule, scheduleProblem, setLEDsOff } from '../api/leds';
+import { fetchLEDs, ledLabel, saveLEDSchedule, scheduleProblem, setLEDsOff } from '../api/leds';
 import { m } from '../paraglide/messages.js';
 import EmptyState from '../ui/EmptyState.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
 import Section from '../ui/Section.svelte';
+import SettingsRow from '../ui/SettingsRow.svelte';
 import Status from '../ui/Status.svelte';
 
 const loader = createLoader(fetchLEDs);
@@ -54,51 +55,61 @@ function save(event: SubmitEvent) {
   filled = false;
   void run(() => saveLEDSchedule(snapshot), m.leds_schedule_saved());
 }
+const formId = $props.id();
 </script>
 
-<Section title={m.leds_title()}>
+<Section title={m.leds_title()} description={loader.data?.leds.length ? (loader.data.off ? m.leds_held_off() : m.leds_all_hint()) : undefined}>
+  {#snippet actions()}
+    {#if loader.data?.leds.length}
+      {@const view = loader.data}
+      <Switch id="leds-all" aria-label={m.leds_all()} bind:checked={() => !view.off, (on) => toggle(!on)} disabled={busy} />
+    {/if}
+  {/snippet}
   <LoadState status={loader.status} retry={loader.retry} stale={loader.data !== undefined}>
     {#if loader.data}
       {@const view = loader.data}
       {#if view.leds.length === 0}
         <EmptyState icon={Lightbulb} title={m.leds_none()} />
       {:else}
-        <ul class="divide-y divide-border" aria-label={m.leds_title()}>
+        <div aria-label={m.leds_title()} role="group" class="border-t border-border">
+
           {#each view.leds as led (led.name)}
-            <li class="flex items-center gap-2 py-2">
-              <span class="min-w-0 flex-1 break-all font-mono text-sm">{led.name}</span>
-              <Status kind={led.on ? 'ok' : 'neutral'}>{led.on ? m.leds_lit() : m.leds_dark()}</Status>
-            </li>
+            <SettingsRow label={ledLabel(led.name)} description={led.name}>
+              {#snippet control()}
+                <Status kind={led.on ? 'ok' : 'neutral'}>{led.on ? m.leds_lit() : m.leds_dark()}</Status>
+              {/snippet}
+            </SettingsRow>
           {/each}
-        </ul>
-        <div class="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" type="button" disabled={busy} onclick={() => toggle(!view.off)}>
-            {view.off ? m.leds_default() : m.leds_off()}
-          </Button>
-          {#if view.off}<Status kind="info">{m.leds_held_off()}</Status>{/if}
         </div>
       {/if}
-      <form class="flex flex-col gap-3" onsubmit={save}>
-        <label class="flex items-center gap-2">
-          <input type="checkbox" bind:checked={form.enabled} disabled={busy} />
-          {m.leds_schedule()}
-        </label>
-        <div class="flex gap-3">
-          <Label class="grid flex-1 gap-1">
-            {m.leds_schedule_off()}
-            <Input type="time" bind:value={form.off_at} required disabled={busy || !form.enabled} />
-          </Label>
-          <Label class="grid flex-1 gap-1">
-            {m.leds_schedule_on()}
-            <Input type="time" bind:value={form.on_at} required disabled={busy || !form.enabled} />
-          </Label>
-        </div>
-        <span class="text-sm text-muted-foreground">{m.leds_schedule_hint()}</span>
-        {#if problem}<Status kind="warn">{problem}</Status>{/if}
-        <div>
-          <Button variant="default" type="submit" disabled={busy || problem !== undefined}>{m.leds_schedule_save()}</Button>
-        </div>
-      </form>
+
     {/if}
   </LoadState>
+</Section>
+
+<Section title={m.leds_schedule()} description={m.leds_schedule_hint()}>
+  {#snippet actions()}
+    {#if loader.data}
+      <Switch id="leds-night" form={formId} aria-label={m.leds_schedule()} bind:checked={form.enabled} disabled={busy} />
+    {/if}
+  {/snippet}
+  {#if loader.data && form.enabled}
+    <form id={formId} class="border-t border-border" onsubmit={save}>
+      <SettingsRow label={m.leds_schedule_window()} for="leds-off-at">
+        {#snippet control()}
+          <Input id="leds-off-at" type="time" class="w-28" aria-label={m.leds_schedule_off()} bind:value={form.off_at} required disabled={busy} />
+          <span class="text-muted-foreground">–</span>
+          <Input type="time" class="w-28" aria-label={m.leds_schedule_on()} bind:value={form.on_at} required disabled={busy} />
+        {/snippet}
+      </SettingsRow>
+      {#if problem}<Status kind="warn">{problem}</Status>{/if}
+    </form>
+  {:else if loader.data}
+    <form id={formId} onsubmit={save}></form>
+  {/if}
+  {#snippet footer()}
+    {#if loader.data && (form.enabled || loader.data.schedule.enabled)}
+      <Button variant="default" type="submit" form={formId} disabled={busy || problem !== undefined}>{m.leds_schedule_save()}</Button>
+    {/if}
+  {/snippet}
 </Section>

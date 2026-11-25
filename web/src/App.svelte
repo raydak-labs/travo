@@ -24,7 +24,15 @@ import { navigate } from './lib/navigate';
 import { lazyPage, pages } from './lib/pages/lazy';
 import PageHost from './lib/pages/PageHost.svelte';
 import { m } from './lib/paraglide/messages.js';
-import { guard, href, NAV_GROUPS, type NavGroup, type Route, section } from './lib/router';
+import {
+  GROUP_OVERVIEW,
+  guard,
+  href,
+  NAV_GROUPS,
+  type NavGroup,
+  navGroup,
+  type Route,
+} from './lib/router';
 import { router } from './lib/router.svelte';
 import { session } from './lib/session.svelte';
 import { theme } from './lib/theme.svelte';
@@ -72,36 +80,37 @@ function onDrawerKey(event: KeyboardEvent) {
   closeDrawer();
 }
 
-// Everyday pages first; expert settings sit one level deeper in the Network and System groups.
+// Everyday pages first; VPN and Services open an overview, Network and System hold the expert pages.
 type NavItem = { route: Route; label: () => string; icon: typeof Wifi };
-const everyday: NavItem[] = [
+type NavGroupItem = { group: NavGroup; label: () => string; icon: typeof Wifi };
+const entries: (NavItem | NavGroupItem)[] = [
   { route: 'dashboard', label: () => m.nav_dashboard(), icon: LayoutDashboard },
   { route: 'internet', label: () => m.nav_internet(), icon: Globe },
   { route: 'wifi', label: () => m.nav_wifi(), icon: Wifi },
-  { route: 'vpn', label: () => m.nav_vpn(), icon: Shield },
+  { group: 'vpn', label: () => m.nav_vpn(), icon: Shield },
   { route: 'clients', label: () => m.nav_clients(), icon: Users },
-  { route: 'services', label: () => m.nav_services(), icon: Server },
+  { group: 'services', label: () => m.nav_services(), icon: Server },
+  { group: 'network', label: () => m.nav_group_network(), icon: Network },
+  { group: 'system', label: () => m.nav_group_system(), icon: Settings },
 ];
 const childLabels: Partial<Record<Route, () => string>> = {
+  'vpn-wireguard': () => m.nav_vpn_wireguard(),
+  'vpn-tailscale': () => m.nav_vpn_tailscale(),
+  'services-adguard': () => m.nav_services_adguard(),
   'network-wan': () => m.nav_network_wan(),
   'network-lan': () => m.nav_network_lan(),
   'network-dhcp': () => m.nav_network_dhcp(),
   'network-port-forwards': () => m.nav_network_port_forwards(),
   'network-ipv6': () => m.nav_network_ipv6(),
   'network-diagnostics': () => m.nav_network_diagnostics(),
-  system: () => m.nav_system(),
-  'system-leds': () => m.nav_system_leds(),
+  'system-hardware': () => m.nav_system_hardware(),
   'system-logs': () => m.nav_system_logs(),
   'system-updates': () => m.nav_system_updates(),
-  'system-tokens': () => m.nav_system_tokens(),
+  'system-access': () => m.nav_system_access(),
   'system-reset': () => m.nav_system_reset(),
 };
-const groups: { id: NavGroup; label: () => string; icon: typeof Wifi }[] = [
-  { id: 'network', label: () => m.nav_group_network(), icon: Network },
-  { id: 'system', label: () => m.nav_group_system(), icon: Settings },
-];
 
-// Open groups survive reloads (nav:v1); the group holding the current page always opens.
+// Open groups survive reloads (nav:v2); the group holding the current page always opens.
 const storage = (() => {
   try {
     return localStorage;
@@ -135,7 +144,7 @@ $effect(() => {
   return () => request.abort();
 });
 const shownNav = $derived(
-  everyday.filter((item) => !(item.route === 'services' && servicesUnavailable)),
+  entries.filter((item) => !('group' in item && item.group === 'services' && servicesUnavailable)),
 );
 
 void session.bootstrap();
@@ -193,7 +202,7 @@ $effect(() => {
 {#snippet navLink(route: Route, label: string, Icon?: typeof Wifi)}
   <Button variant="ghost"
     href={href(route)}
-    aria-current={section(shown) === route ? 'page' : undefined}
+    aria-current={shown === route ? 'page' : undefined}
     class="w-full justify-start gap-3 text-base font-normal aria-[current=page]:bg-bg aria-[current=page]:font-semibold"
     >{#if Icon}<Icon aria-hidden="true" size={18} />{/if}{label}</Button
   >
@@ -202,39 +211,52 @@ $effect(() => {
 {#snippet navigation()}
     <nav aria-label={m.nav_label()} class="flex-1 overflow-y-auto px-2 pb-4">
       <ul class="flex flex-col gap-1">
-        {#each shownNav as item (item.route)}
-          <li>{@render navLink(item.route, item.label(), item.icon)}</li>
-        {/each}
-        {#each groups as group (group.id)}
-          {@const Icon = group.icon}
-          {@const children = NAV_GROUPS[group.id]}
-          <li>
-            <Collapsible.Root open={navState[group.id]} onOpenChange={(open) => setGroup(group.id, open)}>
-              <div class="flex items-center gap-1">
-                <Button variant="ghost"
-                  href={href(children[0] as Route)}
-                  class="min-w-0 flex-1 justify-start gap-3 text-base font-normal"
-                  ><Icon aria-hidden="true" size={18} />{group.label()}</Button
-                >
-                <Collapsible.Trigger>
-                  {#snippet child({ props })}
-                    <Button {...props} variant="ghost" size="icon" type="button"
-                      aria-label={m.nav_group_toggle({ group: group.label() })}
-                      class="shrink-0 aria-expanded:bg-transparent [&[data-state=open]>svg]:rotate-90"
-                      ><ChevronRight aria-hidden="true" size={18} class="transition-transform" /></Button
+        {#each shownNav as item ('group' in item ? item.group : item.route)}
+          {#if 'route' in item}
+            <li>{@render navLink(item.route, item.label(), item.icon)}</li>
+          {:else}
+            {@const Icon = item.icon}
+            {@const overview = GROUP_OVERVIEW[item.group]}
+            {@const children = NAV_GROUPS[item.group]}
+            {@const inside = navGroup(shown) === item.group}
+            <li>
+              <Collapsible.Root open={navState[item.group]} onOpenChange={(open) => setGroup(item.group, open)}>
+                <div class="flex items-center gap-1">
+                  {#if overview}
+                    <Button variant="ghost"
+                      href={href(overview)}
+                      aria-current={shown === overview ? 'page' : undefined}
+                      class="min-w-0 flex-1 justify-start gap-3 text-base font-normal aria-[current=page]:bg-bg {inside ? 'font-semibold' : ''}"
+                      ><Icon aria-hidden="true" size={18} />{item.label()}</Button
                     >
-                  {/snippet}
-                </Collapsible.Trigger>
-              </div>
-              <Collapsible.Content>
-                <ul class="mt-1 flex flex-col gap-1 pl-7">
-                  {#each children as route (route)}
-                    <li>{@render navLink(route, childLabels[route]?.() ?? route)}</li>
-                  {/each}
-                </ul>
-              </Collapsible.Content>
-            </Collapsible.Root>
-          </li>
+                  {:else}
+                    <Button variant="ghost" type="button"
+                      aria-expanded={navState[item.group]}
+                      onclick={() => setGroup(item.group, !navState[item.group])}
+                      class="min-w-0 flex-1 justify-start gap-3 text-base font-normal aria-expanded:bg-transparent {inside ? 'font-semibold' : ''}"
+                      ><Icon aria-hidden="true" size={18} />{item.label()}</Button
+                    >
+                  {/if}
+                  <Collapsible.Trigger>
+                    {#snippet child({ props })}
+                      <Button {...props} variant="ghost" size="icon" type="button"
+                        aria-label={m.nav_group_toggle({ group: item.label() })}
+                        class="size-8 shrink-0 aria-expanded:bg-transparent [&[data-state=open]>svg]:rotate-90"
+                        ><ChevronRight aria-hidden="true" size={16} class="transition-transform" /></Button
+                      >
+                    {/snippet}
+                  </Collapsible.Trigger>
+                </div>
+                <Collapsible.Content>
+                  <ul class="mt-1 ml-[1.2rem] flex flex-col gap-1 border-l border-border pl-3">
+                    {#each children as route (route)}
+                      <li>{@render navLink(route, childLabels[route]?.() ?? route)}</li>
+                    {/each}
+                  </ul>
+                </Collapsible.Content>
+              </Collapsible.Root>
+            </li>
+          {/if}
         {/each}
       </ul>
     </nav>
@@ -313,7 +335,7 @@ $effect(() => {
     </header>
 
     <main class="flex-1 overflow-y-auto p-4 md:p-6">
-      <div class="mx-auto max-w-3xl">
+      <div class="mx-auto max-w-6xl">
         {#if authenticated}
           <AlertBanner list={dashboardEvents.alerts.data} />
         {/if}
