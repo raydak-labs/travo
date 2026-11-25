@@ -24,7 +24,7 @@ func TestDashboardUplinksRoute(t *testing.T) {
 	e := newEnvWithDashboard(t, nil, nil, nil, func(d *Deps) { d.Uplinks = fakeUplinks{body: body} })
 	cookie, _ := e.login()
 	rec := e.do(req{method: http.MethodGet, path: "/api/v1/dashboard/uplinks", cookie: cookie})
-	want := `{"uplinks":[{"name":"wan","configured":false,"up":false,"device":null,"ipv4":null,"ssid":null,"kind":null}],"failover":{"enabled":false,"active":false,"order":["wan"]}}`
+	want := `{"uplinks":[{"name":"wan","configured":false,"up":false,"device":null,"ipv4":null,"ssid":null,"kind":null,"proto":null,"gateway":null,"band":null,"signal_dbm":null}],"failover":{"enabled":false,"active":false,"order":["wan"]}}`
 	if rec.Code != http.StatusOK || compactJSON(t, rec.Body.Bytes()) != compactJSON(t, []byte(want)) {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -35,14 +35,15 @@ func TestDashboardUplinksFromMockCaptures(t *testing.T) {
 		dev := d.Ubus.(*mock.Device)
 		mock.SeedClients(dev) // verbatim AXT1800 interface dump: wan down, wwan up on phy0-sta0
 		mock.SeedWiFi(dev)
-		d.Uplinks = &uplinkview.Service{Ubus: dev, UCI: dev, Links: dev}
+		mock.SeedConnectivity(dev) // captured default route via phy0-sta0
+		d.Uplinks = &uplinkview.Service{Ubus: dev, UCI: dev, Links: dev, Routes: dev}
 	})
 	cookie, _ := e.login()
 	rec := e.do(req{method: http.MethodGet, path: "/api/v1/dashboard/uplinks", cookie: cookie})
 	want := `{"uplinks":[
-		{"name":"wan","configured":true,"up":false,"device":null,"ipv4":null,"ssid":null,"kind":null},
-		{"name":"wwan","configured":true,"up":true,"device":"phy0-sta0","ipv4":"192.168.90.241/24","ssid":"HomeUplink","kind":null},
-		{"name":"usbtether","configured":false,"up":false,"device":null,"ipv4":null,"ssid":null,"kind":null}
+		{"name":"wan","configured":true,"up":false,"device":null,"ipv4":null,"ssid":null,"kind":null,"proto":"dhcp","gateway":null,"band":null,"signal_dbm":null},
+		{"name":"wwan","configured":true,"up":true,"device":"phy0-sta0","ipv4":"192.168.90.241/24","ssid":"HomeUplink","kind":null,"proto":"dhcp","gateway":"192.168.90.2","band":"5g","signal_dbm":-63},
+		{"name":"usbtether","configured":false,"up":false,"device":null,"ipv4":null,"ssid":null,"kind":null,"proto":null,"gateway":null,"band":null,"signal_dbm":null}
 	],"failover":null}`
 	if rec.Code != http.StatusOK || compactJSON(t, rec.Body.Bytes()) != compactJSON(t, []byte(want)) {
 		t.Fatalf("%d %s", rec.Code, rec.Body)

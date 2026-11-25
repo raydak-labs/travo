@@ -437,6 +437,9 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	if links, ok := deps.Device.(device.NetLinkReader); ok {
 		uplinks.Links = links
 	}
+	if routes, ok := deps.Device.(device.DefaultRouteReader); ok {
+		uplinks.Routes = routes
+	}
 	if fo != nil {
 		uplinks.Failover = fo
 	}

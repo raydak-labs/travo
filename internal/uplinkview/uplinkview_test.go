@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/netip"
+	"strconv"
 	"testing"
 
 	"github.com/blackdark-org/travo-greenfield/internal/device"
@@ -49,7 +50,8 @@ func captured(t *testing.T) *mock.Device {
 
 func TestUplinksFromCaptures(t *testing.T) {
 	d := captured(t)
-	s := &Service{Ubus: d, UCI: d, Links: d, Failover: settings{set: failover.Settings{Uplinks: []string{"wan", "wwan"}}}}
+	mock.SeedConnectivity(d) // captured default route: via 192.168.90.2 dev phy0-sta0
+	s := &Service{Ubus: d, UCI: d, Links: d, Routes: d, Failover: settings{set: failover.Settings{Uplinks: []string{"wan", "wwan"}}}}
 	got, err := s.Uplinks(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -69,9 +71,28 @@ func TestUplinksFromCaptures(t *testing.T) {
 			t.Errorf("uplink %d = %v, want %+v", i, row, w)
 		}
 	}
+	details := []struct{ proto, gateway, band, signal string }{
+		{"dhcp", "<nil>", "<nil>", "<nil>"},
+		{"dhcp", "192.168.90.2", "5g", "-63"},
+		{"<nil>", "<nil>", "<nil>", "<nil>"},
+	}
+	for i, w := range details {
+		u := got.Uplinks[i]
+		row := struct{ proto, gateway, band, signal string }{str(u.Proto), str(u.Gateway), str(u.Band), num(u.SignalDBm)}
+		if row != w {
+			t.Errorf("uplink %s details = %+v, want %+v", u.Name, row, w)
+		}
+	}
 	if f := got.Failover; f == nil || f.Enabled || f.Active || len(f.Order) != 2 {
 		t.Errorf("failover on the stock config = %+v, want disabled and not active", f)
 	}
+}
+
+func num(p *int) string {
+	if p == nil {
+		return "<nil>"
+	}
+	return strconv.Itoa(*p)
 }
 
 func bool2(b bool) string {
@@ -91,6 +112,13 @@ func TestUplinksOptionalReadsLeaveNull(t *testing.T) {
 	}
 	if got.Uplinks[1].SSID != nil || got.Failover != nil {
 		t.Errorf("ssid = %s, failover = %+v; want both null", str(got.Uplinks[1].SSID), got.Failover)
+	}
+	d = captured(t)
+	mock.SeedConnectivity(d)
+	d.SetUbusDeviceReply("iwinfo", "info", "phy0-sta0", []byte("not json"))
+	s = &Service{Ubus: d, UCI: d}
+	if got, _ = s.Uplinks(context.Background()); got.Uplinks[1].Gateway != nil || got.Uplinks[1].SignalDBm != nil {
+		t.Errorf("no route reader and a broken iwinfo reply: gateway %s, signal %s; want null", str(got.Uplinks[1].Gateway), num(got.Uplinks[1].SignalDBm))
 	}
 	d = captured(t)
 	s = &Service{Ubus: d, UCI: d, Failover: settings{err: errors.New("torn failover.json")}}
@@ -144,5 +172,26 @@ func TestBuildRules(t *testing.T) {
 	}
 	if down.Uplinks[2].Kind != nil {
 		t.Errorf("unconfigured usbtether kind = %s", str(down.Uplinks[2].Kind))
+	}
+
+	signal := -50
+	wwan := facts.Interface{Name: "wwan", Proto: "dhcp", Up: true, L3Device: "phy0-sta0", IPv4: pfx("192.168.90.241/24")}
+	radios := []facts.Radio{{Band: "5g", Ifaces: []facts.WirelessIface{{Mode: "sta", Ifname: "phy0-sta0", SSID: "Hotel"}}}}
+	for name, tc := range map[string]struct {
+		in                        inputs
+		proto, gateway, band, sig string
+	}{
+		"all read":                {inputs{Interfaces: []facts.Interface{wwan}, Radios: radios, Route: &device.IPv4DefaultRoute{Device: "phy0-sta0", Gateway: "192.168.90.2"}, STAInfo: &facts.IwinfoInfo{Signal: &signal}}, "dhcp", "192.168.90.2", "5g", "-50"},
+		"no route":                {inputs{Interfaces: []facts.Interface{wwan}, Radios: radios}, "dhcp", "<nil>", "5g", "<nil>"},
+		"route on another device": {inputs{Interfaces: []facts.Interface{wwan}, Route: &device.IPv4DefaultRoute{Device: "eth0", Gateway: "10.0.0.1"}}, "dhcp", "<nil>", "<nil>", "<nil>"},
+		"route without gateway":   {inputs{Interfaces: []facts.Interface{wwan}, Route: &device.IPv4DefaultRoute{Device: "phy0-sta0"}}, "dhcp", "<nil>", "<nil>", "<nil>"},
+		"empty proto":             {inputs{Interfaces: []facts.Interface{{Name: "wwan", Up: true, L3Device: "phy0-sta0", IPv4: pfx("192.168.90.241/24")}}}, "<nil>", "<nil>", "<nil>", "<nil>"},
+		"wwan not up":             {inputs{Interfaces: []facts.Interface{{Name: "wwan", Proto: "dhcp", L3Device: "phy0-sta0"}}, Radios: radios, STAInfo: &facts.IwinfoInfo{Signal: &signal}}, "dhcp", "<nil>", "5g", "<nil>"},
+		"radios unreadable":       {inputs{Interfaces: []facts.Interface{wwan}, STAInfo: &facts.IwinfoInfo{Signal: &signal}}, "dhcp", "<nil>", "<nil>", "-50"},
+	} {
+		u := build(tc.in).Uplinks[1]
+		if str(u.Proto) != tc.proto || str(u.Gateway) != tc.gateway || str(u.Band) != tc.band || num(u.SignalDBm) != tc.sig {
+			t.Errorf("%s: proto %s gateway %s band %s signal %s", name, str(u.Proto), str(u.Gateway), str(u.Band), num(u.SignalDBm))
+		}
 	}
 }

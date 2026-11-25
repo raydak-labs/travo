@@ -256,7 +256,8 @@ func TestDashboardEventsThroughProductionMiddleware(t *testing.T) {
 		dev := d.Ubus.(*mock.Device)
 		mock.SeedClients(dev) // verbatim interface dump
 		mock.SeedWiFi(dev)
-		d.Uplinks = &uplinkview.Service{Ubus: dev, UCI: dev, Links: dev}
+		mock.SeedConnectivity(dev)
+		d.Uplinks = &uplinkview.Service{Ubus: dev, UCI: dev, Links: dev, Routes: dev}
 	})
 	mock.SeedSystem(e.dev)
 	if rec := e.do(req{method: http.MethodGet, path: "/api/v1/dashboard/events"}); rec.Code != http.StatusUnauthorized {

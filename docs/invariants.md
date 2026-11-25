@@ -60,7 +60,7 @@ Paths: guards in `/etc/travo-greenfield-guards/`, state in `/etc/travo-greenfiel
 - Missing optional package → 503 naming the package, not 500.
 - Limits: body 64 MB, read timeout 5 min, write timeout 45 min (package streams), idle 60 s on every listener (HTTP, HTTPS, AdGuard proxy); the dashboard stream and the firmware upload set per-request deadlines through `http.ResponseController`, graceful shutdown ~20 s; HTTP drains BEFORE services and persistence close.
 - Long ops stream (NDJSON-like). Live status via one shared push subscription, never per page.
-- Dashboard stream sources run on every tick while any dashboard is open, so they stay cheap: no package-manager query, no fan-out that the data does not need (the clients source reads one station list per AP, every 10 s). A package status read with such costs gets its own slim reader (`internal/uplinkview`).
+- Dashboard stream sources run on every tick while any dashboard is open, so they stay cheap: no package-manager query, no fan-out that the data does not need (the clients source reads one station list per AP, every 10 s). A package status read with such costs gets its own slim reader (`internal/uplinkview`). The uplinks source also reads the kernel default route and, only while wwan is up, one `iwinfo info` on its STA for the signal.
 - GET never mutates.
 
 ## 5. Persistence

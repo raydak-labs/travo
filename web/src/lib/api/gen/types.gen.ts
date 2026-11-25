@@ -478,6 +478,10 @@ export type DashboardFailover = {
 
 export type DashboardUplink = {
     /**
+     * wwan only: band of the STA's radio (2g, 5g, 6g); null when unknown or not wwan
+     */
+    band: string | null;
+    /**
      * The netifd interface exists
      */
     configured: boolean;
@@ -485,6 +489,10 @@ export type DashboardUplink = {
      * Kernel device carrying layer 3; null when absent
      */
     device: string | null;
+    /**
+     * IPv4 gateway of the kernel default route when this uplink carries it; null otherwise
+     */
+    gateway: string | null;
     /**
      * First IPv4 address in CIDR form; null when none
      */
@@ -494,6 +502,14 @@ export type DashboardUplink = {
      */
     kind: string | null;
     name: 'wan' | 'wwan' | 'usbtether';
+    /**
+     * netifd protocol (dhcp, static, pppoe, ...); null when not configured
+     */
+    proto: string | null;
+    /**
+     * wwan only: STA signal in dBm while wwan is up; null otherwise
+     */
+    signal_dbm: number | null;
     /**
      * wwan only: SSID of the uplink STA; null when unknown or not wwan
      */
