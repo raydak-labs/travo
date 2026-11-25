@@ -14,6 +14,7 @@ import { m } from '../paraglide/messages.js';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import Section from '../ui/Section.svelte';
+import { disabledMessage } from '../update-check';
 
 type Update = NonNullable<Awaited<ReturnType<typeof postSystemUpdateCheck>>['data']>;
 let result = $state<Update>();
@@ -164,6 +165,8 @@ onMount(() => {
         {m.update_checking()}
       {:else if result?.status === 'available'}
         {m.update_available({ version: result.latest_version ?? '' })}
+      {:else if result?.status === 'disabled'}
+        {disabledMessage(result)}
       {:else}
         {labels[result?.status ?? 'unavailable']()}
       {/if}

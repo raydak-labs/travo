@@ -223,3 +223,34 @@ func TestManualCheckBypassesConcurrentThrottledAutomaticCheck(t *testing.T) {
 		t.Fatalf("result %+v, outbound attempts %d", r, outbound.Load())
 	}
 }
+
+func TestDisabledReason(t *testing.T) {
+	never := roundTrip(func(r *http.Request) (*http.Response, error) {
+		return response(200, releasesJSON), nil
+	})
+	for _, tt := range []struct {
+		name, source, running, want string
+	}{
+		{"source off", "off", "1.2.3", "off"},
+		{"development build", DefaultSource, "dev", "unstable_build"},
+		{"both: the setting wins", "off", "dev", "off"},
+		{"v prefix is stable", DefaultSource, "v1.2.3", ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			s := New(t.Context(), tt.source, tt.running, filepath.Join(t.TempDir(), "state.json"), time.Now, never)
+			got := s.Check(t.Context(), true)
+			if tt.want == "" {
+				if got.DisabledReason != nil {
+					t.Fatalf("reason = %q, want null (status %s)", *got.DisabledReason, got.Status)
+				}
+				return
+			}
+			if got.Status != "disabled" || got.DisabledReason == nil || *got.DisabledReason != tt.want {
+				t.Fatalf("got status %s reason %v, want disabled %s", got.Status, got.DisabledReason, tt.want)
+			}
+			if got.LatestVersion != nil || got.CheckedAt != nil || got.RunningVersion != tt.running {
+				t.Fatalf("disabled result changed shape: %+v", got)
+			}
+		})
+	}
+}

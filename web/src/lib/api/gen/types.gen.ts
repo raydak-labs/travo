@@ -1268,6 +1268,10 @@ export type ReservationsOutputBody = {
 
 export type Result = {
     checked_at: string | null;
+    /**
+     * Why checks are disabled: off = release source set to off; unstable_build = the running build is not an X.Y.Z release; null otherwise
+     */
+    disabled_reason: 'off' | 'unstable_build';
     latest_version: string | null;
     running_version: string;
     status: 'disabled' | 'deferred' | 'no_release' | 'source_unavailable' | 'rate_limited' | 'unavailable' | 'available' | 'up_to_date';

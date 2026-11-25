@@ -18,6 +18,7 @@ type Result struct {
 	LatestVersion  *string    `json:"latest_version" nullable:"true"`
 	Status         string     `json:"status" enum:"disabled,deferred,no_release,source_unavailable,rate_limited,unavailable,available,up_to_date"`
 	CheckedAt      *time.Time `json:"checked_at" nullable:"true"`
+	DisabledReason *string    `json:"disabled_reason" nullable:"true" enum:"off,unstable_build" doc:"Why checks are disabled: off = release source set to off; unstable_build = the running build is not an X.Y.Z release; null otherwise"`
 }
 
 type attemptState struct {
@@ -48,8 +49,8 @@ func New(daemon context.Context, source, running, statePath string, now func() t
 }
 
 func (s *Service) Check(ctx context.Context, manual bool) Result {
-	if s.source == "off" || !stableVersion.MatchString(strings.TrimPrefix(s.running, "v")) {
-		return Result{RunningVersion: s.running, Status: "disabled"}
+	if reason := disabledReason(s.source, s.running); reason != "" {
+		return Result{RunningVersion: s.running, Status: "disabled", DisabledReason: &reason}
 	}
 	for {
 		s.mu.Lock()
@@ -130,4 +131,16 @@ func (s *Service) EligibleVersion() (string, bool) {
 		return "", false
 	}
 	return *s.last.LatestVersion, true
+}
+
+// disabledReason names why checks cannot run; "" when they can. An "off" source wins over a
+// development build, since it is the operator's setting.
+func disabledReason(source, running string) string {
+	switch {
+	case source == "off":
+		return "off"
+	case !stableVersion.MatchString(strings.TrimPrefix(running, "v")):
+		return "unstable_build"
+	}
+	return ""
 }

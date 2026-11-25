@@ -1309,5 +1309,7 @@
   "uplink_card_traffic": "Traffic",
   "uplink_card_setup": "Set up",
   "dashboard_quick_status": "Quick status",
-  "dashboard_system_open": "Details"
+  "dashboard_system_open": "Details",
+  "update_disabled_off": "Update checks are turned off on this router. Set travo-greenfield.main.release_source to OWNER/REPO and restart the service to turn them on.",
+  "update_disabled_unstable": "This build ({version}) is not a release, so it does not check for updates."
 }
