@@ -1,5 +1,57 @@
 # Changelog
 
+## [0.3.0](https://github.com/blackdark-org/travo-greenfield/compare/v0.2.1...v0.3.0) (2026-11-25)
+
+
+### Features
+
+* **dashboard:** stream uplinks and clients for the topology diagram ([b0be739](https://github.com/blackdark-org/travo-greenfield/commit/b0be73914b2413f20f6a196960966903a0d59c71)), closes [#300](https://github.com/blackdark-org/travo-greenfield/issues/300)
+* **dashboard:** uplink protocol, gateway, band and signal ([a49d80a](https://github.com/blackdark-org/travo-greenfield/commit/a49d80af5a2009b76e4c8fa581f6c92945b9b3c7)), closes [#337](https://github.com/blackdark-org/travo-greenfield/issues/337)
+* **update:** say why update checks are disabled ([e311205](https://github.com/blackdark-org/travo-greenfield/commit/e311205f0347a213fb56cdd7643b8375864919a6)), closes [#338](https://github.com/blackdark-org/travo-greenfield/issues/338)
+* **web:** dashboard pass around the topology diagram ([c329b64](https://github.com/blackdark-org/travo-greenfield/commit/c329b64d30c9439aeb73d0b6ab917b84c18ceef8)), closes [#305](https://github.com/blackdark-org/travo-greenfield/issues/305)
+* **web:** dashboard topology diagram ([3d898ec](https://github.com/blackdark-org/travo-greenfield/commit/3d898ec54f6be9f66e684d9bd0bf4095091527d7)), closes [#304](https://github.com/blackdark-org/travo-greenfield/issues/304)
+* **web:** grouped sidebar navigation with Network and System sub-pages ([d1eb484](https://github.com/blackdark-org/travo-greenfield/commit/d1eb4842de4677d9daf04efe5ad906796ed042a6)), closes [#301](https://github.com/blackdark-org/travo-greenfield/issues/301)
+* **web:** header menu, Travo logo and version ([69b77ca](https://github.com/blackdark-org/travo-greenfield/commit/69b77ca62b38d3eced88f7b2a09308bdacea725c)), closes [#331](https://github.com/blackdark-org/travo-greenfield/issues/331)
+* **web:** layout pass for Internet, VPN & Tailscale and Clients ([0122f91](https://github.com/blackdark-org/travo-greenfield/commit/0122f9136d6e6206519494d4a721e1c0b2a13ba0)), closes [#306](https://github.com/blackdark-org/travo-greenfield/issues/306)
+* **web:** layout pass for the Network sub-pages ([a8ad81c](https://github.com/blackdark-org/travo-greenfield/commit/a8ad81cbb5492b4fba604bc278ea3dc7fa5127f0)), closes [#307](https://github.com/blackdark-org/travo-greenfield/issues/307)
+* **web:** layout pass for the System sub-pages, Services, Login and Setup ([96de85b](https://github.com/blackdark-org/travo-greenfield/commit/96de85b305613ad7508d3c41820c26887ce54a6f)), closes [#308](https://github.com/blackdark-org/travo-greenfield/issues/308)
+* **web:** layout wrappers for pages ([38f44b3](https://github.com/blackdark-org/travo-greenfield/commit/38f44b3ddbb04f7bcb1ded74bf7ec16b0265151b))
+* **web:** let a Section render without a body ([767b10e](https://github.com/blackdark-org/travo-greenfield/commit/767b10ecb8a348706847b78fcf774217a6c74ef4))
+* **web:** network map in the original Travo style; dashboard cards ([4c6c1e7](https://github.com/blackdark-org/travo-greenfield/commit/4c6c1e7c7a1f51cc837b293526d8580b68e491c4)), closes [#332](https://github.com/blackdark-org/travo-greenfield/issues/332)
+* **web:** shadcn Select replaces the native selects ([1c3e62f](https://github.com/blackdark-org/travo-greenfield/commit/1c3e62fdf043aabf294a90456a11e3f845bcc3bc)), closes [#330](https://github.com/blackdark-org/travo-greenfield/issues/330)
+* **web:** topology model from the dashboard sources ([2cf3856](https://github.com/blackdark-org/travo-greenfield/commit/2cf3856129f934b0bcd1c006e4c140eac9a536d3)), closes [#303](https://github.com/blackdark-org/travo-greenfield/issues/303)
+* **web:** uplink cards show protocol, gateway, band and signal ([09c5583](https://github.com/blackdark-org/travo-greenfield/commit/09c558383c075f6c3602ff41d39516eb346ef5e0)), closes [#337](https://github.com/blackdark-org/travo-greenfield/issues/337)
+* **web:** WiFi page on the layout system ([e53ec8f](https://github.com/blackdark-org/travo-greenfield/commit/e53ec8f6aa4d6b7842491aeed45d7476fb925db2)), closes [#302](https://github.com/blackdark-org/travo-greenfield/issues/302)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/danielgtaylor/huma/v2 to v2.41.0 ([#317](https://github.com/blackdark-org/travo-greenfield/issues/317)) ([463f898](https://github.com/blackdark-org/travo-greenfield/commit/463f898dde0722a228d893d11c05d084978e7ba3))
+* **web:** dashboard cards keep the stale rules and show internet ([9d340c5](https://github.com/blackdark-org/travo-greenfield/commit/9d340c584a43d82286450c8e1e3388d317a3973b))
+* **web:** design review findings (round 1) ([c1752ed](https://github.com/blackdark-org/travo-greenfield/commit/c1752ed124b916e373cb16747afa2fbe80d59a69))
+* **web:** design review findings (round 2) ([64e6575](https://github.com/blackdark-org/travo-greenfield/commit/64e6575ef06eea21638e02979f56066d68b41421))
+* **web:** keep uplink addresses on one line ([2d82179](https://github.com/blackdark-org/travo-greenfield/commit/2d821798da5414a13fe44cfeb0d8e16cf49a194f))
+* **web:** LED schedule times are disabled while the schedule is off ([ff084b8](https://github.com/blackdark-org/travo-greenfield/commit/ff084b8c8709588ffe5ceb37a7b83f63c4302707)), closes [#338](https://github.com/blackdark-org/travo-greenfield/issues/338)
+* **web:** load errors render as a plain row, not a box in the card ([a87a547](https://github.com/blackdark-org/travo-greenfield/commit/a87a547b0eb819aaffebf37eb033ff2be0e7f6a3)), closes [#338](https://github.com/blackdark-org/travo-greenfield/issues/338)
+* **web:** narrow topology stale marking to the failing source ([941bea0](https://github.com/blackdark-org/travo-greenfield/commit/941bea0e11c33852bade6ee020a99f667318539a))
+* **web:** route moved-feature alerts to their new pages ([aeb514b](https://github.com/blackdark-org/travo-greenfield/commit/aeb514b1e35e5f13cada5e4cb3a96e2d5d58a93e))
+* **web:** show an unset guest network once ([8f3e985](https://github.com/blackdark-org/travo-greenfield/commit/8f3e9852493989305b9425201a7042019a3ee02b))
+
+
+### Refactoring
+
+* **web:** build per-source dashboard state from SOURCE_NAMES ([432f0c0](https://github.com/blackdark-org/travo-greenfield/commit/432f0c05939c776acc94ae46825714f077ef64dd))
+* **web:** extract SummaryBand and SummaryTile from the WiFi summary ([0ebc4fe](https://github.com/blackdark-org/travo-greenfield/commit/0ebc4fe365e008a419e14f850037af0cd547e1bb))
+* **web:** move the last cards to Section and delete ui/Card ([3c16b8f](https://github.com/blackdark-org/travo-greenfield/commit/3c16b8f7183bb96a4bbf7272070dc8e306b24d6b))
+* **web:** share the restart flow in restart.svelte.ts ([2cbe7d3](https://github.com/blackdark-org/travo-greenfield/commit/2cbe7d3b0fde1dc6054a22486a18f3a390db977e))
+* **web:** share the topology test inputs ([4fb32df](https://github.com/blackdark-org/travo-greenfield/commit/4fb32dfb3f028555cc2aa62df4906115420d7be5))
+
+
+### Documentation
+
+* **spikes:** uplink details pass on the AXT1800 ([00b0c12](https://github.com/blackdark-org/travo-greenfield/commit/00b0c1243282d8bc8478e1ab7a0ac4ce22e16551))
+* web UI and README match the overhauled UI ([415e35a](https://github.com/blackdark-org/travo-greenfield/commit/415e35a6e09e1cd7d92bdc3f37cc8c724856b1d3))
+
 ## [0.2.1](https://github.com/blackdark-org/travo-greenfield/compare/v0.2.0...v0.2.1) (2026-11-20)
 
 
