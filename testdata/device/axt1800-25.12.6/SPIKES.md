@@ -38,5 +38,6 @@ Flagged: on the test device the old Travo left the AdGuard admin API open on `0.
 | #169 | AdGuard preinstalled without config after `firstboot` | Fixed: seeded loopback config in 2 s | DF §11 |
 | #277 | Failover apply probe and live failover, wan to usbtether | Pass after fix: stale mangle base chains deleted on Enable; detection 16 to 17 s, failback 31 to 33 s; same-subnet uplinks refused (`failover_same_subnet`) | DF §9, ADR 0018 |
 | #285 | Quiet 24 h memory soak with slabinfo and vmstat | Open | DF §11 |
+| #337 | Dashboard uplink details against the router (GET-only, dev build of main, then 0.2.0 restored) | Pass: wwan signal -30 dBm = `iwinfo info` -30, band `5g` = STA radio (5745 MHz), gateway 10.0.1.1 on wwan = `ip route show default` (wan up but not the default route: gateway null), WAN protocol `dhcp` = `uci get network.wan.proto`; cards checked by the operator; UCI byte-identical after restore | docs/testing.md |
 
 Open `needs-hardware` issues: #199, #168, #131 (renew on a real portal), #97, #25 (portal detection and assist).
