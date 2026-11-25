@@ -1,0 +1,60 @@
+{
+	"phy": "phy0",
+	"ssid": "HomeUplink",
+	"bssid": "94:83:C4:1F:28:3A",
+	"country": "US",
+	"mode": "Client",
+	"channel": 52,
+	"center_chan1": 58,
+	"frequency": 5260,
+	"frequency_offset": 0,
+	"txpower": 20,
+	"txpower_offset": 0,
+	"quality": 47,
+	"quality_max": 70,
+	"signal": -63,
+	"noise": -102,
+	"bitrate": 325000,
+	"encryption": {
+		"enabled": true,
+		"wpa": [
+			2
+		],
+		"authentication": [
+			"psk"
+		],
+		"ciphers": [
+			"tkip",
+			"ccmp"
+		]
+	},
+	"htmodes": [
+		"HT20",
+		"HT40",
+		"VHT20",
+		"VHT40",
+		"VHT80",
+		"HE20",
+		"HE40",
+		"HE80",
+		"HE80+80",
+		"HE160"
+	],
+	"hwmodes": [
+		"n",
+		"ac",
+		"ax"
+	],
+	"hwmodes_text": "ac/ax/n",
+	"hwmode": "ac",
+	"htmode": "VHT80",
+	"hardware": {
+		"id": [
+			0,
+			0,
+			0,
+			0
+		],
+		"name": "Qualcomm Atheros IPQ6018"
+	}
+}

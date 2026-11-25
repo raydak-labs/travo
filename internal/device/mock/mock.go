@@ -64,6 +64,7 @@ type Device struct {
 	staged       map[string]*config
 	ubus         map[string]json.RawMessage
 	scanReplies  map[string]json.RawMessage
+	deviceUbus   map[string]json.RawMessage // object.method/device, for calls that name a device
 	staLinkIndex int
 	netLinks     []device.NetLink
 	// Reorders records `config.section=index` per Reorder call.
@@ -91,7 +92,7 @@ type Device struct {
 }
 
 func New() *Device {
-	return &Device{bootID: "mock-boot-0", committed: map[string]*config{}, staged: map[string]*config{}, ubus: map[string]json.RawMessage{}, scanReplies: map[string]json.RawMessage{}}
+	return &Device{bootID: "mock-boot-0", committed: map[string]*config{}, staged: map[string]*config{}, ubus: map[string]json.RawMessage{}, scanReplies: map[string]json.RawMessage{}, deviceUbus: map[string]json.RawMessage{}}
 }
 
 // SetUbusReply scripts the reply for object.method (use verbatim captured payloads).
@@ -99,6 +100,14 @@ func (d *Device) SetUbusReply(object, method string, reply json.RawMessage) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.ubus[object+"."+method] = reply
+}
+
+// SetUbusDeviceReply answers object.method only when the call names this device
+// (args {"device": name}); other devices fall back to SetUbusReply's answer.
+func (d *Device) SetUbusDeviceReply(object, method, name string, reply json.RawMessage) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.deviceUbus[object+"."+method+"/"+name] = reply
 }
 
 func clone(c *config) *config {
@@ -246,9 +255,14 @@ func (d *Device) Pending(_ context.Context, cfg string) (bool, error) {
 	return ok, nil
 }
 
-func (d *Device) Call(_ context.Context, object, method string, _ any) (json.RawMessage, error) {
+func (d *Device) Call(_ context.Context, object, method string, args any) (json.RawMessage, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if a, ok := args.(map[string]string); ok && a["device"] != "" {
+		if r, ok := d.deviceUbus[object+"."+method+"/"+a["device"]]; ok {
+			return r, nil
+		}
+	}
 	r, ok := d.ubus[object+"."+method]
 	if !ok {
 		return nil, fmt.Errorf("ubus %s.%s: %w", object, method, device.ErrNotFound)

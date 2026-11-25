@@ -12,6 +12,9 @@ import (
 //go:embed testdata/wireless-status.json
 var wirelessStatus []byte
 
+//go:embed testdata/iwinfo-info-phy0-sta0.json
+var staInfoPHY0 []byte
+
 //go:embed testdata/iwinfo-scan-phy0-sta0.json
 var scanPHY0STA []byte
 
@@ -52,6 +55,7 @@ func SeedWiFi(d *Device) {
 	d.mu.Unlock()
 	d.SetUbusReply("network.wireless", "status", wirelessStatus)
 	d.SetScanReply("phy0-sta0", scanPHY0STA)
+	d.SetUbusDeviceReply("iwinfo", "info", "phy0-sta0", staInfoPHY0)
 	d.SetScanReply("phy1-ap0", scanPHY1AP)
 }
 

@@ -27,3 +27,4 @@ The WiFi seeds use the connected summary with one scan per radio. Per-interface 
 - `devicetree-keys.tsv` is a byte-identical copy of `testdata/device/axt1800-25.12.6/buttons/devicetree-keys.tsv`; mock mode lists these buttons (reset key and slide switch).
 - `validate-firmware-zero-image.json` is a byte-identical copy of `testdata/container/openwrt-25.12.6/sysupgrade/validate-zero-image.json` (container capture, a zero file: `valid:false`); mock `ValidateFirmware` answers with it. Tests that need a valid image flip only the `valid` value.
 - `apk-world.txt` is a byte-identical copy of `testdata/device/axt1800-25.12.6/sysupgrade/etc-apk-world.txt`; mock `PackageWorlds` returns it as both worlds (as on the router: nothing user-installed).
+- `iwinfo-info-phy0-sta0.json` is a byte-identical copy of `testdata/device/axt1800-25.12.6/iwinfo-info-phy0-sta0.json` (`ubus call iwinfo info '{"device":"phy0-sta0"}'`), answered only for that device (`SetUbusDeviceReply`).
