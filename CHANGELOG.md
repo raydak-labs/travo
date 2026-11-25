@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/blackdark-org/travo-greenfield/compare/v0.3.0...v0.4.0) (2026-11-25)
+
+
+### Features
+
+* **web:** UI structure v2 ([#342](https://github.com/blackdark-org/travo-greenfield/issues/342)) ([9bcacc5](https://github.com/blackdark-org/travo-greenfield/commit/9bcacc5a70e21da8be8218de8766348419407eb9))
+
 ## [0.3.0](https://github.com/blackdark-org/travo-greenfield/compare/v0.2.1...v0.3.0) (2026-11-25)
 
 
