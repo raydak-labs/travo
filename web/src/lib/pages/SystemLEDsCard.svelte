@@ -15,8 +15,11 @@ import Status from '../ui/Status.svelte';
 
 const loader = createLoader(fetchLEDs);
 let busy = $state(false);
-let form = $state<LedSchedule>({ enabled: false, off_at: '23:00', on_at: '07:00' });
-let filled = false;
+// Start from data that is already loaded (no flash of the defaults); else the effect fills it.
+let form = $state<LedSchedule>(
+  loader.data ? { ...loader.data.schedule } : { enabled: false, off_at: '23:00', on_at: '07:00' },
+);
+let filled = loader.data !== undefined;
 const problem = $derived(scheduleProblem(form));
 
 // Fill the schedule once from the first load; a later reload must not wipe edits.
@@ -83,11 +86,11 @@ function save(event: SubmitEvent) {
         <div class="flex gap-3">
           <Label class="grid flex-1 gap-1">
             {m.leds_schedule_off()}
-            <Input type="time" bind:value={form.off_at} required disabled={busy} />
+            <Input type="time" bind:value={form.off_at} required disabled={busy || !form.enabled} />
           </Label>
           <Label class="grid flex-1 gap-1">
             {m.leds_schedule_on()}
-            <Input type="time" bind:value={form.on_at} required disabled={busy} />
+            <Input type="time" bind:value={form.on_at} required disabled={busy || !form.enabled} />
           </Label>
         </div>
         <span class="text-sm text-muted-foreground">{m.leds_schedule_hint()}</span>

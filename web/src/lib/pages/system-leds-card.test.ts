@@ -37,6 +37,17 @@ describe('LEDs card', () => {
     expect(body).toContain('Held off by Travo');
   });
 
+  it('disables the schedule times while the schedule is off', () => {
+    loader.data = { leds, off: false, schedule };
+    const off = render(SystemLEDsCard).body.match(/<input[^>]*type="time"[^>]*>/g) ?? [];
+    expect(off).toHaveLength(2);
+    for (const input of off) expect(input).toContain('disabled=""');
+    loader.data = { leds, off: false, schedule: { ...schedule, enabled: true } };
+    const on = render(SystemLEDsCard).body.match(/<input[^>]*type="time"[^>]*>/g) ?? [];
+    expect(on).toHaveLength(2);
+    for (const input of on) expect(input).not.toContain('disabled=""');
+  });
+
   it('no LEDs: says so', () => {
     loader.data = { leds: [], off: false, schedule };
     expect(render(SystemLEDsCard).body).toContain('no LEDs');
