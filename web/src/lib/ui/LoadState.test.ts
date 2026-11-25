@@ -23,6 +23,8 @@ describe('LoadState', () => {
     expect(out).toContain('boom');
     expect(out).toContain('<button');
     expect(out).not.toContain('CONTENT');
+    // A plain row inside the surrounding card, not a second bordered Alert box.
+    expect(out).not.toContain('data-slot="alert"');
   });
 
   it('keeps the known value, dimmed, beside the error when stale', () => {

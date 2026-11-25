@@ -1,6 +1,5 @@
 <script lang="ts">
 import type { Snippet } from 'svelte';
-import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import Skeleton from '$lib/components/ui/skeleton/skeleton.svelte';
 import { m } from '../paraglide/messages.js';
@@ -31,7 +30,8 @@ let {
   {#if stale}
     <div class="opacity-60">{@render children()}</div>
   {/if}
-  <Alert class="flex flex-wrap items-center gap-3">
+  <!-- Plain row, not an Alert box: the error already sits inside its Section card. -->
+  <div role="alert" class="flex flex-wrap items-center gap-3">
     {#if stale}
       <Status kind="stale">{m.load_stale()}</Status>
     {/if}
@@ -43,7 +43,7 @@ let {
     >
       {m.load_retry()}
     </Button>
-  </Alert>
+  </div>
 {:else}
   {@render children()}
 {/if}
