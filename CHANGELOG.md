@@ -2,6 +2,26 @@
 
 Versions 0.1.0 to 0.5.0 below are releases of travo-greenfield, the rewrite that became Travo 0.11.0. Travo 0.10.3 and earlier are described in their [GitHub releases](https://github.com/raydak-labs/travo/releases); their code is on the `legacy` branch.
 
+## [0.12.0](https://github.com/raydak-labs/travo/compare/v0.11.0...v0.12.0) (2026-11-26)
+
+
+### Features
+
+* **packaging:** first install moves the LAN to 192.168.50.1/24 and can set up WiFi ([bca3391](https://github.com/raydak-labs/travo/commit/bca3391b6ee07c04b87596abae2070f34029817f))
+* **web:** set up WiFi first; Connect to WiFi is a dialog ([51b2a50](https://github.com/raydak-labs/travo/commit/51b2a5091b8f9c7cc71510be85ba623dd03adda6))
+* **wifi:** set up the router's WiFi in one transaction ([19dbb26](https://github.com/raydak-labs/travo/commit/19dbb26ef9af65f3c2a79e7ec42b4e0ef53d8346))
+
+
+### Bug Fixes
+
+* address review of the WiFi setup and installer ([9cea369](https://github.com/raydak-labs/travo/commit/9cea369f65f8488b8f8ac1db7178fd8c881707cb))
+* **web:** uplink alerts open the Internet page ([dc08280](https://github.com/raydak-labs/travo/commit/dc082806f3938f2aafb3aab3d99785f374e435b4))
+
+
+### Documentation
+
+* install with --wifi, first use at 192.168.50.1 ([3d678f6](https://github.com/raydak-labs/travo/commit/3d678f6214f4ff4cd9e449ce2a941dbf4908cb92))
+
 ## [0.11.0](https://github.com/raydak-labs/travo/compare/v0.10.3...v0.11.0) (2026-11-26)
 
 
