@@ -1,5 +1,7 @@
 # Changelog
 
+Versions 0.1.0 to 0.5.0 below are releases of travo-greenfield, the rewrite that became Travo 0.11.0. Travo 0.10.3 and earlier are described in their [GitHub releases](https://github.com/raydak-labs/travo/releases); their code is on the `legacy` branch.
+
 ## [0.5.0](https://github.com/blackdark-org/travo-greenfield/compare/v0.4.0...v0.5.0) (2026-11-26)
 
 
