@@ -42,3 +42,9 @@ var FirewallExport []byte
 //
 //go:embed testdata/mwan3-stock-config.txt
 var MWAN3Stock []byte
+
+// SQMExport is the sqm-scripts package's own /etc/config/sqm exported via uci (25.12.6 feed);
+// mock mode loads it so SQM settings work without a device.
+//
+//go:embed testdata/uci-export-sqm.txt
+var SQMExport []byte

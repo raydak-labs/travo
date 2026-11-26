@@ -35,6 +35,7 @@ export const pages: Record<Route, PageImport> = {
   clients: lazyPage(() => import('./Clients.svelte')),
   services: lazyPage(() => import('./Services.svelte')),
   'services-adguard': lazyPage(() => import('./AdGuard.svelte')),
+  'services-sqm': lazyPage(() => import('./SQM.svelte')),
   'network-lan': lazyPage(() => import('./NetworkLAN.svelte')),
   'network-port-forwards': lazyPage(() => import('./NetworkPortForwards.svelte')),
   'network-ipv6': lazyPage(() => import('./NetworkIPv6.svelte')),

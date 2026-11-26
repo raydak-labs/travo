@@ -42,6 +42,7 @@ import (
 	"github.com/raydak-labs/travo/internal/netview"
 	"github.com/raydak-labs/travo/internal/portfwd"
 	"github.com/raydak-labs/travo/internal/reboot"
+	"github.com/raydak-labs/travo/internal/sqm"
 	"github.com/raydak-labs/travo/internal/sshkeys"
 	"github.com/raydak-labs/travo/internal/static"
 	"github.com/raydak-labs/travo/internal/syssettings"
@@ -458,6 +459,8 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		apiDeps.IPv6 = newIPv6(deps)
 		apiDeps.DDNS = newDDNS(deps, connection)
 		apiDeps.Catalog = newCatalog(deps, connection)
+		sqmServices, _ := deps.Device.(device.Services)
+		apiDeps.SQM = &sqm.Service{UCI: deps.Device, Packages: deps.Packages, Services: sqmServices, Apply: deps.Txn}
 		apiDeps.PortForwards = &portfwd.Service{UCI: deps.Device, Txns: deps.Txn}
 		apiDeps.LAN = &lanaddress.Service{UCI: deps.Device, Ubus: deps.Device, Txns: deps.Txn, Now: time.Now,
 			OnMoved: func(c context.Context) { _ = provider.Refresh(c, deps.Device) }}

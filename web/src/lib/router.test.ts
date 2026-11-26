@@ -26,6 +26,7 @@ const PATHS: [string, Route][] = [
   ['#/clients', 'clients'],
   ['#/services', 'services'],
   ['#/services/adguard', 'services-adguard'],
+  ['#/services/sqm', 'services-sqm'],
   ['#/network/lan', 'network-lan'],
   ['#/network/port-forwards', 'network-port-forwards'],
   ['#/network/ipv6', 'network-ipv6'],

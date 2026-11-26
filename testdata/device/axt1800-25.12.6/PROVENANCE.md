@@ -134,3 +134,6 @@ Captured read-only on 2026-11-26 from the same GL-AXT1800 (OpenWrt 25.12.6 r3331
 
 - factory-default/uci-show-wireless.txt: `uci show wireless` (both APs `OpenWrt`, open, disabled)
 - factory-default/uci-show-network.txt: `uci show network` (lan `192.168.1.1/24`)
+
+## sqm/ (2026-11-27, container capture from OpenWrt 25.12.6 feed, #302)
+Container capture of `sqm-scripts-1.7.2-r1` (`/etc/config/sqm`, `/etc/init.d/sqm`, `uci export sqm`) from `openwrt/rootfs:aarch64_generic-25.12.6`. Proves format, defaults, and quoting only. See `sqm/PROVENANCE.md`.

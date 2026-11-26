@@ -15,7 +15,7 @@ import { untrack } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import * as Collapsible from '$lib/components/ui/collapsible';
 import { Toaster } from '$lib/components/ui/sonner';
-import { getAdGuard } from './lib/api/gen';
+import { getAdGuard, getSqm } from './lib/api/gen';
 import { ownDashboardEvents, restoreDashboardEvents } from './lib/app-dashboard-events';
 import logo from './lib/assets/logo.webp';
 import { dashboardEvents } from './lib/dashboard-events.svelte';
@@ -97,6 +97,7 @@ const childLabels: Partial<Record<Route, () => string>> = {
   'vpn-wireguard': () => m.nav_vpn_wireguard(),
   'vpn-tailscale': () => m.nav_vpn_tailscale(),
   'services-adguard': () => m.nav_services_adguard(),
+  'services-sqm': () => m.nav_services_sqm(),
   'network-lan': () => m.nav_network_lan(),
   'network-port-forwards': () => m.nav_network_port_forwards(),
   'network-ipv6': () => m.nav_network_ipv6(),
@@ -129,7 +130,10 @@ function setGroup(group: NavGroup, open: boolean) {
 
 // Services leaves the nav only when the daemon cannot supervise AdGuard Home at all (503).
 // An absent package stays visible: the page is the retry path for a failed install.
+// SQM leaves the nav only when sqm-scripts is explicitly reported absent (sqm_not_installed);
+// a failed check is not absent (docs/web-ui.md).
 let servicesUnavailable = $state(false);
+let sqmAbsent = $state(false);
 $effect(() => {
   if (!authenticated) return;
   const request = new AbortController();
@@ -138,11 +142,22 @@ $effect(() => {
       servicesUnavailable = r.response?.status === 503;
     })
     .catch(() => {});
+  getSqm({ signal: request.signal })
+    .then((r) => {
+      const code = (r.error as { code?: string } | undefined)?.code;
+      sqmAbsent = r.response?.status === 503 && code === 'sqm_not_installed';
+    })
+    .catch(() => {});
   return () => request.abort();
 });
 const shownNav = $derived(
   entries.filter((item) => !('group' in item && item.group === 'services' && servicesUnavailable)),
 );
+function visibleChildren(group: NavGroup): readonly Route[] {
+  const list = NAV_GROUPS[group];
+  if (group === 'services' && sqmAbsent) return list.filter((r) => r !== 'services-sqm');
+  return list;
+}
 
 void session.bootstrap();
 
@@ -214,7 +229,7 @@ $effect(() => {
           {:else}
             {@const Icon = item.icon}
             {@const overview = GROUP_OVERVIEW[item.group]}
-            {@const children = NAV_GROUPS[item.group]}
+            {@const children = visibleChildren(item.group)}
             {@const inside = navGroup(shown) === item.group}
             <li>
               <Collapsible.Root open={navState[item.group]} onOpenChange={(open) => setGroup(item.group, open)}>

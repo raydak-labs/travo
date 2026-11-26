@@ -108,6 +108,9 @@ func New(o Options) (Deps, error) {
 		if secs, err := cli.ParseExport("mwan3", "package mwan3\n\n"+string(mock.MWAN3Stock)); err == nil {
 			_ = dev.Load(context.Background(), "mwan3", secs)
 		}
+		if secs, err := cli.ParseExport("sqm", string(mock.SQMExport)); err == nil {
+			_ = dev.Load(context.Background(), "sqm", secs)
+		}
 		wireless, err := cli.ParseShow("wireless", string(mock.WirelessUCI))
 		if err != nil {
 			return Deps{}, fmt.Errorf("mock wireless: %w", err)

@@ -1308,6 +1308,41 @@ export type Result = {
     status: 'disabled' | 'deferred' | 'no_release' | 'source_unavailable' | 'rate_limited' | 'unavailable' | 'available' | 'up_to_date';
 };
 
+export type SqmSettings = {
+    /**
+     * Download bandwidth limit in kbit/s (0 disables ingress shaping)
+     */
+    download: number;
+    /**
+     * Enable SQM queue management
+     */
+    enabled: boolean;
+    /**
+     * Kernel network device to shape (e.g. eth1, phy0-sta0)
+     */
+    interface: string;
+    /**
+     * Link layer adaptation
+     */
+    linklayer: 'none' | 'ethernet' | 'atm';
+    /**
+     * Per-packet overhead in bytes (0..256)
+     */
+    overhead: number;
+    /**
+     * Queue discipline
+     */
+    qdisc: 'cake' | 'fq_codel';
+    /**
+     * SQM queue setup script
+     */
+    script: 'piece_of_cake.qos' | 'layer_cake.qos' | 'simple.qos' | 'simplest.qos' | 'simplest_tbf.qos';
+    /**
+     * Upload bandwidth limit in kbit/s (0 disables egress shaping)
+     */
+    upload: number;
+};
+
 export type Sta = {
     /**
      * Device carrier; null = could not read
@@ -4330,6 +4365,76 @@ export type PostSetupPasswordResponses = {
 };
 
 export type PostSetupPasswordResponse = PostSetupPasswordResponses[keyof PostSetupPasswordResponses];
+
+export type GetSqmData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/sqm';
+};
+
+export type GetSqmErrors = {
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type GetSqmError = GetSqmErrors[keyof GetSqmErrors];
+
+export type GetSqmResponses = {
+    /**
+     * OK
+     */
+    200: SqmSettings;
+};
+
+export type GetSqmResponse = GetSqmResponses[keyof GetSqmResponses];
+
+export type SetSqmData = {
+    body: SqmSettings;
+    path?: never;
+    query?: never;
+    url: '/api/v1/sqm';
+};
+
+export type SetSqmErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetSqmError = SetSqmErrors[keyof SetSqmErrors];
+
+export type SetSqmResponses = {
+    /**
+     * OK
+     */
+    200: SqmSettings;
+};
+
+export type SetSqmResponse = SetSqmResponses[keyof SetSqmResponses];
 
 export type ResetStatsHistoryData = {
     body?: never;

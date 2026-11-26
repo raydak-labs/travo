@@ -28,7 +28,10 @@ function page() {
   createLoader.mockImplementation((fn: unknown) =>
     fn === fetchAdGuard
       ? loader({ installed: true, running: true, default_dns: true, topology: 'default' })
-      : loader({ busy: false, entries: [entry('sqm', true), entry('vnstat', false)] }),
+      : loader({
+          busy: false,
+          entries: [entry('sqm', true), entry('watchcat', true), entry('vnstat', false)],
+        }),
   );
   const body = render(Services).body;
   vi.unstubAllGlobals();
@@ -48,10 +51,11 @@ describe('Services overview', () => {
     expect(available).toBeLessThan(body.indexOf('Install (1 MB)'));
   });
 
-  it('opens AdGuard Home here and other installed services in LuCI', () => {
+  it('opens AdGuard Home and SQM here and other installed services in LuCI', () => {
     const body = page();
     expect(body).toContain('href="#/services/adguard"');
+    expect(body).toContain('href="#/services/sqm"');
     expect(body).toContain('Configure');
-    expect(body).toMatch(/href="[^"]*admin\/sqm"/);
+    expect(body).toMatch(/href="[^"]*admin\/watchcat"/);
   });
 });
