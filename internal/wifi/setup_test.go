@@ -107,3 +107,19 @@ func TestNotSetUpOnTheFactoryConfig(t *testing.T) {
 		t.Fatalf("%+v %v", aps, err)
 	}
 }
+
+// An AP that was only off because its radio was: once setup switches the radio on, it comes
+// up too, so the probe must prove it.
+func TestPlanSetupProvesOtherAPsOnARadioItEnables(t *testing.T) {
+	wireless := configFixture(t, "wireless", "factory-default/uci-show-wireless.txt")
+	for i := range wireless {
+		if wireless[i].Name == "radio1" {
+			wireless[i].Options["disabled"] = "1"
+		}
+	}
+	guest := device.Section{Name: "guest", Type: "wifi-iface", Options: map[string]string{"device": "radio1", "mode": "ap", "network": "guest", "ssid": "Guest"}}
+	_, expect, err := planSetup(append(wireless, guest), SetupRequest{SSID: DefaultSSID, Key: "example-only"})
+	if err != nil || !slices.Contains(expect, apExpectation{section: "guest", enabled: true}) {
+		t.Fatalf("%#v %v", expect, err)
+	}
+}

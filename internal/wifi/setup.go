@@ -56,6 +56,7 @@ func mainAP(section device.Section) bool {
 func planSetup(wireless []device.Section, req SetupRequest) ([]uciWrite, []apExpectation, error) {
 	var writes []uciWrite
 	enabled := map[string]bool{}
+	enabledRadios := map[string]bool{}
 	found := false
 	for _, section := range wireless {
 		if !mainAP(section) {
@@ -78,8 +79,9 @@ func planSetup(wireless []device.Section, req SetupRequest) ([]uciWrite, []apExp
 			writes = append(writes, uciWrite{"key", "wireless", section.Name, "key", ""})
 		}
 		set("disabled", "0")
-		if radioDisabled(wireless, radio) {
+		if radioDisabled(wireless, radio) && !enabledRadios[radio] {
 			writes = append(writes, uciWrite{"set", "wireless", radio, "disabled", "0"})
+			enabledRadios[radio] = true
 		}
 	}
 	switch {
@@ -93,7 +95,9 @@ func planSetup(wireless []device.Section, req SetupRequest) ([]uciWrite, []apExp
 		switch {
 		case enabled[section.Name]:
 			expect = append(expect, apExpectation{section: section.Name, enabled: true, ssid: req.SSID})
-		case isAP(section) && section.Options["disabled"] != "1" && !radioDisabled(wireless, section.Options["device"]):
+		// Other APs on a radio this plan switches on come up too, so the probe proves them.
+		case isAP(section) && section.Options["disabled"] != "1" &&
+			(enabledRadios[section.Options["device"]] || !radioDisabled(wireless, section.Options["device"])):
 			expect = append(expect, apExpectation{section: section.Name, enabled: true})
 		}
 	}
