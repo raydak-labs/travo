@@ -94,6 +94,18 @@ export function href(route: Route): string {
   return `#${PATHS[route]}`;
 }
 
+/** The Internet page with its Connect to WiFi dialog open (one entry point from anywhere). */
+export function connectHref(): string {
+  return `${href('internet')}?${CONNECT_QUERY}`;
+}
+
+export const CONNECT_QUERY = 'connect';
+
+/** Whether a location hash asks for the Connect to WiFi dialog. */
+export function wantsConnect(hash: string): boolean {
+  return new URLSearchParams(hash.split('?')[1] ?? '').has(CONNECT_QUERY);
+}
+
 /** Auth state as the guard sees it; `session.svelte.ts` owns the transitions. */
 export type AuthState = 'unknown' | 'setup_required' | 'anonymous' | 'authenticated';
 

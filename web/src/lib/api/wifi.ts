@@ -14,9 +14,11 @@ import {
   type JoinWiFiData,
   joinWiFi,
   reorderWiFiProfiles,
+  type SetupWiFiAccessPointsData,
   type SetWiFiGuestData,
   type SetWiFiUplinkMacData,
   selectWiFiProfile,
+  setupWiFiAccessPoints,
   setWiFiGuest,
   setWiFiUplinkMac,
   type UpdateWiFiAccessPointData,
@@ -107,4 +109,8 @@ export async function fetchUplinkMAC(signal?: AbortSignal) {
 
 export function updateUplinkMAC(body: SetWiFiUplinkMacData['body'], signal?: AbortSignal) {
   return setWiFiUplinkMac({ body, signal });
+}
+
+export function setupAccessPoints(body: SetupWiFiAccessPointsData['body'], signal?: AbortSignal) {
+  return setupWiFiAccessPoints({ body, signal });
 }

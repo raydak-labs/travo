@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { bandLabel, bandsBadge, securityLabel, signalLabel, wifiScanErrorMessage } from './wifi';
+import {
+  bandLabel,
+  bandsBadge,
+  securityLabel,
+  signalLabel,
+  wifiNotSetUp,
+  wifiScanErrorMessage,
+} from './wifi';
 
 describe('WiFi labels', () => {
   it('labels bands and dual-band badges', () => {
@@ -26,5 +33,26 @@ describe('WiFi labels', () => {
     expect(
       wifiScanErrorMessage(Object.assign(new Error('fallback'), { code: 'wifi_unavailable' })),
     ).toBe('WiFi is unavailable. Try again.');
+  });
+});
+
+const ap = (over: Partial<{ guest: boolean; enabled: boolean; security: string }> = {}) => ({
+  guest: false,
+  enabled: false,
+  security: 'open',
+  ...over,
+});
+
+describe('wifiNotSetUp', () => {
+  it('is true for the factory APs: off and open', () => {
+    expect(wifiNotSetUp([ap(), ap()])).toBe(true);
+  });
+  it('is false once one main AP is on or has a key', () => {
+    expect(wifiNotSetUp([ap(), ap({ enabled: true })])).toBe(false);
+    expect(wifiNotSetUp([ap({ security: 'protected' })])).toBe(false);
+  });
+  it('ignores guest APs and needs at least one main AP', () => {
+    expect(wifiNotSetUp([ap({ guest: true })])).toBe(false);
+    expect(wifiNotSetUp([])).toBe(false);
   });
 });

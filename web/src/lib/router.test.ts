@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   type AuthState,
+  connectHref,
   GROUP_OVERVIEW,
   guard,
   href,
@@ -10,6 +11,7 @@ import {
   parseHash,
   ROUTE_LIST,
   type Route,
+  wantsConnect,
 } from './router';
 
 const PATHS: [string, Route][] = [
@@ -112,5 +114,14 @@ describe('guard', () => {
     expect(guard('anonymous', 'system-firmware')).toBe('login');
     expect(guard('authenticated', 'setup')).toBe('dashboard');
     expect(guard('setup_required', 'network-lan')).toBe('setup');
+  });
+});
+
+describe('connect dialog link', () => {
+  it('opens the Internet page with the Connect to WiFi dialog', () => {
+    expect(connectHref()).toBe('#/internet?connect');
+    expect(parseHash(connectHref())).toBe('internet');
+    expect(wantsConnect(connectHref())).toBe(true);
+    expect(wantsConnect('#/internet')).toBe(false);
   });
 });

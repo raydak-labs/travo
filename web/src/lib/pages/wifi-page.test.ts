@@ -17,6 +17,7 @@ vi.mock('../api/wifi', () => ({ fetchWifi, fetchWifiProfiles, fetchWifiReconnect
 vi.mock('./WiFiAccessPoints.svelte', () => ({ default: () => {} }));
 vi.mock('./WiFiUplinkMAC.svelte', () => ({ default: () => {} }));
 vi.mock('./WiFiScheduleCard.svelte', () => ({ default: () => {} }));
+vi.mock('./WiFiSetupCard.svelte', () => ({ default: () => {} }));
 
 const summary = { radios: [], stas: [], aps: [] };
 // HomeUplink and Neighbor2 are the mock device's scan fixtures.
@@ -95,10 +96,9 @@ describe('WiFi page', () => {
     );
   });
 
-  it('starts idle and never scans automatically', () => {
+  it('keeps the Connect to WiFi dialog closed and does not scan until it opens', () => {
     const body = render(WiFi, { props: { part: 'uplink' } }).body;
-    expect(body).toContain('Scan to see nearby networks.');
-    expect(body).toContain('Scan');
+    expect(body).not.toContain('Connect to WiFi');
     expect(fetchWifiScan).not.toHaveBeenCalled();
     expect(createLoader).toHaveBeenCalledWith(fetchWifi);
     // Access points live on the WiFi page, not in the Internet page's uplink part.
@@ -108,7 +108,7 @@ describe('WiFi page', () => {
 
   it('announces a slow scan and disables the button', () => {
     const body = render(WiFi, {
-      props: { part: 'uplink', initialScanStatus: { state: 'loading' } },
+      props: { part: 'uplink', connectOpen: true, initialScanStatus: { state: 'loading' } },
     }).body;
     expect(body).toContain('Scanning, this can take several seconds');
     expect(body).toContain('aria-busy="true"');
@@ -119,6 +119,7 @@ describe('WiFi page', () => {
     const body = render(WiFi, {
       props: {
         part: 'uplink',
+        connectOpen: true,
         initialScanStatus: {
           state: 'error',
           message: 'No radio could complete the scan. Try again.',
