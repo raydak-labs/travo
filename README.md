@@ -1,90 +1,112 @@
-# travo
+# Travo
 
-Travel-router web UI and API for OpenWrt (GL.iNet Slate AX, Beryl AX), for travellers who are not network admins and for power users who want an API. Join hotel WiFi, get through captive portals, see whether you are online, switch the VPN on and off, and filter DNS with AdGuard Home. Runs on the router next to LuCI.
+A simple web UI for OpenWrt travel routers. Join the hotel WiFi, get through its login page, see at a glance whether you are online, switch your VPN on and off, and block ads for every device you carry. Travo runs on the router next to LuCI and never takes LuCI away.
 
-## Requirements
+![Dashboard with the network map: uplinks on the left, the router in the middle, clients on the right](docs/images/dashboard-1280-light.png)
 
-- OpenWrt 25.12 or newer on an aarch64 router, starting from a fresh installation
-- Root shell on the router (SSH or console)
+Made for travellers who are not network admins, and for power users who want a clean API.
+
+## What you get
+
+- **Get online anywhere.** Scan and join WiFi, keep a list of saved networks by priority, reconnect automatically, use Ethernet or a phone over USB, and fail over between them.
+- **Hotel and airport WiFi.** Travo spots a login page, offers it in one click and can accept simple ones by itself.
+- **VPN.** WireGuard profiles (paste or upload), Tailscale with exit nodes, a kill switch and split tunnelling.
+- **Ad and tracker blocking** with AdGuard Home, including DNS over HTTPS.
+- **Your own WiFi.** Access point, guest network and an on/off schedule.
+- **Clients.** See who is connected, give a device a fixed address, block or wake it.
+- **Safe changes.** Anything that could cut you off (WiFi, VPN, firewall, LAN address, WAN) is applied, checked and then waits for you to confirm. If you lose the connection, the router rolls it back by itself.
+- **Updates** from the UI, signed and with automatic rollback.
+- **Works on a phone**, light and dark.
+
+| Internet | VPN | On a phone |
+|---|---|---|
+| ![Internet page](docs/images/internet-1280-light.png) | ![VPN page](docs/images/vpn-1280-light.png) | ![Dashboard on a phone, dark mode](docs/images/dashboard-390-dark.png) |
+
+## Supported routers
+
+- OpenWrt 25.12 or newer on an aarch64 router. Tested on GL.iNet Slate AX (GL-AXT1800); Beryl AX (GL-MT3000) is expected to work.
+- Start from a fresh OpenWrt installation.
+- You need a root shell on the router (SSH or console).
 
 ## Install
 
-Download `travo-<version>-aarch64.tar.gz` and `checksums.txt.sig` from the [latest release](https://github.com/raydak-labs/travo/releases/latest), copy both to the router, then run as root:
+1. Download `travo-<version>-aarch64.tar.gz` and `checksums.txt.sig` from the [latest release](https://github.com/raydak-labs/travo/releases/latest).
+2. Copy both to the router, for example `scp -O travo-*.tar.gz checksums.txt.sig root@192.168.1.1:/tmp/`.
+3. On the router, as root:
 
 ```sh
-mkdir -p /tmp/tg && tar -xzf travo-<version>-aarch64.tar.gz -C /tmp/tg
-cp checksums.txt.sig /tmp/tg/
-sh /tmp/tg/install.sh
+cd /tmp && mkdir -p travo && tar -xzf travo-*-aarch64.tar.gz -C travo
+cp checksums.txt.sig travo/
+sh travo/install.sh
 ```
 
-The installer checks the signature with the router's `usign` before it changes anything. The first install trusts the release key in the tarball and stores it in `/etc/travo/minisign.pub`. Later installs must match that key; pass `--rotate-key` once when the release notes announce a new one.
+The installer checks the release signature with the router's `usign` before it changes anything, and refuses an unsigned or tampered tarball.
 
 | Option | Effect |
 |---|---|
-| `--port N` | Serve on `http://<router>:N` and leave LuCI on port 80 |
+| `--port N` | Serve Travo on `http://<router>:N` and leave LuCI on port 80 |
 | `--adguard-bundle <file>` | Install AdGuard Home offline from the release's `adguardhome-*.apk` |
+| `--rotate-key` | Accept a new signing key once, when the release notes announce one |
 | `--insecure` | Install an unsigned build you made yourself |
-| `--uninstall` | Remove Travo; add `--purge` to delete its config and state too |
+| `--uninstall` | Remove Travo and give port 80 back to LuCI; add `--purge` to delete its settings too |
 
 ## First use
 
-Open `http://<router>/` and set the password; LuCI moves to ports 8080 and 8443. After `--port N`, open `http://<router>:N/` instead; LuCI stays on port 80. `https://<router>/` serves the same UI with a certificate the router generated itself; its fingerprint is in `logread -e travo`. Settings live in `/etc/config/travo` (to turn HTTPS off: `uci set travo.main.listen_tls=off && uci commit travo && /etc/init.d/travo restart`).
+Open `http://<router>/` (usually `http://192.168.1.1/`) and choose the admin password. LuCI moves to `http://<router>:8080/`.
 
-Changes that can cut you off (WiFi, VPN, firewall, LAN address, WAN) are applied, verified and then wait for you to confirm. If you don't confirm in time, the router rolls the change back.
-
-## Features
-
-| Page | What it does |
-|---|---|
-| Dashboard | Network map of uplinks, router and clients with live rates and Internet/VPN/Tailscale state, details (WAN protocol, gateway, WiFi band and signal) on hover; uplink cards on phones; hotel WiFi login with automatic click-through; CPU, memory, uptime and version tiles; VPN toggle; per-interface traffic; 24 h / 7 day history |
-| Internet | Scan and join WiFi uplinks, saved uplinks by priority, capped automatic reconnect, uplink MAC address; Ethernet WAN (DHCP, static, PPPoE); USB tethering; failover across two or three uplinks; data usage with a monthly budget |
-| WiFi | The networks the router offers: access point and guest network settings, on/off schedule |
-| VPN → WireGuard, Tailscale | Overview with each VPN and the traffic rules (kill switch, split tunnel, DNS check); WireGuard profiles (add by paste or file) and tunnel switch; Tailscale with exit node, LAN sharing and SSH |
-| Clients | Connected devices; name, reserve an address, block, disconnect, wake |
-| Services → AdGuard Home | Overview of installed and available services; AdGuard Home (default DNS, DNS over HTTPS, expert topology on port 53); optional SQM, Cloudflare Tunnel, vnStat, Watchcat, speedtestcpp |
-| Network → LAN, Port forwards, IPv6 & DDNS, Diagnostics | LAN address, DHCP server and local DNS names; port forwards; IPv6 and dynamic DNS; ping/traceroute/DNS lookup, Wake-on-LAN, interfaces and firewall zones (read-only) |
-| System → Hardware, Logs, Firmware, Access | Overview with router facts and the Travo version, device settings and backup; each LED on or off, night mode and the slide switch; system log; Travo updates, OpenWrt release check, firmware upgrade and factory reset; API tokens, SSH keys and the admin password. Restart and Log out are in the header menu |
-
-A banner above every page names conditions that need you, such as a guard left by an interrupted operation, AdGuard Home bypassed, or low memory, and links to the page that fixes them.
+- After `--port N`, open `http://<router>:N/` instead; LuCI stays on port 80.
+- `https://<router>/` serves the same UI with a certificate the router made itself. Its fingerprint is in `logread -e travo`.
+- Settings live in `/etc/config/travo`, so a normal OpenWrt backup or sysupgrade keeps them.
 
 ## Updating
 
-Under System, Travo checks GitHub for a newer stable release at most once a day, or on **Check for updates**. **Verify package** checks the signed archive and stages it; **Apply update** installs it and restarts the service, so sign in again afterwards. If the updater reports that recovery is required, use **Retry recovery** or the console command in [ADR 0007](docs/adr/0007-distribution-and-self-update.md). To use another release source, set `travo.main.release_source` to `OWNER/REPO` (or `off`) and restart the daemon. The Updates page says when checks are turned off or the running build is not a release.
+Travo checks GitHub for a new release at most once a day, or when you press **Check for updates** under **System → Firmware**. **Verify package** downloads and checks the signed release; **Apply update** installs it, restarts Travo and rolls back by itself if the new version does not come up. Sign in again afterwards.
 
-Firmware: **System → Firmware → OpenWrt updates** checks downloads.openwrt.org and links LuCI attended sysupgrade. **System → Firmware → Firmware upgrade** flashes an image you uploaded, after checking that it fits this board.
+OpenWrt itself: **System → Firmware** shows whether a newer OpenWrt release exists and can flash an image you upload, after checking that it fits your router.
 
-## Automation
-
-Scripts on the LAN use an API token instead of the browser login. Create one under System → Access, or with `POST /api/v1/auth/tokens` (`{"name":"ci","scope":"read"}` or `"admin"`) from a signed-in session. The token is shown once. `read` tokens can only GET, and no token can manage tokens, change the password or flash firmware ([ADR 0008](docs/adr/0008-auth-and-trust-boundary.md)). The OpenAPI spec is served at `/api/openapi.json`.
+## Uninstall
 
 ```sh
-curl -H "Authorization: Bearer tgt_..." http://192.168.8.1/api/v1/system/info
+sh /tmp/travo/install.sh --uninstall          # keep settings
+sh /tmp/travo/install.sh --uninstall --purge  # delete settings too
 ```
+
+Use the `install.sh` of the release you installed. LuCI moves back to port 80 with its original settings.
+
+## Automation and API
+
+Scripts on your LAN can use an API token instead of the browser login. Create one under **System → Access** and choose `read` or `admin`; the token is shown once.
+
+```sh
+curl -H "Authorization: Bearer tgt_..." http://192.168.1.1/api/v1/system/info
+```
+
+`read` tokens can only read. No token can manage tokens, change the password or flash firmware. The OpenAPI spec is served at `/api/openapi.json`.
 
 ## Known issues
 
-- GL-AXT1800 on OpenWrt 25.12.6: the kernel's available memory drifts down over hours while Travo and AdGuard Home stay flat ([device facts](docs/device-facts.md)). The dashboard's System card warns below 15 MiB and the banner shows below 8 MiB; a reboot frees it.
+- GL-AXT1800 on OpenWrt 25.12.6: the kernel's available memory slowly drops over hours. Travo warns on the dashboard below 15 MiB; a reboot frees it ([device facts](docs/device-facts.md)).
 
 ## Development
 
-Needs [mise](https://mise.jdx.dev). No router required: the daemon runs against a mock device scripted from captured fixtures.
+Needs [mise](https://mise.jdx.dev). No router required: the daemon runs against a mock device built from captured router data.
 
 ```sh
-mise run dev          # UI on Vite :18092 against the mock daemon :18081
-mise run check        # Go, web, generated client and size checks; must pass before every commit
+mise run dev          # UI on :18092 against the mock daemon on :18081
+mise run check        # all checks; must pass before every commit
 mise run gen          # regenerate the OpenAPI spec and TypeScript client after API changes
 mise run screenshots  # PNGs of every page into web/screenshots/
 mise run package      # release tarball
 ```
 
-Contributors and agents start with [AGENTS.md](AGENTS.md). Work is tracked in [GitHub issues](https://github.com/raydak-labs/travo/issues) and on the [project board](https://github.com/orgs/blackdark-org/projects/1).
-
-## Docs
+Contributors and coding agents start with [AGENTS.md](AGENTS.md). Work is tracked in [GitHub issues](https://github.com/raydak-labs/travo/issues).
 
 - [Invariants](docs/invariants.md): rules for live state, auth, DNS and WiFi
 - [Device facts](docs/device-facts.md): hardware behaviour learned on real routers
 - [Testing](docs/testing.md): test layers and the hardware playbook
 - [Web UI](docs/web-ui.md): page rules, dialogs and toasts
 - [ADRs](docs/adr/README.md) and [glossary](GLOSSARY.md)
+
+Travo 0.11 is a rewrite. The code of Travo 0.10 and earlier is on the [`legacy`](https://github.com/raydak-labs/travo/tree/legacy) branch.
 
 License: [MIT](LICENSE).
