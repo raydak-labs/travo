@@ -18,7 +18,7 @@ export function alertRoute(alert: Alert): Route {
     case 'data_budget_exceeded':
       return 'internet';
     case 'firmware_upgrade_completed':
-      return 'system-updates';
+      return 'system-firmware';
     case 'stale_guard': {
       const name = alert.subject ?? '';
       if (/^(wifi|wireless|uplink)/.test(name)) return 'wifi';
@@ -27,8 +27,8 @@ export function alertRoute(alert: Alert): Route {
       if (/^(failover|usbtether)/.test(name)) return 'internet';
       if (/^ddns/.test(name)) return 'network-ipv6';
       if (/^interface/.test(name)) return 'network-lan';
-      if (/^(firmware|update)/.test(name)) return 'system-updates';
-      if (/^factory-reset/.test(name)) return 'system-reset';
+      if (/^(firmware|update)/.test(name)) return 'system-firmware';
+      if (/^factory-reset/.test(name)) return 'system-firmware';
       return 'system';
     }
     default:

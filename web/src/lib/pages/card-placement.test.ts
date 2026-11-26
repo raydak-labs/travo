@@ -9,9 +9,8 @@ const sources = import.meta.glob(
     './System.svelte',
     './SystemHardware.svelte',
     './SystemLogs.svelte',
-    './SystemUpdates.svelte',
+    './SystemFirmware.svelte',
     './SystemAccess.svelte',
-    './SystemReset.svelte',
     './Services.svelte',
     './AdGuard.svelte',
     './VPN.svelte',
@@ -61,7 +60,7 @@ function pagesWith(needle: string): string[] {
 
 describe('card placement', () => {
   it('loads the expected page modules', () => {
-    expect(Object.keys(sources)).toHaveLength(18);
+    expect(Object.keys(sources)).toHaveLength(15);
   });
 
   it.each(CARD_COMPONENTS)('%s renders on exactly one page', (name) => {

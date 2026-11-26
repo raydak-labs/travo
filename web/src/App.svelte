@@ -97,17 +97,14 @@ const childLabels: Partial<Record<Route, () => string>> = {
   'vpn-wireguard': () => m.nav_vpn_wireguard(),
   'vpn-tailscale': () => m.nav_vpn_tailscale(),
   'services-adguard': () => m.nav_services_adguard(),
-  'network-wan': () => m.nav_network_wan(),
   'network-lan': () => m.nav_network_lan(),
-  'network-dhcp': () => m.nav_network_dhcp(),
   'network-port-forwards': () => m.nav_network_port_forwards(),
   'network-ipv6': () => m.nav_network_ipv6(),
   'network-diagnostics': () => m.nav_network_diagnostics(),
   'system-hardware': () => m.nav_system_hardware(),
   'system-logs': () => m.nav_system_logs(),
-  'system-updates': () => m.nav_system_updates(),
+  'system-firmware': () => m.nav_system_firmware(),
   'system-access': () => m.nav_system_access(),
-  'system-reset': () => m.nav_system_reset(),
 };
 
 // Open groups survive reloads (nav:v2); the group holding the current page always opens.

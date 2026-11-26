@@ -74,7 +74,7 @@ describe('WiFi page', () => {
       ],
       connected_id: 'b'.repeat(32),
     };
-    const body = render(WiFi).body;
+    const body = render(WiFi, { props: { part: 'uplink' } }).body;
     expect(body).toContain('Saved uplinks');
     expect(body.indexOf('Neighbor2')).toBeLessThan(body.indexOf('HomeUplink'));
     expect(body).toContain('BSSID 94:83:c4:1f:28:3a');
@@ -90,20 +90,26 @@ describe('WiFi page', () => {
   });
 
   it('shows an empty saved list as empty, not absent', () => {
-    expect(render(WiFi).body).toContain('No saved uplinks. Save one from a nearby network.');
+    expect(render(WiFi, { props: { part: 'uplink' } }).body).toContain(
+      'No saved uplinks. Save one from a nearby network.',
+    );
   });
 
   it('starts idle and never scans automatically', () => {
-    const body = render(WiFi).body;
+    const body = render(WiFi, { props: { part: 'uplink' } }).body;
     expect(body).toContain('Scan to see nearby networks.');
     expect(body).toContain('Scan');
     expect(fetchWifiScan).not.toHaveBeenCalled();
     expect(createLoader).toHaveBeenCalledWith(fetchWifi);
-    expect(body).toContain('Access point settings');
+    // Access points live on the WiFi page, not in the Internet page's uplink part.
+    expect(body).not.toContain('Access point settings');
+    expect(render(WiFi).body).toContain('Access point settings');
   });
 
   it('announces a slow scan and disables the button', () => {
-    const body = render(WiFi, { props: { initialScanStatus: { state: 'loading' } } }).body;
+    const body = render(WiFi, {
+      props: { part: 'uplink', initialScanStatus: { state: 'loading' } },
+    }).body;
     expect(body).toContain('Scanning, this can take several seconds');
     expect(body).toContain('aria-busy="true"');
     expect(body).toContain('disabled');
@@ -112,6 +118,7 @@ describe('WiFi page', () => {
   it('keeps prior scan data dimmed and stale on error with Retry', () => {
     const body = render(WiFi, {
       props: {
+        part: 'uplink',
         initialScanStatus: {
           state: 'error',
           message: 'No radio could complete the scan. Try again.',
@@ -127,7 +134,9 @@ describe('WiFi page', () => {
 
   it('shows reconnect attempts while retrying', () => {
     reconnect = { state: 'retrying', attempts: 2, max_attempts: 5 };
-    expect(render(WiFi).body).toContain('Uplink lost. Reconnecting, attempt 2 of 5.');
+    expect(render(WiFi, { props: { part: 'uplink' } }).body).toContain(
+      'Uplink lost. Reconnecting, attempt 2 of 5.',
+    );
     expect(createLoader).toHaveBeenCalledWith(fetchWifiReconnect, 30_000);
   });
 
@@ -140,7 +149,7 @@ describe('WiFi page', () => {
       ],
       connected_id: null,
     };
-    const body = render(WiFi, { props: { initialScanData: scan } }).body;
+    const body = render(WiFi, { props: { part: 'uplink', initialScanData: scan } }).body;
     expect(body).toContain('Automatic reconnect stopped after 5 attempts.');
     expect(body).toContain('HomeUplink is a saved uplink in range.');
     expect(body).not.toContain('Hotel is a saved uplink in range.');
@@ -148,10 +157,12 @@ describe('WiFi page', () => {
 
   it('asks for a scan when the cap is reached and nothing was scanned', () => {
     reconnect = { state: 'exhausted', attempts: 5, max_attempts: 5 };
-    expect(render(WiFi).body).toContain('Scan to find a saved uplink in range.');
+    expect(render(WiFi, { props: { part: 'uplink' } }).body).toContain(
+      'Scan to find a saved uplink in range.',
+    );
   });
 
   it('shows no reconnect notice while idle', () => {
-    expect(render(WiFi).body).not.toContain('Uplink lost');
+    expect(render(WiFi, { props: { part: 'uplink' } }).body).not.toContain('Uplink lost');
   });
 });

@@ -17,18 +17,15 @@ const SIGNED_IN_ROUTES = [
   '/clients',
   '/services',
   '/services/adguard',
-  '/network/wan',
   '/network/lan',
-  '/network/dhcp',
   '/network/port-forwards',
   '/network/ipv6',
   '/network/diagnostics',
   '/system',
   '/system/hardware',
   '/system/logs',
-  '/system/updates',
+  '/system/firmware',
   '/system/access',
-  '/system/reset',
 ];
 const MOCK_PASSWORD = 'mock-password';
 const VIEWPORTS = [

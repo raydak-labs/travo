@@ -10,18 +10,15 @@ export type Route =
   | 'clients'
   | 'services'
   | 'services-adguard'
-  | 'network-wan'
   | 'network-lan'
-  | 'network-dhcp'
   | 'network-port-forwards'
   | 'network-ipv6'
   | 'network-diagnostics'
   | 'system'
   | 'system-hardware'
   | 'system-logs'
-  | 'system-updates'
-  | 'system-access'
-  | 'system-reset';
+  | 'system-firmware'
+  | 'system-access';
 
 /** Canonical path of every route; `href` builds these and `parseHash` reads them back. */
 const PATHS: Record<Route, string> = {
@@ -36,26 +33,27 @@ const PATHS: Record<Route, string> = {
   clients: '/clients',
   services: '/services',
   'services-adguard': '/services/adguard',
-  'network-wan': '/network/wan',
   'network-lan': '/network/lan',
-  'network-dhcp': '/network/dhcp',
   'network-port-forwards': '/network/port-forwards',
   'network-ipv6': '/network/ipv6',
   'network-diagnostics': '/network/diagnostics',
   system: '/system',
   'system-hardware': '/system/hardware',
   'system-logs': '/system/logs',
-  'system-updates': '/system/updates',
+  'system-firmware': '/system/firmware',
   'system-access': '/system/access',
-  'system-reset': '/system/reset',
 };
 
 // `#/network` has no page of its own: it opens the group's first page. Old paths keep working.
 const ROUTES: Record<string, Route> = {
   ...Object.fromEntries(Object.entries(PATHS).map(([route, path]) => [path, route as Route])),
-  '/network': 'network-wan',
+  '/network': 'network-lan',
+  '/network/wan': 'internet',
+  '/network/dhcp': 'network-lan',
   '/system/leds': 'system-hardware',
   '/system/tokens': 'system-access',
+  '/system/updates': 'system-firmware',
+  '/system/reset': 'system-firmware',
 };
 
 export const ROUTE_LIST = Object.keys(PATHS) as Route[];
@@ -66,15 +64,8 @@ export type NavGroup = 'vpn' | 'services' | 'network' | 'system';
 export const NAV_GROUPS: Record<NavGroup, readonly Route[]> = {
   vpn: ['vpn-wireguard', 'vpn-tailscale'],
   services: ['services-adguard'],
-  network: [
-    'network-wan',
-    'network-lan',
-    'network-dhcp',
-    'network-port-forwards',
-    'network-ipv6',
-    'network-diagnostics',
-  ],
-  system: ['system-hardware', 'system-logs', 'system-updates', 'system-access', 'system-reset'],
+  network: ['network-lan', 'network-port-forwards', 'network-ipv6', 'network-diagnostics'],
+  system: ['system-hardware', 'system-logs', 'system-firmware', 'system-access'],
 };
 
 /** The page a group label opens; a group without one (Network) only expands. */

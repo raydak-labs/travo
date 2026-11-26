@@ -8,6 +8,7 @@ import { fetchVpnStatus } from '../api/vpn-status';
 import { formatUptime } from '../format';
 import { m } from '../paraglide/messages.js';
 import { href } from '../router';
+import CardGrid from '../ui/CardGrid.svelte';
 import LinkRow from '../ui/LinkRow.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
@@ -67,6 +68,7 @@ const wireguardHint = $derived.by(() => {
 <div class="flex flex-col gap-6">
   <PageHeader title={m.nav_vpn()} description={m.vpn_page_description()} />
 
+  <CardGrid cols={2}>
   <Section title={m.vpn_connections()}>
     <div>
       <LinkRow href={href('vpn-wireguard')} label={m.nav_vpn_wireguard()} description={wireguardHint}>
@@ -107,4 +109,5 @@ const wireguardHint = $derived.by(() => {
       <VPNDNSRow />
     </div>
   </Section>
+  </CardGrid>
 </div>

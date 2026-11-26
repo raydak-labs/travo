@@ -5,6 +5,7 @@ import '../api/client';
 import { downloadSystemBackup, fetchSystemInfo } from '../api/system';
 import { formatBytes, formatLoad, formatUptime } from '../format';
 import { m } from '../paraglide/messages.js';
+import CardGrid from '../ui/CardGrid.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
@@ -60,6 +61,7 @@ const used = (total: number, available: number) =>
     <SummaryTile label={m.system_uptime()}>{@render fact(info.data ? formatUptime(info.data.uptime_seconds) : '')}</SummaryTile>
   </SummaryBand>
 
+  <CardGrid cols={2}>
   <SystemSettingsCard />
 
   <Section title={m.system_details()}>
@@ -78,4 +80,5 @@ const used = (total: number, available: number) =>
       {/if}
     </LoadState>
   </Section>
+  </CardGrid>
 </div>

@@ -17,7 +17,7 @@ describe('nav state', () => {
   });
 
   it('opens the group of a child route and leaves everyday routes alone', () => {
-    expect(withRoute(collapsed, 'network-dhcp')).toEqual({ ...collapsed, network: true });
+    expect(withRoute(collapsed, 'network-port-forwards')).toEqual({ ...collapsed, network: true });
     expect(withRoute(collapsed, 'system-access')).toEqual({ ...collapsed, system: true });
     expect(withRoute(collapsed, 'vpn-tailscale')).toEqual({ ...collapsed, vpn: true });
     expect(withRoute(collapsed, 'services')).toEqual({ ...collapsed, services: true });
@@ -26,7 +26,7 @@ describe('nav state', () => {
 
   it('returns the same state when the group is already open', () => {
     const open = { ...collapsed, network: true };
-    expect(withRoute(open, 'network-wan')).toBe(open);
+    expect(withRoute(open, 'network-lan')).toBe(open);
   });
 
   it('restores the stored state', () => {

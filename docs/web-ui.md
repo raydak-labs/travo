@@ -83,8 +83,9 @@ what stays narrow is the control:
 
 - **Fields** have a fixed width in the row's control slot (`w-28` for numbers and times, `w-64`
   for names, addresses and keys); they never stretch with the card.
-- **Settings are never laid out side by side:** two short cards next to each other leave holes
-  and make rows hard to scan. Overview grids (Services, summary tiles) are the exception.
+- **Cards per row:** related short cards of one topic sit in a `CardGrid`: up to 3 per row from
+  `xl`, 2 from `lg`, 1 below. A new topic starts a new row. Long lists, tables and forms with
+  many rows stay outside it at full width (DNS names, data usage, interfaces).
 - A page whose subject can be switched on or off carries that switch, its state chip and its
   one main action in the **page header** (WireGuard: tunnel; Tailscale: on/off plus Log in or
   Log out; AdGuard Home: running). No card repeats them; cards hold only what adds to it.
@@ -141,15 +142,22 @@ A single-section page gives its section a title that does not repeat the page ti
 
 Sidebar only, every top-level entry with an icon. Everyday pages first:
 
-- Dashboard · Internet · WiFi
+- Dashboard
+- **Internet**: how the router gets online. WiFi networks it joins (saved, scan, join, uplink
+  MAC), Ethernet WAN, USB tethering, failover, data usage.
+- **WiFi**: the networks the router offers. Access points, guest network, schedule.
 - **VPN** ▸ WireGuard · Tailscale
 - Clients
 - **Services** ▸ one page per installed service that has settings here (AdGuard Home; SQM later)
-- **Network** ▸ WAN · LAN · DHCP & DNS names · Port forwards · IPv6 & DDNS · Diagnostics
-- **System** ▸ Hardware · Logs · Updates & firmware · Access · Factory reset
+- **Network** ▸ LAN (address, DHCP server, DNS names) · Port forwards · IPv6 & DDNS · Diagnostics
+  (tools, interfaces, firewall zones)
+- **System** ▸ Hardware · Logs · Firmware (Travo and OpenWrt updates, firmware upgrade, factory
+  reset) · Access
 
 A group label that has an overview page (VPN, Services, System) opens it; the overview is not
-repeated as a child. Network has no overview: its label only expands, and `#/network` opens WAN.
+repeated as a child. Network has no overview: its label only expands, and `#/network` opens LAN. Old paths
+(`#/network/wan`, `#/network/dhcp`, `#/system/updates`, `#/system/reset`, `#/system/leds`,
+`#/system/tokens`) open their new page.
 The chevron is its own 32 px button and only expands or collapses. A child route expands its
 parent. The tree lives in `router.ts` (`NAV_GROUPS`, `GROUP_OVERVIEW`); open groups are stored
 under `nav:v2`.

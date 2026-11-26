@@ -37,13 +37,13 @@ Changes that can cut you off (WiFi, VPN, firewall, LAN address, WAN) are applied
 | Page | What it does |
 |---|---|
 | Dashboard | Network map of uplinks, router and clients with live rates and Internet/VPN/Tailscale state, details (WAN protocol, gateway, WiFi band and signal) on hover; uplink cards on phones; hotel WiFi login with automatic click-through; CPU, memory, uptime and version tiles; VPN toggle; per-interface traffic; 24 h / 7 day history |
-| Internet | USB tethering, failover across two or three uplinks, data usage with a monthly budget |
-| WiFi | Scan and join uplinks, saved uplinks by priority, capped automatic reconnect, access point and guest network settings, uplink MAC address, on/off schedule |
+| Internet | Scan and join WiFi uplinks, saved uplinks by priority, capped automatic reconnect, uplink MAC address; Ethernet WAN (DHCP, static, PPPoE); USB tethering; failover across two or three uplinks; data usage with a monthly budget |
+| WiFi | The networks the router offers: access point and guest network settings, on/off schedule |
 | VPN → WireGuard, Tailscale | Overview with each VPN and the traffic rules (kill switch, split tunnel, DNS check); WireGuard profiles (add by paste or file) and tunnel switch; Tailscale with exit node, LAN sharing and SSH |
 | Clients | Connected devices; name, reserve an address, block, disconnect, wake |
 | Services → AdGuard Home | Overview of installed and available services; AdGuard Home (default DNS, DNS over HTTPS, expert topology on port 53); optional SQM, Cloudflare Tunnel, vnStat, Watchcat, speedtestcpp |
-| Network → WAN, LAN, DHCP & DNS names, Port forwards, IPv6 & DDNS, Diagnostics | WAN (DHCP, static, PPPoE); LAN address with interfaces and firewall zones (read-only); DHCP server and local DNS names; port forwards; IPv6 and dynamic DNS; ping/traceroute/DNS lookup and Wake-on-LAN |
-| System → Hardware, Logs, Updates & firmware, Access, Factory reset | Overview with router facts, device settings and backup; LEDs, night mode and the slide switch; system log; Travo updates, OpenWrt release check and firmware upgrade; API tokens, SSH keys and the admin password; factory reset. Restart and Log out are in the header menu |
+| Network → LAN, Port forwards, IPv6 & DDNS, Diagnostics | LAN address, DHCP server and local DNS names; port forwards; IPv6 and dynamic DNS; ping/traceroute/DNS lookup, Wake-on-LAN, interfaces and firewall zones (read-only) |
+| System → Hardware, Logs, Firmware, Access | Overview with router facts and the Travo version, device settings and backup; each LED on or off, night mode and the slide switch; system log; Travo updates, OpenWrt release check, firmware upgrade and factory reset; API tokens, SSH keys and the admin password. Restart and Log out are in the header menu |
 
 A banner above every page names conditions that need you, such as a guard left by an interrupted operation, AdGuard Home bypassed, or low memory, and links to the page that fixes them.
 
@@ -51,7 +51,7 @@ A banner above every page names conditions that need you, such as a guard left b
 
 Under System, Travo checks GitHub for a newer stable release at most once a day, or on **Check for updates**. **Verify package** checks the signed archive and stages it; **Apply update** installs it and restarts the service, so sign in again afterwards. If the updater reports that recovery is required, use **Retry recovery** or the console command in [ADR 0007](docs/adr/0007-distribution-and-self-update.md). To use another release source, set `travo-greenfield.main.release_source` to `OWNER/REPO` (or `off`) and restart the daemon. The Updates page says when checks are turned off or the running build is not a release.
 
-Firmware: **System → Updates & firmware → OpenWrt updates** checks downloads.openwrt.org and links LuCI attended sysupgrade. **System → Updates & firmware → Firmware upgrade** flashes an image you uploaded, after checking that it fits this board.
+Firmware: **System → Firmware → OpenWrt updates** checks downloads.openwrt.org and links LuCI attended sysupgrade. **System → Firmware → Firmware upgrade** flashes an image you uploaded, after checking that it fits this board.
 
 ## Automation
 

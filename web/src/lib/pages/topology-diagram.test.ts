@@ -70,7 +70,7 @@ describe('TopologyDiagram', () => {
     expect(sourceItem(body, 'active')).toContain('Active');
     expect(sourceItem(body, 'active')).toContain('href="#/wifi"');
     expect(sourceItem(body, 'down')).toContain('Down');
-    expect(sourceItem(body, 'down')).toContain('href="#/network/wan"');
+    expect(sourceItem(body, 'down')).toContain('href="#/internet"');
     expect(sourceItem(body, 'not_configured')).toContain('Not set up');
     expect(sourceItem(body, 'not_configured')).toContain('href="#/internet"');
     expect(body).toContain('topology-link topology-link-active');

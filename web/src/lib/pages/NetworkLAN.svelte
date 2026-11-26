@@ -1,14 +1,19 @@
 <script lang="ts">
 import { m } from '../paraglide/messages.js';
+import CardGrid from '../ui/CardGrid.svelte';
 import PageHeader from '../ui/PageHeader.svelte';
-
-// Each card is its own chunk; the page shell stays small.
+import DHCPServerCard from './DHCPServerCard.svelte';
+import DNSNamesCard from './DNSNamesCard.svelte';
 import LANAddressCard from './LANAddressCard.svelte';
-import NetworkInterfacesCard from './NetworkInterfacesCard.svelte';
+
+// LAN: the router's address, the DHCP pool inside it and the local DNS names, on one page.
 </script>
 
 <div class="flex flex-col gap-6">
   <PageHeader title={m.nav_network_lan()} description={m.network_lan_description()} />
-  <LANAddressCard />
-  <NetworkInterfacesCard />
+  <CardGrid cols={2}>
+    <LANAddressCard />
+    <DHCPServerCard />
+  </CardGrid>
+  <DNSNamesCard />
 </div>

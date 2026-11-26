@@ -1200,7 +1200,7 @@
   "nav_group_network": "Network",
   "nav_group_system": "System",
   "nav_group_toggle": "Show or hide {group}",
-  "wifi_page_description": "Join a network for internet, and set the networks this router broadcasts.",
+  "wifi_page_description": "The WiFi networks this router offers, the guest network and their schedule.",
   "wifi_saved_description": "Networks the router rejoins on its own, top first.",
   "wifi_mac_description": "The address the router shows to the network it joins.",
   "wifi_mac_mode_label": "Address",
@@ -1228,7 +1228,7 @@
   "tailscale_status_title": "Connection",
   "clients_devices_title": "Devices",
   "network_wan_description": "Your wired internet connection: DHCP from a modem, a static address, or PPPoE.",
-  "network_lan_description": "The router's own address and the interfaces and firewall zones behind it.",
+  "network_lan_description": "The router’s LAN address, the DHCP pool inside it, and local DNS names.",
   "network_dhcp_description": "How devices on your network get addresses and names.",
   "network_port_forwards_description": "Let devices from the uplink side reach a service on your network.",
   "network_ipv6_description": "IPv6 on the LAN and a dynamic DNS name for the router.",
@@ -1336,5 +1336,8 @@
   "tailscale_device_title": "This router in your tailnet",
   "adguard_dns_title": "DNS filtering",
   "leds_one_off": "{name} is off.",
-  "leds_one_default": "{name} is back to normal."
+  "leds_one_default": "{name} is back to normal.",
+  "nav_system_firmware": "Firmware",
+  "system_firmware_description": "Updates for Travo and OpenWrt, flashing an image, and the factory reset.",
+  "internet_description": "How the router gets online: WiFi networks it joins, Ethernet, a phone over USB, and failover between them."
 }

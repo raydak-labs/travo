@@ -34,7 +34,7 @@ const rateStale = $derived(status.throughput.state !== 'ready');
 
 const icons: Record<UplinkName, typeof Wifi> = { wan: Cable, wwan: Wifi, usbtether: Smartphone };
 const configure: Record<UplinkName, string> = {
-  wan: href('network-wan'),
+  wan: href('internet'),
   wwan: href('wifi'),
   usbtether: href('internet'),
 };

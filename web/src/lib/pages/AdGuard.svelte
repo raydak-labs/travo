@@ -6,6 +6,7 @@ import Button from '$lib/components/ui/button/button.svelte';
 import Switch from '$lib/components/ui/switch/switch.svelte';
 import { type AdGuardAction, adguardUrl, changeAdGuard, fetchAdGuard } from '../api/adguard';
 import { m } from '../paraglide/messages.js';
+import CardGrid from '../ui/CardGrid.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
@@ -61,6 +62,7 @@ const proxy = adguardUrl(window.location);
       {/if}
     {/snippet}
   </PageHeader>
+  <CardGrid cols={3}>
   <Section
     title={m.adguard_dns_title()}
     description={adguard.data?.installed
@@ -109,4 +111,5 @@ const proxy = adguardUrl(window.location);
   {#if adguard.data && (adguard.data.running || adguard.data.topology === 'expert')}
     <AdGuardTopologyCard {...{ expert: adguard.data.topology === 'expert', hosts: adguard.data.topology_hosts ?? [], busy: adguard.data.busy, refresh: adguard.retry }} />
   {/if}
+  </CardGrid>
 </div>

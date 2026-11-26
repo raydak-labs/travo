@@ -24,18 +24,15 @@ const PATHS: [string, Route][] = [
   ['#/clients', 'clients'],
   ['#/services', 'services'],
   ['#/services/adguard', 'services-adguard'],
-  ['#/network/wan', 'network-wan'],
   ['#/network/lan', 'network-lan'],
-  ['#/network/dhcp', 'network-dhcp'],
   ['#/network/port-forwards', 'network-port-forwards'],
   ['#/network/ipv6', 'network-ipv6'],
   ['#/network/diagnostics', 'network-diagnostics'],
   ['#/system', 'system'],
   ['#/system/hardware', 'system-hardware'],
   ['#/system/logs', 'system-logs'],
-  ['#/system/updates', 'system-updates'],
+  ['#/system/firmware', 'system-firmware'],
   ['#/system/access', 'system-access'],
-  ['#/system/reset', 'system-reset'],
 ];
 
 describe('router', () => {
@@ -53,8 +50,8 @@ describe('router', () => {
     expect(parseHash('#/system?tab=x')).toBe('system');
   });
 
-  it('opens WAN for the Network group path', () => {
-    expect(parseHash('#/network')).toBe('network-wan');
+  it('opens LAN for the Network group path', () => {
+    expect(parseHash('#/network')).toBe('network-lan');
   });
 
   it('falls back to the dashboard for unknown hashes', () => {
@@ -63,9 +60,13 @@ describe('router', () => {
     expect(parseHash('#/network/nope')).toBe('dashboard');
   });
 
-  it('keeps the old LED and token paths working', () => {
+  it('keeps old paths working', () => {
     expect(parseHash('#/system/leds')).toBe('system-hardware');
     expect(parseHash('#/system/tokens')).toBe('system-access');
+    expect(parseHash('#/system/updates')).toBe('system-firmware');
+    expect(parseHash('#/system/reset')).toBe('system-firmware');
+    expect(parseHash('#/network/wan')).toBe('internet');
+    expect(parseHash('#/network/dhcp')).toBe('network-lan');
   });
 
   it.each(
@@ -108,7 +109,7 @@ describe('guard', () => {
 
   it('pins the redirects that matter', () => {
     expect(guard('anonymous', 'login')).toBe('login');
-    expect(guard('anonymous', 'system-reset')).toBe('login');
+    expect(guard('anonymous', 'system-firmware')).toBe('login');
     expect(guard('authenticated', 'setup')).toBe('dashboard');
     expect(guard('setup_required', 'network-lan')).toBe('setup');
   });

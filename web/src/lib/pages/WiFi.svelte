@@ -25,6 +25,7 @@ import {
   selectWifiProfile,
 } from '../api/wifi';
 import { m } from '../paraglide/messages.js';
+import CardGrid from '../ui/CardGrid.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import EmptyState from '../ui/EmptyState.svelte';
@@ -47,10 +48,17 @@ import WiFiSummary from './WiFiSummary.svelte';
 import WiFiUplinkMAC from './WiFiUplinkMAC.svelte';
 
 const idle: LoadStatus = { state: 'ready' };
+// `access` is the WiFi page (networks this router offers); `uplink` is the WiFi part of the
+// Internet page (networks it joins). Both share the join/AP transaction handling below.
 let {
+  part = 'access',
   initialScanStatus = idle,
   initialScanData,
-}: { initialScanStatus?: LoadStatus; initialScanData?: ScanResult } = $props();
+}: {
+  part?: 'access' | 'uplink';
+  initialScanStatus?: LoadStatus;
+  initialScanData?: ScanResult;
+} = $props();
 
 const summary = createLoader(fetchWifi);
 const profiles = createLoader(fetchWifiProfiles);
@@ -276,6 +284,7 @@ async function scan() {
 }
 </script>
 
+{#if part === 'access'}
 <div class="flex flex-col gap-6">
   <PageHeader title={m.nav_wifi()} description={m.wifi_page_description()}>
     {#snippet actions()}
@@ -293,6 +302,19 @@ async function scan() {
     {/if}
   </LoadState>
 
+  <CardGrid cols={2}>
+  <Section title={m.wifi_aps_title()}>
+    {#key apVersion}
+      <WiFiAccessPoints {...{ busy, apply: submitAP }} />
+    {/key}
+  </Section>
+  <Section title={m.wifi_schedule_title()}>
+    <WiFiScheduleCard />
+  </Section>
+  </CardGrid>
+</div>
+{:else}
+<div class="flex flex-col gap-6">
   <Section title={m.wifi_saved_title()} description={m.wifi_saved_description()}>
     <WiFiReconnect status={reconnect.status} data={reconnect.data} profiles={profiles.data?.profiles ?? []}
       scan={scanData} joinBusy={busy} select={selectProfile} />
@@ -313,7 +335,6 @@ async function scan() {
       {/if}
     </LoadState>
   </Section>
-
   <Section title={m.wifi_scan_title()}>
     {#snippet actions()}
       {#if scanStatus.state !== 'error'}
@@ -339,23 +360,13 @@ async function scan() {
       {/if}
     </LoadState>
   </Section>
-
-  <Section title={m.wifi_aps_title()}>
-    {#key apVersion}
-      <WiFiAccessPoints {...{ busy, apply: submitAP }} />
-    {/key}
-  </Section>
-
   <Section title={m.wifi_mac_title()} description={m.wifi_mac_description()}>
     {#key apVersion}
       <WiFiUplinkMAC {...{ busy, apply: submitChange }} />
     {/key}
   </Section>
-
-  <Section title={m.wifi_schedule_title()}>
-    <WiFiScheduleCard />
-  </Section>
 </div>
+{/if}
 
 {#if selected}
   <WiFiJoinDialog {...{ network: selected, summary: summary.data, returnFocus: joinTrigger, busy: joining.state === 'joining', submit: submitJoin, save: saveProfile, close: () => { selected = undefined; } }} />
