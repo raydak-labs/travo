@@ -13,7 +13,7 @@ export function alertRoute(alert: Alert): Route {
     case 'adguard_fail_open':
       return 'services';
     case 'uplink_reconnect_exhausted':
-      return 'wifi';
+      return 'internet';
     case 'wifi_not_set_up':
       return 'wifi';
     case 'data_budget_warning':
@@ -23,7 +23,8 @@ export function alertRoute(alert: Alert): Route {
       return 'system-firmware';
     case 'stale_guard': {
       const name = alert.subject ?? '';
-      if (/^(wifi|wireless|uplink)/.test(name)) return 'wifi';
+      if (/^(wifi-reconnect|uplink)/.test(name)) return 'internet';
+      if (/^(wifi|wireless)/.test(name)) return 'wifi';
       if (/^(vpn|wireguard)/.test(name)) return 'vpn';
       if (/^(adguard|tailscale)/.test(name)) return 'services';
       if (/^(failover|usbtether)/.test(name)) return 'internet';
