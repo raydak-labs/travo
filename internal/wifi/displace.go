@@ -50,6 +50,11 @@ func planRadioDisplace(radios []facts.Radio, wireless []device.Section, radio st
 	}
 	plan := displacePlan{radio: radio}
 	takenRoles := map[string][2]bool{}
+	// APs without a twin can only move, so they claim move targets before APs that
+	// could fall back to being disabled.
+	slices.SortStableFunc(aps, func(a, b device.Section) int {
+		return cmp.Compare(boolRank(hasTwinAP(radios, wireless, radio, a)), boolRank(hasTwinAP(radios, wireless, radio, b)))
+	})
 	for _, ap := range aps {
 		if target := findMoveTarget(radios, wireless, radio, ap, takenRoles); target != "" {
 			plan.moves = append(plan.moves, apMove{section: ap.Name, target: target})
@@ -179,4 +184,11 @@ func markAPsDown(aps []lockout.AP, sections []string) {
 			aps[i].Enabled = false
 		}
 	}
+}
+
+func boolRank(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

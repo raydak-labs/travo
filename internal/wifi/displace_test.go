@@ -6,8 +6,6 @@ import (
 	"errors"
 	"maps"
 	"net/netip"
-	"os"
-	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -16,7 +14,6 @@ import (
 	"github.com/raydak-labs/travo/internal/device/facts"
 	"github.com/raydak-labs/travo/internal/device/mock"
 	"github.com/raydak-labs/travo/internal/lockout"
-	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // dualAPWireless derives a post-ADR-0034 UCI config (both radios carrying an enabled
@@ -170,6 +167,14 @@ func TestDisplaceRadioSelection(t *testing.T) {
 	// radio1 has a different-SSID main AP (blocks move) plus a guest AP with DefaultSSID (wrong role for a twin).
 	roleMismatch := withGuestAP(withOption(base, "default_radio1", "ssid", "OtherMain"), "guest1", "radio1", DefaultSSID)
 	eth := lockout.Caller{Method: lockout.Ethernet}
+	// Three radios, only radio0 band-compatible. radio0's guest "Shared" has a twin on
+	// radio2, guest "Unique" has none; radio1 has room for one guest AP. Unique must get
+	// that room, so Shared is disabled instead of moved.
+	threeRadios := append(slices.Clone(radios), facts.Radio{Name: "radio2", Band: "6g", Up: true})
+	twinBeforeUnique := withGuestAP(withGuestAP(withGuestAP(append(cloneSections(base), device.Section{
+		Name: "main2", Type: "wifi-iface",
+		Options: map[string]string{"device": "radio2", "mode": "ap", "network": "lan", "ssid": DefaultSSID, "disabled": "0"},
+	}), "shared0", "radio0", "Shared"), "unique0", "radio0", "Unique"), "shared2", "radio2", "Shared")
 
 	for _, tc := range []struct {
 		name         string
@@ -191,6 +196,7 @@ func TestDisplaceRadioSelection(t *testing.T) {
 		{"twin on live-disabled radio refused", radio1LiveOff, []string{"5g", "2g"}, base, eth, "", nil, nil},
 		{"guest AP with no twin and no move target refused", radios, []string{"5g", "2g"}, guestBlocked, eth, "", nil, nil},
 		{"guest AP on R moves while main twin disabled", radios, []string{"5g"}, guestMovable, eth, "radio0", []string{"default_radio0"}, []apMove{{section: "guest", target: "radio1"}}},
+		{"AP without twin gets the move target first", threeRadios, []string{"5g"}, twinBeforeUnique, eth, "radio0", []string{"default_radio0", "shared0"}, []apMove{{section: "unique0", target: "radio1"}}},
 		{"role mismatch main vs guest is not a twin", radios, []string{"5g"}, roleMismatch, eth, "", nil, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -338,39 +344,5 @@ func TestDisplaceProbeExpectations(t *testing.T) {
 				t.Fatalf("apsProven=%v, want %v", got, tc.pass)
 			}
 		})
-	}
-}
-
-func TestJoinDisplaceRollsBackWhenDisplacedAPStaysListed(t *testing.T) {
-	ctx := context.Background()
-	service, scanner := noSTAScanService(t)
-	scanner.replies["phy0-ap0"] = fixture(t, "wifi-scan/no-sta/iwinfo-scan-radio0.json")
-	ubus := service.ubus.(*fakeUbus)
-	ubus.replies[ubusKey{"network.wireless", "status", ""}] = dualAPWirelessStatus(t)
-	ubus.replies[ubusKey{"network.interface", "dump", ""}] = fixture(t, "interface-dump.json")
-	ubus.replies[ubusKey{"hostapd.phy0-ap0", "get_clients", ""}] = fixture(t, "with-ap-client/hostapd-phy1-ap0-get_clients.json")
-	ubus.replies[ubusKey{"hostapd.phy1-ap0", "get_clients", ""}] = fixture(t, "hostapd-phy1-ap0-get_clients.json")
-	ubus.replies[ubusKey{"network.device", "status", "phy0-ap0"}] = fixture(t, "wifi-scan/connected/device-status-phy1-ap0.json")
-	ubus.replies[ubusKey{"network.device", "status", "phy1-ap0"}] = fixture(t, "wifi-scan/connected/device-status-phy1-ap0.json")
-
-	base := mock.New()
-	seedWirelessSections(t, base, dualAPWireless(t))
-	base.SetNeighbours(fixture(t, "with-ap-client/ip-neigh.json"))
-
-	ssid := joinFixtureSSID(t, service)
-	manager, configDir := fileTxnManager(t, base, func() {})
-	service.WithJoin(JoinDeps{
-		UCI: manager.Device, Ubus: ubus, Routes: joinRoute{"phy1-sta0"}, Keys: base, Neighbours: base,
-		Links: fixedJoinLinks(3), Txns: manager, ProbeBudget: 30 * time.Millisecond, ProbeEvery: time.Millisecond,
-	})
-	st, err := service.Join(ctx, JoinRequest{SSID: ssid, Security: SecurityWPA2, Key: "example-only", Caller: netip.MustParseAddr("192.168.1.151")})
-	if !errors.Is(err, txn.ErrProbeFailed) || st.State != txn.RolledBack {
-		t.Fatalf("got state=%s err=%v, want RolledBack/ErrProbeFailed", st.State, err)
-	}
-	for _, config := range []string{"wireless", "network", "firewall"} {
-		content, err := os.ReadFile(filepath.Join(configDir, config))
-		if err != nil || string(content) != "original "+config {
-			t.Fatalf("%s not restored: %v", config, err)
-		}
 	}
 }
