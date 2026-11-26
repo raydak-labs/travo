@@ -3,6 +3,7 @@ import Wifi from '@lucide/svelte/icons/wifi';
 import { onDestroy } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import * as Collapsible from '$lib/components/ui/collapsible';
+import { fetchIPv6 } from '../api/ipv6';
 import { fetchVpnStatus } from '../api/vpn-status';
 import { captiveCardVisible } from '../captive';
 import type { dashboardEvents } from '../dashboard-events.svelte';
@@ -36,6 +37,8 @@ const throughput = $derived(events.throughput);
 const tailscale = $derived(events.tailscale);
 // Same status poll and guarded toggle as the VPN page: Enable, then Confirm (two taps).
 const vpn = createLoader(fetchVpnStatus, 10000);
+// IPv6 is a setting, not live state: read it once for the map badge.
+const ipv6 = createLoader(fetchIPv6);
 const tunnel = createTunnelControl(() => vpn.retry());
 const topology = $derived(
   topologyModel({
@@ -50,6 +53,7 @@ const topology = $derived(
 );
 onDestroy(() => {
   vpn.stop();
+  ipv6.stop();
   tunnel.stop();
 });
 
@@ -73,6 +77,7 @@ let trafficOpen = $state(false);
       <TopologyDiagram
         model={topology}
         uplinks={events.uplinks.data}
+        ipv6={ipv6.data?.enabled}
         resources={resources.data}
         status={{
           uplinks: events.uplinks.status,

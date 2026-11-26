@@ -178,8 +178,11 @@ under `nav:v2`.
 Travo look across the full content width: uplinks (wan, wwan, usbtether) on the left with
 label and state before their icon, thin curved links into a square router tile, client counts
 on the right. Icons and links share one coordinate system, so every link ends in an icon
-centre. Under the router tile: hostname, model and one row of status chips (Internet, VPN,
-Tailscale when installed). DOM and tab order: sources, router, clients.
+centre. Under the router tile: hostname, model and one row of `MapBadge`s: square-cornered
+outline badges with a one-word label (Internet, VPN, Tailscale when installed, IPv6 once its
+setting is read). The colour is the state: green on, grey off, amber or red only for a problem
+(captive portal, offline). The state is in the tooltip and for screen readers, so colour is
+never the only signal. Each badge links to its page. DOM and tab order: sources, router, clients.
 
 - Shown from the `lg` breakpoint only; below it the uplink cards, Quick status and System
   cards carry the same facts.

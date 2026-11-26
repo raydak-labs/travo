@@ -22,6 +22,7 @@ import {
   vpnChip,
 } from '../topology-labels';
 import type { LoadStatus } from '../ui/loader.svelte';
+import MapBadge from '../ui/MapBadge.svelte';
 import Status from '../ui/Status.svelte';
 import type { StatusKind } from '../ui/status';
 import { uplinkFacts } from '../uplink-facts';
@@ -36,11 +37,14 @@ let {
   status,
   uplinks,
   resources,
+  ipv6,
 }: {
   model: TopologyModel;
   status: Record<Part, LoadStatus> & { vpn?: LoadStatus };
   uplinks?: DashboardUplinks;
   resources?: SystemInfoBody;
+  /** IPv6 on the LAN; undefined while unknown, which hides the badge. */
+  ipv6?: boolean;
 } = $props();
 
 const captionId = $props.id();
@@ -225,12 +229,15 @@ const routerDot = $derived(
           <div class="text-sm font-semibold">{model.router?.hostname ?? m.topology_router()}</div>
           {#if model.router}<div class="text-xs break-words text-muted-foreground">{model.router.model}</div>{/if}
         </div>
-        <div class="mt-1 flex flex-nowrap justify-center gap-1">
-          <Status kind={internetChip[model.internet].kind}>{m.topology_internet()} {internetChip[model.internet].label()}</Status>
-          <a href={href('vpn')}><Status kind={vpnChip[model.vpn].kind}>{m.dashboard_vpn()} {vpnChip[model.vpn].label()}</Status></a>
+        <div class="mt-1 flex flex-nowrap justify-center gap-1" data-part="router-badges">
+          <MapBadge label={m.topology_internet()} state={internetChip[model.internet].label()} kind={internetChip[model.internet].kind} href={href('internet')} />
+          <MapBadge label={m.dashboard_vpn()} state={vpnChip[model.vpn].label()} kind={vpnChip[model.vpn].kind} href={href('vpn')} />
           {#if model.tailscale !== 'absent'}
             {@const chip = tailscaleChip[model.tailscale]}
-            <a href={href('vpn-tailscale')}><Status kind={chip.kind}>{m.tailscale_title()} {chip.label()}</Status></a>
+            <MapBadge label={m.tailscale_title()} state={chip.label()} kind={chip.kind} href={href('vpn-tailscale')} />
+          {/if}
+          {#if ipv6 !== undefined}
+            <MapBadge label={m.topology_ipv6()} state={ipv6 ? m.topology_on() : m.topology_off()} kind={ipv6 ? 'ok' : 'neutral'} href={href('network-ipv6')} />
           {/if}
         </div>
         {@render staleMark(routerStale)}

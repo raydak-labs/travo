@@ -1326,5 +1326,8 @@
   "clients_unknown": "Unknown device",
   "osupdate_never_short": "Not since the service started",
   "usbtether_no_phone_title": "No phone connected",
-  "firmware_image": "Sysupgrade image"
+  "firmware_image": "Sysupgrade image",
+  "topology_ipv6": "IPv6",
+  "topology_on": "On",
+  "topology_off": "Off"
 }

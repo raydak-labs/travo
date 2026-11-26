@@ -97,8 +97,9 @@ describe('Dashboard Tailscale', () => {
     const body = dashboard({ state: 'ready' }, []);
     expect(body).toContain('Tailscale: Connected');
     const plain = body.replace(/<!--[^>]*-->/g, '');
-    expect(plain).toContain('<a href="#/vpn/tailscale"><span data-slot="badge"');
-    expect(plain).toContain('Tailscale Connected');
+    expect(plain).toMatch(
+      /<a href="#\/vpn\/tailscale"[^>]*title="Tailscale: Connected"[^>]*data-kind="ok"/,
+    );
     // An absent package hides the Tailscale row and chip.
   });
 });

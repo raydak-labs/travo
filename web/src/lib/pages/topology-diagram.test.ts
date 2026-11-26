@@ -118,16 +118,32 @@ describe('TopologyDiagram', () => {
     expect(part).not.toMatch(/>0<\/span>/);
   });
 
-  it('shows the router chips and hides Tailscale when absent', () => {
+  it('shows the router badges and hides Tailscale when absent', () => {
     const body = html(full);
     expect(body).toContain('OpenWrt');
     expect(body).toContain('GL.iNet GL-AXT1800');
-    expect(body).toContain('status-ok');
+    const badges = body.slice(body.indexOf('data-part="router-badges"'));
+    // Colour carries the state; the state text is there for screen readers and the tooltip.
+    expect(badges).toMatch(/title="Internet: Online"[^>]*data-kind="ok"/);
+    expect(badges).toContain('<span class="sr-only">: Online</span>');
     expect(body).not.toContain('Tailscale');
+    // IPv6 shows only once its setting is known.
+    expect(badges).not.toContain('IPv6');
     const withTailscale = topologyModel({
       tailscale: { ...tailscale, installed: true, running: true, backend_state: 'Running' },
     });
     expect(html(withTailscale)).toContain('href="#/vpn/tailscale"');
+  });
+
+  it('shows IPv6 green when on and grey when off', () => {
+    const on = render(TopologyDiagram, {
+      props: { model: full, status: allReady, ipv6: true },
+    }).body;
+    expect(on).toMatch(/title="IPv6: On"[^>]*data-kind="ok"/);
+    const off = render(TopologyDiagram, {
+      props: { model: full, status: allReady, ipv6: false },
+    }).body;
+    expect(off).toMatch(/title="IPv6: Off"[^>]*data-kind="neutral"/);
   });
 
   it('lists every part in the hidden summary', () => {
