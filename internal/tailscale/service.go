@@ -252,8 +252,13 @@ func (s *Service) SetRunning(ctx context.Context, on bool) (Status, error) {
 			if err := s.waitReady(ctx); err != nil {
 				return fmt.Errorf("tailscaled not answering: %w (guard %s kept)", err, ChangeGuard)
 			}
-		} else if err := s.serviceActions(ctx, "stop", "disable"); err != nil {
-			return fmt.Errorf("%w (guard %s kept)", err, ChangeGuard)
+		} else {
+			if err := s.serviceActions(ctx, "stop", "disable"); err != nil {
+				return fmt.Errorf("%w (guard %s kept)", err, ChangeGuard)
+			}
+			if err := s.waitStopped(ctx); err != nil {
+				return fmt.Errorf("tailscaled still running: %w (guard %s kept)", err, ChangeGuard)
+			}
 		}
 		return s.Guards.Release(ChangeGuard)
 	}()
@@ -276,6 +281,24 @@ func (s *Service) waitReady(ctx context.Context) error {
 		case <-ctx.Done():
 			return fmt.Errorf("%w (last: %v)", ctx.Err(), err)
 		case <-time.After(every):
+		}
+	}
+}
+
+// waitStopped polls procd until tailscaled is gone: right after `stop` procd still lists the
+// instance for a moment, and a status read then fails against the stopped daemon (hardware).
+func (s *Service) waitStopped(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, ReadyTimeout)
+	defer cancel()
+	for {
+		running, err := s.Services.ServiceRunning(ctx, Package)
+		if err == nil && !running {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("%w (last: running=%v err=%v)", ctx.Err(), running, err)
+		case <-time.After(s.every()):
 		}
 	}
 }
