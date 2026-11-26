@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/netip"
 	"regexp"
-	"slices"
 	"strings"
 	"time"
 
@@ -208,26 +207,34 @@ func (s *Service) prepareJoin(ctx context.Context, req JoinRequest, radios []fac
 	if err != nil {
 		return joinPlan{}, ErrUnavailable
 	}
+	caller := classifyCaller(ctx, s.join.Ubus, s.join.Neighbours, apNetworks(wireless), req.Caller)
 	radio, target, moved := pickRadio(radios, bands, wireless), "", []string(nil)
+	var displaced displacePlan
 	if radio == "" {
 		if radio, target, moved = reconcileRadio(radios, bands, wireless); radio == "" {
-			return joinPlan{}, ErrNoFreeRadio
+			displaced = displaceRadio(radios, bands, wireless, caller)
+			if displaced.radio == "" {
+				return joinPlan{}, ErrNoFreeRadio
+			}
+			radio = displaced.radio
 		}
 	}
 	writes, before, after, err := planJoin(wireless, network, firewall, req, radio)
 	if err != nil {
 		return joinPlan{}, err
 	}
-	if len(moved) > 0 {
+	switch {
+	case len(moved) > 0:
 		writes = reconcileWrites(wireless, writes, moved, target)
 		// A moved AP drops its clients: it does not count as the caller's AP staying up.
-		for i := range after {
-			if slices.Contains(moved, after[i].Section) {
-				after[i].Enabled = false
-			}
+		markAPsDown(after, moved)
+	case displaced.radio != "":
+		writes = displaceWrites(wireless, writes, displaced)
+		markAPsDown(after, displaced.disabled)
+		for _, m := range displaced.moves {
+			markAPsDown(after, []string{m.section})
 		}
 	}
-	caller := classifyCaller(ctx, s.join.Ubus, s.join.Neighbours, apNetworks(wireless), req.Caller)
 	if err := checkJoinLockout(caller, withIfnames(ctx, s.join.Ubus, before), after, req.Acknowledge); err != nil {
 		return joinPlan{}, err
 	}
@@ -235,7 +242,7 @@ func (s *Service) prepareJoin(ctx context.Context, req JoinRequest, radios []fac
 	if sta := uplinkSections(wireless); len(sta) > 0 {
 		section = sta[0].Name
 	}
-	return joinPlan{radio: radio, section: section, writes: writes, expect: apExpectations(wireless, "", false, "")}, nil
+	return joinPlan{radio: radio, section: section, writes: writes, expect: joinAPExpectations(wireless, displaced.disabled)}, nil
 }
 
 // checkJoinLockout runs only when the join takes an AP down (a move counts as down).
