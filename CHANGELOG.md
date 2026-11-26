@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.5.0](https://github.com/blackdark-org/travo-greenfield/compare/v0.4.0...v0.5.0) (2026-11-26)
+
+
+### Features
+
+* **leds:** hold single LEDs off; night mode keeps the user's choice ([aa6cb6e](https://github.com/blackdark-org/travo-greenfield/commit/aa6cb6e1386feb57d4da3839d648fcd72f93ab41))
+* **tailscale:** switch tailscaled on or off; off after install ([9f37326](https://github.com/blackdark-org/travo-greenfield/commit/9f37326cc916b1457990344ec17c5a44d3b5ea73))
+* **web:** compact outline badges under the map's router ([b316768](https://github.com/blackdark-org/travo-greenfield/commit/b316768d4c54ae012a6d788f90c985ab51cef50a))
+* **web:** Internet holds every uplink, LAN takes DHCP, Firmware takes reset ([cc61cf7](https://github.com/blackdark-org/travo-greenfield/commit/cc61cf762cc87e402029a7888b0ad34c5d366078))
+* **web:** main switches in the page header; Tailscale and LED switches ([b35e573](https://github.com/blackdark-org/travo-greenfield/commit/b35e57324ed5fff10ef466399c3bee6456411168))
+
+
+### Bug Fixes
+
+* **packaging:** install.sh removes UI files the release does not list ([024235c](https://github.com/blackdark-org/travo-greenfield/commit/024235cbc6be79d0f4ce979c50e6b4aa428015e3))
+* **packaging:** prune every stale UI file, dot-dot names included ([bdedb5d](https://github.com/blackdark-org/travo-greenfield/commit/bdedb5dcf075b39497b07d088ea9bbd17cfdba15))
+* **scripts:** attach PR screenshots with gh pr edit --attach ([8d26a5a](https://github.com/blackdark-org/travo-greenfield/commit/8d26a5ae878155ee3c566e3597b2f346b00e7963))
+* **tailscale:** wait until procd lists tailscaled as stopped ([1d820d1](https://github.com/blackdark-org/travo-greenfield/commit/1d820d18139e49b170f2297de7ab183b8e073715))
+* **web:** Internet cards two per row; the WAN form needs the width ([4a43f6e](https://github.com/blackdark-org/travo-greenfield/commit/4a43f6edd299d7dce7cbdbda4b3cb4e8ab510643))
+* **web:** stale update result, Travo version tile, password dialog ([43a4d66](https://github.com/blackdark-org/travo-greenfield/commit/43a4d66b768a4fb609ae4ffd617946d56cbe4729))
+
 ## [0.4.0](https://github.com/blackdark-org/travo-greenfield/compare/v0.3.0...v0.4.0) (2026-11-25)
 
 
