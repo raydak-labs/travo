@@ -38,6 +38,7 @@ const (
 	CodeDataBudgetExceeded   = "data_budget_exceeded"
 	CodeFirmwareCompleted    = "firmware_upgrade_completed"
 	CodeMemoryLow            = "memory_low"
+	CodeWiFiNotSetUp         = "wifi_not_set_up"
 )
 
 // StaleGuardAfter separates a guard of a running operation (the longest, a package install,
@@ -59,7 +60,7 @@ const (
 type Alert struct {
 	ID       string     `json:"id" doc:"Stable while the condition lasts, e.g. stale_guard:wifi-apply-in-progress"`
 	Severity Severity   `json:"severity" enum:"warning,danger,info"`
-	Code     string     `json:"code" enum:"stale_guard,overlay_low,persistence_degraded,adguard_fail_open,uplink_reconnect_exhausted,data_budget_warning,data_budget_exceeded,firmware_upgrade_completed,memory_low"`
+	Code     string     `json:"code" enum:"stale_guard,overlay_low,persistence_degraded,adguard_fail_open,uplink_reconnect_exhausted,data_budget_warning,data_budget_exceeded,firmware_upgrade_completed,memory_low,wifi_not_set_up"`
 	Subject  string     `json:"subject,omitempty" doc:"What the alert is about, e.g. the guard name"`
 	Since    *time.Time `json:"since" nullable:"true" doc:"When the condition started; null when unknown"`
 }
@@ -84,6 +85,8 @@ type Inputs struct {
 	FirmwareCompleted *time.Time
 	// MemAvailable is /proc/meminfo MemAvailable in bytes.
 	MemAvailable *uint64
+	// WiFiNotSetUp: the main access points are still as OpenWrt ships them (off and open).
+	WiFiNotSetUp *bool
 }
 
 // Derive is the pure mapping from inputs to alerts, by severity rank, then by id.
@@ -115,6 +118,10 @@ func Derive(in Inputs) []Alert {
 		out = append(out, Alert{ID: CodeDataBudgetWarning, Severity: Warning, Code: CodeDataBudgetWarning})
 	case datausage.StateExceeded:
 		out = append(out, Alert{ID: CodeDataBudgetExceeded, Severity: Danger, Code: CodeDataBudgetExceeded})
+	}
+	// Danger, so the shell banner shows it on every page: a travel router is reached over WiFi.
+	if in.WiFiNotSetUp != nil && *in.WiFiNotSetUp {
+		out = append(out, Alert{ID: CodeWiFiNotSetUp, Severity: Danger, Code: CodeWiFiNotSetUp})
 	}
 	if in.FirmwareCompleted != nil {
 		out = append(out, Alert{ID: CodeFirmwareCompleted, Severity: Info, Code: CodeFirmwareCompleted, Since: timePtr(*in.FirmwareCompleted)})
@@ -192,6 +199,7 @@ type Sources struct {
 	// FirmwareCompleted never fails: the value lives in the daemon's memory.
 	FirmwareCompleted func() *time.Time
 	MemAvailable      func(context.Context) (uint64, error)
+	WiFiNotSetUp      func(context.Context) (bool, error)
 	Now               func() time.Time
 }
 
@@ -240,6 +248,11 @@ func (s *Service) List(ctx context.Context) (AlertList, error) {
 	if src.MemAvailable != nil {
 		if avail, err := src.MemAvailable(ctx); err == nil {
 			in.MemAvailable = &avail
+		}
+	}
+	if src.WiFiNotSetUp != nil {
+		if off, err := src.WiFiNotSetUp(ctx); err == nil {
+			in.WiFiNotSetUp = &off
 		}
 	}
 	return AlertList{Alerts: Derive(in)}, nil

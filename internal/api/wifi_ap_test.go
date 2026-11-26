@@ -14,6 +14,7 @@ import (
 type fakeAPs struct {
 	list    []wifi.APConfig
 	last    wifi.APRequest
+	setup   wifi.SetupRequest
 	calls   int
 	status  txn.Status
 	err     error
@@ -25,6 +26,39 @@ func (f *fakeAPs) UpdateAP(_ context.Context, r wifi.APRequest) (txn.Status, err
 	f.calls++
 	f.last = r
 	return f.status, f.err
+}
+
+func (f *fakeAPs) SetupAPs(_ context.Context, r wifi.SetupRequest) (txn.Status, error) {
+	f.calls++
+	f.setup = r
+	return f.status, f.err
+}
+
+func TestWiFiSetupRoute(t *testing.T) {
+	const key = "sentinel-password"
+	aps := &fakeAPs{status: txn.Status{State: txn.Pending}}
+	aps.status.Meta.ID = "1234567890abcdef"
+	e := newEnvWithDashboard(t, nil, nil, nil, func(d *Deps) { d.WiFiAPs = aps })
+	cookie, csrf := e.login()
+	request := req{method: http.MethodPost, path: "/api/v1/wifi/setup", cookie: cookie, csrf: csrf, body: `{"ssid":"Travo","key":"` + key + `"}`}
+	if rec := e.do(request); rec.Code != 202 || strings.Contains(rec.Body.String(), key) || aps.setup != (wifi.SetupRequest{SSID: "Travo", Key: key}) {
+		t.Fatal(rec.Code, rec.Body, aps.setup.SSID)
+	}
+	for _, tc := range []struct {
+		err  error
+		http int
+		code string
+	}{
+		{wifi.ValidationError{Code: "wifi_key_invalid"}, 400, "wifi_key_invalid"},
+		{wifi.ErrAPNotFound, 404, "wifi_ap_not_found"},
+		{wifi.ErrRadioInUse, 409, "wifi_radio_in_use"},
+		{txn.ErrNoChanges, 409, "wifi_no_change"},
+	} {
+		aps.status, aps.err = txn.Status{}, tc.err
+		if rec := e.do(request); rec.Code != tc.http || bodyField(t, rec, "code") != tc.code {
+			t.Fatal(rec.Code, rec.Body)
+		}
+	}
 }
 
 func TestWiFiAPRoutes(t *testing.T) {

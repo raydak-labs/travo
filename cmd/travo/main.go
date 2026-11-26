@@ -418,7 +418,7 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 	}
 	apiDeps.SystemSettings = settings
 	apiDeps.OpenWrtUpdates = newOpenWrtUpdates(deps)
-	apiDeps.Alerts = newAlerts(deps, aghService, reconnect, usage, fw)
+	apiDeps.Alerts = newAlerts(deps, aghService, reconnect, usage, fw, wirelessAPs)
 	if f, ok := deps.Device.(sshkeys.File); ok {
 		apiDeps.SSHKeys = &sshkeys.Service{File: f}
 	}

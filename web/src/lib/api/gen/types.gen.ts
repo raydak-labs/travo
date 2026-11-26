@@ -113,7 +113,7 @@ export type AdguardTopologyInputBody = {
 };
 
 export type Alert = {
-    code: 'stale_guard' | 'overlay_low' | 'persistence_degraded' | 'adguard_fail_open' | 'uplink_reconnect_exhausted' | 'data_budget_warning' | 'data_budget_exceeded' | 'firmware_upgrade_completed' | 'memory_low';
+    code: 'stale_guard' | 'overlay_low' | 'persistence_degraded' | 'adguard_fail_open' | 'uplink_reconnect_exhausted' | 'data_budget_warning' | 'data_budget_exceeded' | 'firmware_upgrade_completed' | 'memory_low' | 'wifi_not_set_up';
     /**
      * Stable while the condition lasts, e.g. stale_guard:wifi-apply-in-progress
      */
@@ -1369,6 +1369,13 @@ export type SetMacInputBody = {
     mode: 'default' | 'random' | 'custom' | 'clone';
 };
 
+export type SetupApsInputBody = {
+    /**
+     * Name of the router's WiFi on every band
+     */
+    ssid: string;
+};
+
 export type SetupInputBody = {
     /**
      * New root password, 8 to 128 bytes
@@ -1957,6 +1964,17 @@ export type SetGuestInputBodyWritable = {
      * Radio for the guest AP; omitted keeps the current one or picks a radio without the uplink
      */
     radio?: string;
+    ssid: string;
+};
+
+export type SetupApsInputBodyWritable = {
+    /**
+     * WPA key, 8 to 63 printable ASCII characters
+     */
+    key: string;
+    /**
+     * Name of the router's WiFi on every band
+     */
     ssid: string;
 };
 
@@ -6893,6 +6911,51 @@ export type GetWiFiScheduleStatusResponses = {
 };
 
 export type GetWiFiScheduleStatusResponse = GetWiFiScheduleStatusResponses[keyof GetWiFiScheduleStatusResponses];
+
+export type SetupWiFiAccessPointsData = {
+    body: SetupApsInputBodyWritable;
+    path?: never;
+    query?: never;
+    url: '/api/v1/wifi/setup';
+};
+
+export type SetupWiFiAccessPointsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Not Found
+     */
+    404: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetupWiFiAccessPointsError = SetupWiFiAccessPointsErrors[keyof SetupWiFiAccessPointsErrors];
+
+export type SetupWiFiAccessPointsResponses = {
+    /**
+     * Accepted
+     */
+    202: TxnBody;
+};
+
+export type SetupWiFiAccessPointsResponse = SetupWiFiAccessPointsResponses[keyof SetupWiFiAccessPointsResponses];
 
 export type GetWiFiUplinkMacData = {
     body?: never;

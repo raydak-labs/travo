@@ -59,11 +59,12 @@ func TestDeriveMapsEverySource(t *testing.T) {
 			{Name: "adguard-install-in-progress", Started: now.Add(-StaleGuardAfter)},
 			{Name: "firmware-upgrade-in-progress"}, // unreadable start time
 		},
-		OverlayFree: &low,
-		Mounts:      &mounts,
-		FailOpen:    &failOpen,
-		Reconnect:   &wifireconnect.Status{State: wifireconnect.StateExhausted, Attempts: 5, MaxAttempts: 5},
-		DataBudget:  datausage.StateWarning,
+		OverlayFree:  &low,
+		Mounts:       &mounts,
+		FailOpen:     &failOpen,
+		Reconnect:    &wifireconnect.Status{State: wifireconnect.StateExhausted, Attempts: 5, MaxAttempts: 5},
+		DataBudget:   datausage.StateWarning,
+		WiFiNotSetUp: ptr(true),
 	})
 	ids := []string{}
 	for _, a := range got {
@@ -74,6 +75,7 @@ func TestDeriveMapsEverySource(t *testing.T) {
 		"danger persistence_degraded",
 		"danger stale_guard:adguard-install-in-progress",
 		"danger stale_guard:firmware-upgrade-in-progress",
+		"danger wifi_not_set_up",
 		"warning data_budget_warning",
 		"warning overlay_low",
 		"warning uplink_reconnect_exhausted",
@@ -175,3 +177,4 @@ func TestListSkipsFailedSources(t *testing.T) {
 		t.Fatalf("%v %v", l, err)
 	}
 }
+func ptr[T any](v T) *T { return &v }

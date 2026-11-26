@@ -14,6 +14,8 @@ export function alertRoute(alert: Alert): Route {
       return 'services';
     case 'uplink_reconnect_exhausted':
       return 'wifi';
+    case 'wifi_not_set_up':
+      return 'wifi';
     case 'data_budget_warning':
     case 'data_budget_exceeded':
       return 'internet';
@@ -57,5 +59,7 @@ export function alertMessage(alert: Alert): string {
       return m.alert_firmware_upgrade_completed();
     case 'memory_low':
       return m.alert_memory_low();
+    case 'wifi_not_set_up':
+      return m.alert_wifi_not_set_up();
   }
 }
