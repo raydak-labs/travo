@@ -5,10 +5,6 @@ export type TimezoneMismatch = {
   browserZone: string;
 };
 
-/**
- * Reads the browser's IANA time zone. The resolver is injected for pure unit tests;
- * errors or empty values resolve to null.
- */
 export function readBrowserTimezone(
   resolve: () => string | undefined = () => Intl.DateTimeFormat().resolvedOptions().timeZone,
 ): string | null {
@@ -26,7 +22,6 @@ export function serializeDismissedPair(routerZone: string, browserZone: string):
   return JSON.stringify([routerZone, browserZone]);
 }
 
-/** sessionStorage can be absent or throw (private mode, blocked site data): treat as not dismissed. */
 export function isTimezoneMismatchDismissed(
   storage: Pick<Storage, 'getItem'> | undefined,
   routerZone: string,
@@ -48,15 +43,10 @@ export function dismissTimezoneMismatch(
   try {
     storage?.setItem(TIMEZONE_DISMISS_KEY, serializeDismissedPair(routerZone, browserZone));
   } catch {
-    // Failing to persist only drops the remembered dismissal for this session.
+    // Ignore storage errors (private mode / blocked site data).
   }
 }
 
-/**
- * Reports a mismatch only when the browser time zone is non-empty, supported by the router's
- * zone list, differs from the router's current zonename, and has not been dismissed for this
- * (routerZone, browserZone) pair in session storage.
- */
 export function detectTimezoneMismatch(input: {
   routerZone: string;
   zonenames: readonly string[];

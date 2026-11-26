@@ -51,7 +51,7 @@ async function updateTimezone() {
   const toastId = 'timezone-mismatch-update';
   notify.progress(m.timezone_mismatch_updating(), toastId);
   try {
-    // Re-read current device settings right before saving so hostname and NTP edits are never clobbered.
+    // Re-read before saving so hostname and NTP edits are not overwritten.
     const latest = await fetchDeviceSettings();
     const result = await saveDeviceSettings(latest.settings, {
       hostname: latest.settings.hostname,
