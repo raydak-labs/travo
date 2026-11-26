@@ -1,0 +1,9 @@
+/etc/adguardhome/:
+drwx------    2 adguardhome adguardhome       240 Nov  9 16:21 .
+drwxr-xr-x    1 root     root          2064 Nov  9 16:21 ..
+-rw-------    1 adguardhome adguardhome      4187 Nov  9 16:21 adguardhome.yaml
+
+/var/lib/adguardhome/:
+drwx------    3 adguardhome adguardhome        60 Nov  9 16:21 .
+drwxr-xr-x    4 root     root            80 Nov  9 16:21 ..
+drwx------    3 adguardhome adguardhome       100 Nov  9 16:21 data

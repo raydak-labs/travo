@@ -1,0 +1,51 @@
+package network
+
+config interface 'loopback'
+	option device 'lo'
+	option proto 'static'
+	list ipaddr '127.0.0.1/8'
+
+config globals 'globals'
+	option dhcp_default_duid '0004325cbf765bfc4771925ffc916a590cc7'
+	option ula_prefix 'fdc7:8957:dc2d::/48'
+
+config device
+	option name 'br-lan'
+	option type 'bridge'
+	list ports 'lan1'
+	list ports 'lan2'
+
+config interface 'lan'
+	option device 'br-lan'
+	option proto 'static'
+	list ipaddr '192.168.1.1/24'
+	option ip6assign '60'
+
+config interface 'wan'
+	option device 'wan'
+	option proto 'dhcp'
+	option peerdns '0'
+	option dns '127.0.0.1'
+
+config interface 'wan6'
+	option device 'wan'
+	option proto 'dhcpv6'
+
+config interface 'wwan'
+	option proto 'dhcp'
+
+config interface 'wg0'
+	option proto 'wireguard'
+	option private_key 'REDACTED'
+	option dns '198.18.0.1,198.18.0.2'
+	option disabled '1'
+	list addresses '100.64.2.234/32'
+
+config wireguard_wg0 'wg0_peer0'
+	option public_key 'KgTUh3KLijVluDvNpzDCJJfrJ7EyLzYLmdHCksG4sRg='
+	option route_allowed_ips '1'
+	option persistent_keepalive '25'
+	option endpoint_host '203.0.113.8'
+	option endpoint_port '51820'
+	list allowed_ips '0.0.0.0/0'
+

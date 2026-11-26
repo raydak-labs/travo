@@ -1,0 +1,73 @@
+name: Agent brief
+description: One tracer-bullet slice with a full contract; ready-for-agent once the readiness probe passes (docs/agents/workflow.md).
+title: "<area>: <outcome>"
+labels: ["needs-triage", "enhancement"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: One or two sentences on the behaviour after this lands, from the user's (or caller's) side. Use GLOSSARY.md terms.
+    validations:
+      required: true
+  - type: textarea
+    id: read
+    attributes:
+      label: Read first
+      description: Exact links into docs/ (invariants sections, ADRs, device-facts, testing). Rules live there; do not copy them here.
+      value: |
+        - AGENTS.md
+        - docs/invariants.md §
+        - docs/adr/
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Contract
+      description: Behavioural contract and key interfaces (types, signatures, endpoints with method/path/body/status/error codes, UI states). Concrete enough that no design decision is left. Name packages and types; avoid line numbers.
+    validations:
+      required: true
+  - type: textarea
+    id: out
+    attributes:
+      label: Out of scope
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checkable items, each backed by a test or a command.
+      value: |
+        - [ ] `mise run check` green
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests required
+      description: Unit / container integration / hardware; which fixtures (verbatim, with provenance; never invented fields).
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware
+      description: "None, or the playbook step in docs/testing.md that must pass on the router before closing (then add label needs-hardware)."
+      value: None
+  - type: input
+    id: depends
+    attributes:
+      label: Depends on
+      description: Informational only. Set the real edges with GitHub's native "blocked by" (gh issue edit <n> --add-blocked-by <m>).
+      value: none
+  - type: dropdown
+    id: model
+    attributes:
+      label: Model hint
+      options:
+        - small (mechanical)
+        - medium (normal)
+        - large (security or design heavy)
+    validations:
+      required: true

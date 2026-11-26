@@ -1,0 +1,27 @@
+{
+	"tailscale": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 5793,
+				"command": [
+					"/usr/sbin/tailscaled",
+					"--port",
+					"41641",
+					"--state",
+					"/etc/tailscale/tailscaled.state"
+				],
+				"term_timeout": 5,
+				"env": {
+					"TS_DEBUG_FIREWALL_MODE": "nftables",
+					"TS_NO_LOGS_NO_SUPPORT": "true"
+				},
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	}
+}

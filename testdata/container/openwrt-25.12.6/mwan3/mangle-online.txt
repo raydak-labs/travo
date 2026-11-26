@@ -1,0 +1,41 @@
+-P PREROUTING ACCEPT
+-P INPUT ACCEPT
+-P FORWARD ACCEPT
+-P OUTPUT ACCEPT
+-P POSTROUTING ACCEPT
+-N mwan3_connected_ipv4
+-N mwan3_custom_ipv4
+-N mwan3_dynamic_ipv4
+-N mwan3_hook
+-N mwan3_iface_in_usbtether
+-N mwan3_iface_in_wwan
+-N mwan3_ifaces_in
+-N mwan3_policy_travo_failover
+-N mwan3_rules
+-A PREROUTING -j mwan3_hook
+-A OUTPUT -j mwan3_hook
+-A mwan3_connected_ipv4 -m set --match-set mwan3_connected_ipv4 dst -j MARK --set-xmark 0x3f00/0x3f00
+-A mwan3_custom_ipv4 -m set --match-set mwan3_custom_ipv4 dst -j MARK --set-xmark 0x3f00/0x3f00
+-A mwan3_dynamic_ipv4 -m set --match-set mwan3_dynamic_ipv4 dst -j MARK --set-xmark 0x3f00/0x3f00
+-A mwan3_hook -m mark --mark 0x0/0x3f00 -j CONNMARK --restore-mark --nfmask 0x3f00 --ctmask 0x3f00
+-A mwan3_hook -m mark --mark 0x0/0x3f00 -j mwan3_ifaces_in
+-A mwan3_hook -m mark --mark 0x0/0x3f00 -j mwan3_custom_ipv4
+-A mwan3_hook -m mark --mark 0x0/0x3f00 -j mwan3_connected_ipv4
+-A mwan3_hook -m mark --mark 0x0/0x3f00 -j mwan3_dynamic_ipv4
+-A mwan3_hook -m mark --mark 0x0/0x3f00 -j mwan3_rules
+-A mwan3_hook -j CONNMARK --save-mark --nfmask 0x3f00 --ctmask 0x3f00
+-A mwan3_hook -m mark ! --mark 0x3f00/0x3f00 -j mwan3_custom_ipv4
+-A mwan3_hook -m mark ! --mark 0x3f00/0x3f00 -j mwan3_connected_ipv4
+-A mwan3_hook -m mark ! --mark 0x3f00/0x3f00 -j mwan3_dynamic_ipv4
+-A mwan3_iface_in_usbtether -i v2 -m set --match-set mwan3_custom_ipv4 src -m mark --mark 0x0/0x3f00 -m comment --comment default -j MARK --set-xmark 0x3f00/0x3f00
+-A mwan3_iface_in_usbtether -i v2 -m set --match-set mwan3_connected_ipv4 src -m mark --mark 0x0/0x3f00 -m comment --comment default -j MARK --set-xmark 0x3f00/0x3f00
+-A mwan3_iface_in_usbtether -i v2 -m set --match-set mwan3_dynamic_ipv4 src -m mark --mark 0x0/0x3f00 -m comment --comment default -j MARK --set-xmark 0x3f00/0x3f00
+-A mwan3_iface_in_usbtether -i v2 -m mark --mark 0x0/0x3f00 -m comment --comment usbtether -j MARK --set-xmark 0x200/0x3f00
+-A mwan3_iface_in_wwan -i v1 -m set --match-set mwan3_custom_ipv4 src -m mark --mark 0x0/0x3f00 -m comment --comment default -j MARK --set-xmark 0x3f00/0x3f00
+-A mwan3_iface_in_wwan -i v1 -m set --match-set mwan3_connected_ipv4 src -m mark --mark 0x0/0x3f00 -m comment --comment default -j MARK --set-xmark 0x3f00/0x3f00
+-A mwan3_iface_in_wwan -i v1 -m set --match-set mwan3_dynamic_ipv4 src -m mark --mark 0x0/0x3f00 -m comment --comment default -j MARK --set-xmark 0x3f00/0x3f00
+-A mwan3_iface_in_wwan -i v1 -m mark --mark 0x0/0x3f00 -m comment --comment wwan -j MARK --set-xmark 0x100/0x3f00
+-A mwan3_ifaces_in -m mark --mark 0x0/0x3f00 -j mwan3_iface_in_wwan
+-A mwan3_ifaces_in -m mark --mark 0x0/0x3f00 -j mwan3_iface_in_usbtether
+-A mwan3_policy_travo_failover -m mark --mark 0x0/0x3f00 -m comment --comment "wwan 1 1" -j MARK --set-xmark 0x100/0x3f00
+-A mwan3_rules -m mark --mark 0x0/0x3f00 -j mwan3_policy_travo_failover

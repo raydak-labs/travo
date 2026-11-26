@@ -1,0 +1,2 @@
+/sys/class/ieee80211/phy0: 94:83:c4:1f:28:3a 
+/sys/class/ieee80211/phy1: 94:83:c4:1f:28:39 

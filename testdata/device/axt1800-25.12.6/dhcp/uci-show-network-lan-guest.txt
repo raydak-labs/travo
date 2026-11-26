@@ -1,0 +1,9 @@
+network.lan=interface
+network.lan.device='br-lan'
+network.lan.proto='static'
+network.lan.ipaddr='192.168.1.1/24'
+network.lan.ip6assign='60'
+network.guest=interface
+network.guest.proto='static'
+network.guest.device='br-guest'
+network.guest.ipaddr='192.168.2.1/24'

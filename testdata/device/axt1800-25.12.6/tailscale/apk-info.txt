@@ -1,0 +1,23 @@
+tailscale-1.104.1-r1 description:
+It creates a secure network between your servers, computers, and cloud instances. Even when separated by firewalls or subnets.
+
+tailscale-1.104.1-r1 webpage:
+https://tailscale.com
+
+tailscale-1.104.1-r1 installed size:
+26 MiB
+
+tailscale-1.104.1-r1 depends on:
+ca-bundle
+kmod-tun
+libc
+
+tailscale-1.104.1-r1 provides:
+tailscale-any
+tailscaled=1.104.1-r1
+
+tailscale-1.104.1-r1 has auto-install rule:
+
+tailscale-1.104.1-r1 license:
+BSD-3-Clause
+

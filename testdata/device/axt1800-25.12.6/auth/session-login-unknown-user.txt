@@ -1,0 +1,2 @@
+Command failed: ubus call session login {"username":"nosuchuser","password":"x"} (Permission denied)
+exit=250

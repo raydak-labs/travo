@@ -1,0 +1,6 @@
+(1/2) Installing ddns-scripts-services (2.8.4-r9)
+  Executing ddns-scripts-services-2.8.4-r9.post-install
+(2/2) Installing ddns-scripts (2.8.4-r9)
+  Executing ddns-scripts-2.8.4-r9.post-install
+OK: 57.7 MiB in 216 packages
+rc=0

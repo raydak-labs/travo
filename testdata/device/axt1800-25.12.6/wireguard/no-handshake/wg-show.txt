@@ -1,0 +1,13 @@
+interface: wg0
+  public key: E/jjbAp2dyHKfxsM88HS13xxhtItgq8aUvwyfH/KH1c=
+  private key: (hidden)
+  listening port: 45901
+
+peer: KgTUh3KLijVluDvNpzDCJJfrJ7EyLzYLmdHCksG4sRg=
+  endpoint: 192.0.2.1:51820
+  allowed ips: 0.0.0.0/0
+  transfer: 0 B received, 888 B sent
+  persistent keepalive: every 25 seconds
+---
+wg0	REDACTED	E/jjbAp2dyHKfxsM88HS13xxhtItgq8aUvwyfH/KH1c=	45901	off
+wg0	KgTUh3KLijVluDvNpzDCJJfrJ7EyLzYLmdHCksG4sRg=	(none)	192.0.2.1:51820	0.0.0.0/0	0	0	888	25

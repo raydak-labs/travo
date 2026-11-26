@@ -1,0 +1,7 @@
+# catalog/ (2026-11-19, #268)
+
+GL-AXT1800, OpenWrt 25.12.6 after firstboot, Travo 0.1.0 installed. GET-only: `apk add --simulate` changes nothing. Section headers (`# ...`) name the command; the rest is verbatim output. Nothing to redact.
+
+- `apk-add-simulate.txt`: what each catalog entry would install and the resulting total (`OK: X MiB`). The base total is 57.6 MiB (sqm-scripts already installed), so the deltas give the sizes in `internal/catalog/entries.go`, rounded up to the next MiB: cloudflared +24.6, vnstat2 +2.9, watchcat +0.1, speedtestcpp +2.2. speedtest-go (+24.6 MiB) lost to speedtestcpp on size.
+- `sqm-builtin.txt`: sqm-scripts and luci-app-sqm ship in the image (`/rom/etc/apk/world`), so the catalog refuses to remove them; sqm has no procd instance (empty `service list`), so it has no running state; `enabled` in `/etc/rc.common` is what `/etc/init.d/<name> enabled` answers with its exit code (0 enabled, 1 not).
+- `installed-probe.txt` (write probe under the lock; `apk add watchcat luci-app-watchcat vnstat2 luci-app-vnstat2`, then `apk del` in reverse order; `/etc/apk/world` and `apk list -I` byte-identical afterwards): the LuCI menu paths, `enabled` exit codes before and after `disable`, and vnstatd's procd instance. Watchcat starts right after install with `ping_reboot` 8.8.8.8 every 6 h. The first combined `apk add` ended with `10 errors` while the uplink dropped, yet left all four names in `/etc/apk/world`, so the next `apk add` installed them: a failed install keeps the catalog guard for that reason.

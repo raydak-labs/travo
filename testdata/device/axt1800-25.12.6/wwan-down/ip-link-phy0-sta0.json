@@ -1,0 +1,1 @@
+[{"ifindex":13,"ifname":"phy0-sta0","flags":["NO-CARRIER","BROADCAST","MULTICAST","UP"],"mtu":1500,"qdisc":"noqueue","operstate":"DOWN","linkmode":"DORMANT","group":"default","txqlen":1000,"link_type":"ether","address":"94:83:c4:1f:28:3a","broadcast":"ff:ff:ff:ff:ff:ff"}]

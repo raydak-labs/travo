@@ -1,249 +1,88 @@
+# Builds, signs and attaches the router tarball to an existing GitHub release (docs/adr/0007).
+# Called by release-please.yml (`publish`) because a tag pushed with GITHUB_TOKEN starts no
+# workflows; run it by hand with workflow_dispatch to retry a tag. It never creates the release.
 name: Release
 
 on:
-  push:
-    tags: ['v*']
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag, e.g. v0.1.0
+        required: true
+        type: string
+    secrets:
+      MINISIGN_SECRET_KEY:
+        required: false # absent until the operator creates the key; the gate step then fails loudly
+      MINISIGN_PASSWORD:
+        required: false
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, e.g. v0.1.0
+        required: true
+        type: string
 
 permissions: {}
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  # workflow_dispatch makes a release possible from a branch that is not a tag.
-  # Nothing downstream noticed: VERSION came out empty, the artifacts were named
-  # travo__aarch64_cortex-a53.tar.gz, and the only layout check lives in ci.yml
-  # with its own hardcoded VERSION, so the release published a filename no
-  # install.sh can resolve. Fail here instead, before anything is built.
-  guard:
-    name: Verify the release ref
+  sign-and-upload:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
-      contents: read
+      contents: write # gh release upload
     steps:
-      - name: Require a vMAJOR.MINOR.PATCH tag
+      - name: Require the signing key
         env:
-          REF_TYPE: ${{ github.ref_type }}
-          REF_NAME: ${{ github.ref_name }}
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
         run: |
-          set -euo pipefail
-          if [ "${REF_TYPE}" != "tag" ]; then
-            echo "::error::a release must be cut from a tag, not ${REF_TYPE} ${REF_NAME}"
+          if [ -z "$MINISIGN_SECRET_KEY" ]; then
+            echo "::error::MINISIGN_SECRET_KEY is not set"
             exit 1
           fi
-          if ! echo "${REF_NAME}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$'; then
-            echo "::error::${REF_NAME} is not a v<semver> tag; the version is baked " \
-              "into the tarball name install.sh has to resolve"
-            exit 1
-          fi
-
-  # A release must never ship from a red main: re-run the CI checks against the
-  # exact tagged commit and fail the release when anything is red.
-  #
-  # A reusable workflow is called at the job level, never from steps — a job that
-  # calls one has no runs-on and no steps of its own. $/.github/workflows/<file> is
-  # the documented same-repository form (GitHub's recommended syntax; it resolves
-  # against this repository, not the caller's workspace) and, like ./, resolves
-  # to the caller's own commit. It must not carry an @ref.
-  verify:
-    name: Verify CI green on the tagged commit
-    uses: $/.github/workflows/ci.yml
-    permissions:
-      contents: read
-
-  build-and-release:
-    name: Build (${{ matrix.arch }})
-    needs: [guard, verify]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: arm64
-            arch: aarch64
-            package_arch: aarch64_cortex-a53
-          - goos: linux
-            goarch: amd64
-            arch: x86_64
-            package_arch: x86_64
-    steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.tag }}
           persist-credentials: false
-
-      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
-        with:
-          go-version-file: backend/go.mod
-          cache: false
-
-      - name: Read pinned toolchain versions
-        id: toolchain
-        run: make toolchain-versions >> "$GITHUB_OUTPUT"
-
-      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-        with:
-          version: ${{ steps.toolchain.outputs.pnpm }}
-
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: ${{ steps.toolchain.outputs.node }}
-          package-manager-cache: false
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build frontend
-        run: pnpm build
-        working-directory: frontend
-
-      - name: Set version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      # main.BuildTime doubles as the time-sync plausibility floor (see
-      # cmd/server/main.go); a release that omits it falls back to a hardcoded
-      # 2025-01-01 floor and weakens the unauthenticated time-sync gate.
-      - name: Stamp build time
-        id: buildmeta
-        run: echo "BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-
-      - name: Cross-compile backend
-        working-directory: backend
-        env:
-          CGO_ENABLED: '0'
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          VERSION: ${{ steps.version.outputs.VERSION }}
-          BUILD_TIME: ${{ steps.buildmeta.outputs.BUILD_TIME }}
+      - name: Require the public key
         run: |
-          go build \
-            -ldflags "-s -w -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME}" \
-            -o "../dist/travo" \
-            ./cmd/server
-
-      - name: Build install tarball
-        env:
-          VERSION: ${{ steps.version.outputs.VERSION }}
-          ARCH: ${{ matrix.package_arch }}
-        run: bash scripts/package-tarball.sh
-
-      # The layout check in ci.yml runs against its own VERSION=0.0.0 tarball,
-      # so on the release path it verified a different artifact from the one
-      # that ships. Check the real one: install.sh resolves it by name and
-      # unpacks it as /.
-      - name: Verify the release tarball is install.sh-resolvable
-        env:
-          VERSION: ${{ steps.version.outputs.VERSION }}
-          ARCH: ${{ matrix.package_arch }}
-        run: |
-          set -euo pipefail
-          tarball="dist/travo_${VERSION}_${ARCH}.tar.gz"
-          if [ ! -f "${tarball}" ]; then
-            echo "::error::package-tarball.sh produced no ${tarball}"; ls -l dist
+          if [ ! -f packaging/minisign.pub ]; then
+            echo "::error::packaging/minisign.pub missing"
             exit 1
           fi
-          listing="$(tar -tzf "${tarball}")"
-          for p in \
-            ./usr/bin/travo \
-            ./etc/init.d/travo \
-            ./etc/config/travo \
-            ./etc/uci-defaults/99-travel-gui-ports \
-            ./lib/upgrade/keep.d/travo \
-            ./www/travo/index.html ; do
-            echo "${listing}" | grep -qx "${p}" \
-              || { echo "::error::${tarball} is missing ${p}"; echo "${listing}"; exit 1; }
-          done
-          if echo "${listing}" | grep -qE '^\.\./'; then
-            echo "::error::${tarball} contains paths escaping /"; exit 1
-          fi
-
-      - name: Prepare artifacts
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0 tools from mise.toml
+        with:
+          cache_save: false
+      - run: mise run check
+      - name: Fetch the offline AdGuard Home bundle
+        run: echo "ADGUARD_BUNDLE=$(scripts/fetch-adguard-bundle.sh)" >> "$GITHUB_ENV"
+      - name: Package
+        env:
+          TAG: ${{ inputs.tag }}
+        run: VERSION="${TAG#v}" mise run package
+      - name: Sign checksums.txt
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+          MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
         run: |
-          mkdir -p artifacts
-          cp dist/travo_*.tar.gz artifacts/
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: release-${{ matrix.arch }}
-          path: artifacts/*
-          retention-days: 5
-
-  create-release:
-    name: Create Release
-    needs: [verify, build-and-release]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: Set version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Generate checksums
-        working-directory: artifacts
-        run: sha256sum * > SHA256SUMS
-
-      # Idempotent: GitHub UI "Publish release" creates the release before the
-      # tag-push workflow runs. softprops/action-gh-release handled that; plain
-      # `gh release create` does not — upload into an existing release instead.
-      - name: Create or update release
+          umask 077
+          printf '%s\n' "$MINISIGN_SECRET_KEY" > "$RUNNER_TEMP/minisign.key"
+          # -l: legacy format, the one the router's usign verifies
+          printf '%s\n' "$MINISIGN_PASSWORD" | minisign -S -l -s "$RUNNER_TEMP/minisign.key" -m dist/checksums.txt
+          # usign reads only the untrusted comment and the signature line
+          head -n 2 dist/checksums.txt.minisig > dist/checksums.txt.sig
+      - name: Verify the signature
+        run: minisign -V -m dist/checksums.txt -x dist/checksums.txt.minisig -p packaging/minisign.pub
+      - name: Remove the secret key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/minisign.key"
+      - name: Upload assets
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.VERSION }}
-          REPOSITORY: ${{ github.repository }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
         run: |
-          NOTES="$(cat <<EOF
-          ## Quick Install (OpenWRT)
-
-          There is no default password: pass your own, or run the script from a
-          terminal to be prompted.
-
-          \`\`\`sh
-          wget -O- https://raw.githubusercontent.com/${REPOSITORY}/main/scripts/install.sh | \
-            sh -s -- --password 'your-strong-password'
-          \`\`\`
-
-          Or install a specific version:
-
-          \`\`\`sh
-          VERSION=${VERSION} \\
-            wget -O- https://raw.githubusercontent.com/${REPOSITORY}/main/scripts/install.sh | \
-            sh -s -- --password 'your-strong-password'
-          \`\`\`
-
-          ## Downloads
-
-          | Architecture | Install tarball |
-          |---|---|
-          | aarch64 (GL.iNet MT3000/AXT1800) | \`travo_${VERSION}_aarch64_cortex-a53.tar.gz\` |
-          | x86_64 | \`travo_${VERSION}_x86_64.tar.gz\` |
-
-          See [SHA256SUMS](SHA256SUMS) for checksums.
-          EOF
-          )"
-
-          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            echo "Release ${GITHUB_REF_NAME} already exists; uploading assets"
-            gh release upload "${GITHUB_REF_NAME}" artifacts/* --clobber
-          else
-            gh release create "${GITHUB_REF_NAME}" \
-              --generate-notes \
-              artifacts/* \
-              --notes "${NOTES}"
-          fi
+          gh release upload "$TAG" \
+            "dist/travo-greenfield-${TAG#v}-aarch64.tar.gz" \
+            dist/checksums.txt dist/checksums.txt.sig \
+            "$ADGUARD_BUNDLE" \
+            --clobber

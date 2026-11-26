@@ -1,0 +1,8 @@
+-N mwan3_policy_travo_failover
+-N mwan3_rules
+-A mwan3_policy_travo_failover -o eth0 -m mark --mark 0x0/0x3f00 -m comment --comment "out usbtether eth0" -j MARK --set-xmark 0x3f00/0x3f00
+-A mwan3_policy_travo_failover -o wan -m mark --mark 0x0/0x3f00 -m comment --comment "out wan wan" -j MARK --set-xmark 0x3f00/0x3f00
+-A mwan3_policy_travo_failover -m mark --mark 0x0/0x3f00 -m comment --comment default -j MARK --set-xmark 0x3f00/0x3f00
+-A mwan3_rules -m mark --mark 0x0/0x3f00 -j mwan3_policy_travo_failover
+-A mwan3_rules -p tcp -m multiport --dports 443 -m mark --mark 0x0/0x3f00 -j mwan3_rule_https
+-A mwan3_rules -m mark --mark 0x0/0x3f00 -j mwan3_policy_balanced

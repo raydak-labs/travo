@@ -1,0 +1,67 @@
+Tue Nov 17 21:58:32 2026 kern.info kernel: [    0.000000] Booting Linux on physical CPU 0x0000000000 [0x51af8014]
+Tue Nov 17 21:58:32 2026 kern.notice kernel: [    0.000000] Linux version 6.12.112 (builder@buildhost) (aarch64-openwrt-linux-musl-gcc (OpenWrt GCC 14.3.0 r33311-981c978eff) 14.3.0, GNU ld (GNU Binutils) 2.44) #0 SMP Sat Oct 17 21:45:38 2026
+Tue Nov 17 21:58:32 2026 kern.info kernel: [    0.000000] Machine model: GL.iNet GL-AXT1800
+Tue Nov 17 21:58:32 2026 kern.info kernel: [    0.000000] OF: reserved mem: 0x0000000000060000..0x0000000000065fff (24 KiB) nomap non-reusable memory@60000
+Tue Nov 17 21:58:32 2026 kern.debug kernel: [    0.000000] pcpu-alloc: s43352 r8192 d30376 u81920 alloc=20*4096
+Tue Nov 17 21:58:32 2026 kern.debug kernel: [    0.000000] pcpu-alloc: [0] 0 [0] 1 [0] 2 [0] 3
+Tue Nov 17 21:58:32 2026 kern.notice kernel: [    0.000000] Kernel command line: console=ttyMSM0,115200n8 ubi.mtd=rootfs root=mtd:ubi_rootfs rootfstype=squashfs rootwait root=/dev/ubiblock0_1
+Tue Nov 17 21:58:32 2026 kern.notice kernel: [    0.099590] SCSI subsystem initialized
+Tue Nov 17 21:58:32 2026 kern.warn kernel: [    0.117101] qcom-qmp-usb-phy 78000.ssphy: supply vdda-phy not found, using dummy regulator
+Tue Nov 17 21:58:32 2026 kern.warn kernel: [    0.117249] qcom-qmp-usb-phy 78000.ssphy: supply vdda-pll not found, using dummy regulator
+Tue Nov 17 21:58:32 2026 kern.warn kernel: [    0.118795] qcom-qusb2-phy 79000.qusb: supply vdda-pll not found, using dummy regulator
+Tue Nov 17 21:58:32 2026 kern.alert kernel: [    1.135242] mtdsplit: no squashfs found in "rootfs"
+Tue Nov 17 21:58:32 2026 kern.debug kernel: [    2.055443]   with arguments:
+Tue Nov 17 21:58:32 2026 user.info kernel: [    2.386589] init: Console is alive
+Tue Nov 17 21:58:32 2026 user.info kernel: [    2.386737] init: - watchdog -
+Tue Nov 17 21:58:32 2026 user.info kernel: [    3.025164] kmodloader: loading kernel modules from /etc/modules-boot.d/*
+Tue Nov 17 21:58:32 2026 user.warn kernel: [    9.501825] urandom-seed: Seeding with /etc/urandom.seed
+Tue Nov 17 21:58:33 2026 user.notice dnsmasq: DNS rebinding protection is active, will discard upstream RFC1918 responses!
+Tue Nov 17 21:58:33 2026 user.notice dnsmasq: Allowing 127.0.0.0/8 responses
+Tue Nov 17 21:58:33 2026 daemon.info dnsmasq[1]: started, version 2.93 cachesize 1000
+Tue Nov 17 21:58:33 2026 daemon.info dnsmasq[1]: DNS service limited to local subnets
+Tue Nov 17 21:58:33 2026 daemon.info dnsmasq[1]: compile time options: IPv6 GNU-getopt no-DBus UBus no-i18n no-IDN DHCP no-DHCPv6 no-Lua TFTP no-conntrack no-ipset no-nftset no-auth no-DNSSEC no-ID loop-detect inotify dumpfile
+Tue Nov 17 21:58:33 2026 authpriv.info dropbear[1715]: Not backgrounding
+Tue Nov 17 21:58:34 2026 user.notice : Added device handler type: vrf
+Tue Nov 17 21:58:34 2026 user.notice : Added device handler type: bonding
+Tue Nov 17 21:58:34 2026 user.notice : Added device handler type: 8021ad
+Tue Nov 17 21:58:34 2026 daemon.notice wpa_supplicant[1866]: Successfully initialized wpa_supplicant
+Tue Nov 17 21:58:35 2026 daemon.notice hostapd: Set MLD config: [ ]
+Tue Nov 17 21:58:35 2026 daemon.notice hostapd: Reload all interfaces
+Tue Nov 17 21:58:35 2026 daemon.notice wpa_supplicant[1866]: Set MLD config: [ ]
+Tue Nov 17 21:58:35 2026 daemon.notice netifd: Interface 'guest' is enabled
+Tue Nov 17 21:58:35 2026 daemon.notice netifd: Interface 'guest' is setting up now
+Tue Nov 17 21:58:35 2026 daemon.notice netifd: Interface 'guest' is now up
+Tue Nov 17 21:58:35 2026 daemon.notice hostapd: Set new config for phy phy1:
+Tue Nov 17 21:58:35 2026 daemon.notice wpa_supplicant[1866]: Set new config for phy phy1
+Tue Nov 17 21:58:35 2026 user.notice firewall: Reloading firewall due to ifup of guest (br-guest)
+Tue Nov 17 21:58:36 2026 user.notice ucitrack: Setting up /etc/config/luci-splash reload dependency on /etc/config/firewall
+Tue Nov 17 21:58:36 2026 user.notice ucitrack: Setting up /etc/config/qos reload dependency on /etc/config/firewall
+Tue Nov 17 21:58:36 2026 user.notice ucitrack: Setting up /etc/config/miniupnpd reload dependency on /etc/config/firewall
+Tue Nov 17 21:58:36 2026 user.notice firewall: Reloading firewall due to ifup of lan (br-lan)
+Tue Nov 17 21:58:37 2026 daemon.info procd: - init complete -
+Tue Nov 17 21:58:37 2026 daemon.warn odhcpd[2006]: No default route present, setting ra_lifetime to 0!
+Tue Nov 17 21:58:37 2026 daemon.warn odhcpd[2006]: rfc9096: br-lan: piofile updated
+Tue Nov 17 21:58:37 2026 daemon.err travo-greenfield[3089]: 2026/11/17 21:58:37 INFO adapters mock=false packages=apk
+Tue Nov 17 21:58:37 2026 daemon.err travo-greenfield[3089]: 2026/11/17 21:58:37 INFO reboot guard settled after a new boot
+Tue Nov 17 21:58:38 2026 daemon.err travo-greenfield[3089]: 2026/11/17 21:58:38 INFO listening addr=:80 version=0.1.0-rc.agh-seed
+Tue Nov 17 21:58:40 2026 user.notice firewall: Reloading firewall due to ifup of wwan (phy0-sta0)
+Tue Nov 17 21:58:41 2026 daemon.warn odhcpd[2006]: No default route present, setting ra_lifetime to 0!
+Tue Nov 17 21:58:44 2026 daemon.err procd: Got unexpected signal 1
+Tue Nov 17 21:58:44 2026 daemon.info dnsmasq-dhcp[1]: DHCP, IP range 192.168.2.100 -- 192.168.2.249, lease time 1h
+Tue Nov 17 21:58:44 2026 daemon.info dnsmasq-dhcp[1]: DHCP, IP range 192.168.1.100 -- 192.168.1.249, lease time 12h
+Tue Nov 17 21:58:44 2026 daemon.info dnsmasq-dhcp[1]: read /etc/ethers - 0 addresses
+Tue Nov 17 21:58:45 2026 daemon.info AdGuardHome[3778]: jail: exec-ing /usr/bin/AdGuardHome
+Tue Nov 17 21:58:48 2026 user.notice AdGuardHome[1]: 2026/11/17 21:58:48.671435 [info] starting adguard home version="AdGuard Home, version 0.107.79"
+Tue Nov 17 21:58:48 2026 user.notice AdGuardHome[1]: 2026/11/17 21:58:48.772606 [info] warning: no users in the configuration file; authentication is disabled
+Tue Nov 17 21:58:48 2026 user.notice AdGuardHome[1]: 2026/11/17 21:58:48.779309 [info] tls_manager: using default ciphers
+Tue Nov 17 21:59:56 2026 daemon.info hostapd: phy1-ap0: STA bc:9f:58:7c:e4:3d IEEE 802.11: authenticated
+Tue Nov 17 21:59:56 2026 daemon.info hostapd: phy1-ap0: STA bc:9f:58:7c:e4:3d IEEE 802.11: associated (aid 1)
+Tue Nov 17 21:59:56 2026 daemon.info hostapd: phy1-ap0: STA bc:9f:58:7c:e4:3d WPA: pairwise key handshake completed (RSN)
+Tue Nov 17 22:16:48 2026 authpriv.info dropbear[4265]: Child connection from 192.168.1.2:62634
+Tue Nov 17 22:16:48 2026 authpriv.notice dropbear[4265]: Pubkey auth succeeded for 'root' with ssh-ed25519 key SHA256:c0tOOD1JddZOa2JUai8Q35K3cHZ9baVAYGL54Syz8qs from 192.168.1.2:62634
+Tue Nov 17 22:16:48 2026 authpriv.info dropbear[4265]: Exit (root) from <192.168.1.2:62634>: Disconnect received
+Tue Nov 17 22:25:08 2026 authpriv.notice dropbear[4431]: Pubkey auth succeeded for 'root' with ssh-ed25519 key SHA256:c0tOOD1JddZOa2JUai8Q35K3cHZ9baVAYGL54Syz8qs from 192.168.1.2:62851
+Tue Nov 17 22:27:07 2026 authpriv.notice dropbear[4459]: Pubkey auth succeeded for 'root' with ssh-ed25519 key SHA256:c0tOOD1JddZOa2JUai8Q35K3cHZ9baVAYGL54Syz8qs from 192.168.1.2:63098
+Tue Nov 17 23:10:41 2026 daemon.err tailscaled[5793]: 2026/11/17 23:10:41 You have disabled logging. Tailscale will not be able to provide support.
+Tue Nov 17 23:10:41 2026 daemon.err tailscaled[5793]: 2026/11/17 23:10:41 Program starting: v1.104.1-1 (OpenWrt), Go 1.27.4: []string{"/usr/sbin/tailscaled", "--port", "41641", "--state", "/etc/tailscale/tailscaled.state"}
+Tue Nov 17 23:10:41 2026 daemon.err tailscaled[5793]: 2026/11/17 23:10:41 LogID: REDACTED

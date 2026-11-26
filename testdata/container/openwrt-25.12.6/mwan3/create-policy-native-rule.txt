@@ -1,0 +1,5 @@
+iptables v1.8.10 (nf_tables): table `mangle' is incompatible, use 'nft' tool.
+error create_policies_iptables (travo_failover): iptables-restore: line 2 failed: Chain already exists.
+Warning: Extension CONNMARK is not supported, missing kernel module?
+iptables v1.8.10 (nf_tables): table `mangle' is incompatible, use 'nft' tool.
+iptables v1.8.10 (nf_tables): table `mangle' is incompatible, use 'nft' tool.

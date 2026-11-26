@@ -1,0 +1,3 @@
+# Interface wwan
+nameserver 192.168.90.2
+search home.lan

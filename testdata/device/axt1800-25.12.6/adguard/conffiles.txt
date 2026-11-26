@@ -1,0 +1,7 @@
+/etc/adguardhome/adguardhome.yaml
+/etc/config/adguardhome
+---
+adguardhome.conffiles
+adguardhome.conffiles_static
+adguardhome.list
+adguardhome.rusers

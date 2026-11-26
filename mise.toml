@@ -1,0 +1,172 @@
+[tools]
+go = "1.27.4"
+minisign = "0.12"
+node = "26.13.1"
+pnpm = "12.21.0"
+shellcheck = "0.11.0"
+
+[tasks.check]
+description = "Everything CI checks"
+depends = ["check:go", "check:sh", "check:web", "check:gen", "check:size"]
+
+[tasks."check:go"]
+description = "gofmt, vet, tests"
+run = '''
+test -z "$(gofmt -l .)"
+go vet ./...
+go test ./...
+'''
+
+[tasks."check:sh"]
+description = "sh -n and shellcheck (POSIX sh) on install, init and helper scripts"
+run = '''
+set -- packaging/install.sh packaging/port80.sh packaging/files/etc/init.d/travo-greenfield packaging/files/etc/uci-defaults/90-travo-greenfield packaging/files/etc/hotplug.d/button/50-travo-greenfield scripts/*.sh scripts/lib/*.sh
+for f in "$@"; do sh -n "$f"; done
+shellcheck -s sh "$@"
+'''
+
+[tasks."web:install"]
+description = "Install web dependencies from the lockfile (shared so parallel tasks do not race)"
+run = "pnpm -C web install --frozen-lockfile"
+
+[tasks."check:web"]
+description = "Web: biome, svelte-check, vitest, build, size budget"
+depends = ["web:install", "gen"] # gen first: check reads src/lib/api/gen
+run = "pnpm -C web check"
+
+[tasks.gen]
+description = "Regenerate the hey-api client from the Go spec (web/openapi.json is a git-ignored intermediate)"
+depends = ["web:install"]
+run = '''
+go run ./cmd/openapi > web/openapi.json
+pnpm -C web gen
+'''
+
+[tasks."check:gen"]
+description = "Generated client is committed and matches the Go handlers"
+depends = ["gen"]
+# porcelain also catches new untracked generated files, which `git diff` ignores
+run = '''
+git diff --exit-code -- web/src/lib/api/gen
+test -z "$(git status --porcelain -- web/src/lib/api/gen)"
+'''
+
+[tasks.build]
+description = "Static aarch64 binary for the router"
+run = '''
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath \
+  -ldflags "-s -w -X github.com/blackdark-org/travo-greenfield/internal/version.Version=${VERSION:-dev} -X github.com/blackdark-org/travo-greenfield/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  -o dist/travo-greenfield-arm64 ./cmd/travo-greenfield
+'''
+
+[tasks.package]
+description = "Release tarball dist/travo-greenfield-<version>-aarch64.tar.gz (+ dist/checksums.txt), reproducible from SOURCE_DATE_EPOCH; PUBKEY (default packaging/minisign.pub, when present) ships as minisign.pub"
+depends = ["web:install"]
+run = '''
+SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct)}
+export SOURCE_DATE_EPOCH
+VERSION=${VERSION:-0.0.0-dev}
+pnpm -C web build
+# BSD date takes -r <epoch>, GNU date takes -d @<epoch>
+build_time=$(date -u -r "$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)
+# ADGUARD_BUNDLE (optional): the offline AdGuard Home package; its pin goes into the binary (docs/adr/0020)
+bundle_flags=
+if [ -n "${ADGUARD_BUNDLE:-}" ]; then
+  sum=$(sha256sum "$ADGUARD_BUNDLE" 2>/dev/null || shasum -a 256 "$ADGUARD_BUNDLE")
+  agh=github.com/blackdark-org/travo-greenfield/internal/adguard
+  bundle_flags="-X $agh.BundleSHA256=${sum%% *} -X $agh.BundleName=$(basename "$ADGUARD_BUNDLE")"
+fi
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath \
+  -ldflags "-s -w -X github.com/blackdark-org/travo-greenfield/internal/version.Version=$VERSION -X github.com/blackdark-org/travo-greenfield/internal/version.BuildTime=$build_time $bundle_flags" \
+  -o dist/travo-greenfield-arm64 ./cmd/travo-greenfield
+PUBKEY=${PUBKEY:-}
+[ -n "$PUBKEY" ] || ! [ -f packaging/minisign.pub ] || PUBKEY=packaging/minisign.pub
+go run ./cmd/mkpkg -out "dist/travo-greenfield-$VERSION-aarch64.tar.gz" -version "$VERSION" \
+  -binary dist/travo-greenfield-arm64 -web web/dist -files packaging/files -install packaging/install.sh -port80 packaging/port80.sh \
+  ${PUBKEY:+-pubkey "$PUBKEY"}
+'''
+
+[tasks."adguard-bundle"]
+description = "Download the offline AdGuard Home package for the release into dist/ (docs/adr/0020); prints its path"
+run = "scripts/fetch-adguard-bundle.sh"
+
+[tasks."test:update"]
+description = "Apply and recover signed update payloads in a booted OpenWrt container"
+run = "scripts/test-update.sh"
+
+[tasks."test:package"]
+description = "Install, reboot, uninstall the release tarball in a booted OpenWrt container (needs Docker)"
+run = "scripts/test-package.sh"
+
+[tasks."test:port80"]
+description = "Verify the reversible LuCI port move in a booted OpenWrt container (needs Docker)"
+run = "scripts/test-port80.sh"
+
+[tasks."test:integration"]
+description = "Run adapter tests against real uci/apk/opkg in OpenWrt containers (needs Docker)"
+usage = 'arg "[arch]" help="arm64 or amd64; both when omitted"'
+run = '''
+case "${usage_arch:-}" in ""|arm64|amd64) ;; *) echo "unknown arch: ${usage_arch}" >&2; exit 2 ;; esac
+mkdir -p dist
+for spec in "linux/aarch64_generic arm64 openwrt/rootfs:aarch64_generic-25.12.6@sha256:22f13387da208c0fb4150c41f3ec12e34cc5994a0717a49e50aa9f9ae6cb5e7b" "linux/amd64 amd64 openwrt/rootfs:x86-64-24.10.8@sha256:9972a4b4747cd136abd597475d7b88c51a49fd849d0d53f069a2f4bf446061b9"; do
+  set -- $spec
+  [ -z "${usage_arch:-}" ] || [ "$2" = "$usage_arch" ] || continue
+  CGO_ENABLED=0 GOOS=linux GOARCH=$2 go test -tags integration -c -o dist/cli-$2.test ./internal/device/cli
+  CGO_ENABLED=0 GOOS=linux GOARCH=$2 go test -tags integration -c -o dist/pkgmgr-$2.test ./internal/pkgmgr
+  CGO_ENABLED=0 GOOS=linux GOARCH=$2 go test -tags integration -c -o dist/dnslayer-$2.test ./internal/dnslayer
+  CGO_ENABLED=0 GOOS=linux GOARCH=$2 go test -tags integration -c -o dist/txn-$2.test ./internal/txn
+  docker run --rm --platform $1 --entrypoint sh -v "$PWD/dist:/t:ro" "$3" -c "mkdir -p /var/lock && /t/cli-$2.test -test.run 'TestReal(UCI|RebootReturnsBeforeDelay)' -test.v && /t/pkgmgr-$2.test -test.run TestRealManager -test.v && /t/dnslayer-$2.test -test.run TestRealStack -test.v && /t/txn-$2.test -test.run '^TestReal(WatchdogRestoresAfterDaemonDeath|ConfirmKeepsChange)$' -test.v"
+  # booted container (procd as PID 1): watchdog must survive a procd service stop
+  name=travo-itest-$2
+  docker rm -f $name >/dev/null 2>&1 || true
+  docker run -d --name $name --platform $1 -v "$PWD/dist:/t:ro" "$3" /sbin/init >/dev/null
+  # wait until boot finished (procd runs /etc/rc.d, then the "done" init script)
+  for _ in $(seq 1 60); do docker exec $name sh -c 'ubus call service list "{\"name\":\"dnsmasq\"}" | grep -q running' 2>/dev/null && break; sleep 1; done
+  docker exec $name /t/txn-$2.test -test.run TestRealWatchdogSurvivesProcdStop -test.v; rc=$?
+  # root account (empty shadow -> passwd -> rpcd login) needs the booted rpcd; runs last: it sets a password
+  [ $rc -eq 0 ] && { docker exec $name /t/cli-$2.test -test.run TestRealRootAccount -test.v; rc=$?; }
+  docker rm -f $name >/dev/null
+  [ $rc -eq 0 ] || exit $rc
+done
+'''
+
+[tasks."check:size"]
+description = "Stripped arm64 binary stays within the 12.8 MB budget (invariants §15)"
+depends = ["build"]
+run = '''
+size=$(wc -c < dist/travo-greenfield-arm64)
+echo "binary: $size bytes (budget 13421772)"
+test "$size" -le 13421772
+'''
+
+[tasks.dev]
+description = "Web UI against the mock daemon (daemon :18081, Vite :18092)"
+run = "scripts/dev.sh"
+
+[tasks."dev:firstrun"]
+description = "Same as dev, daemon starts without a root password"
+run = "scripts/dev.sh --firstrun"
+
+[tasks.screenshots]
+description = "Build, serve the UI against the mock daemon, write web/screenshots/*.png"
+depends = ["web:install"]
+run = "pnpm -C web build && scripts/with-mock.sh -- node web/scripts/screenshots.mjs"
+
+[tasks."screenshots:compare"]
+description = "Before/after screenshots against BASE (default origin/main): web/screenshots-diff/"
+depends = ["web:install"]
+run = "scripts/screenshots-compare.sh"
+
+[tasks."screenshots:publish"]
+description = "Attach web/screenshots-diff to PR N (gh pr edit --attach) under its Screenshots heading"
+run = "scripts/screenshots-publish.sh"
+
+[tasks."e2e:csp"]
+description = "Build, let the mock daemon serve web/dist, fail on CSP violations or script errors in headless Chrome"
+depends = ["web:install"]
+run = "pnpm -C web build && scripts/with-daemon-ui.sh -- node web/scripts/e2e-csp.mjs"
+
+[tasks."e2e:auth"]
+description = "Build, run the login/setup flow in headless Chrome against the first-run mock daemon"
+depends = ["web:install"]
+run = "pnpm -C web build && scripts/with-mock.sh --firstrun -- node web/scripts/e2e-auth.mjs"

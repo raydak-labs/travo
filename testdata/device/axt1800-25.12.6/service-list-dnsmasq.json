@@ -1,0 +1,57 @@
+{
+	"dnsmasq": {
+		"instances": {
+			"cfg01411c": {
+				"running": true,
+				"pid": 3571,
+				"command": [
+					"/usr/sbin/dnsmasq",
+					"-C",
+					"/var/etc/dnsmasq.conf.cfg01411c",
+					"-k",
+					"-x",
+					"/var/run/dnsmasq/dnsmasq.cfg01411c.pid"
+				],
+				"term_timeout": 5,
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				},
+				"jail": {
+					"name": "dnsmasq",
+					"procfs": false,
+					"sysfs": false,
+					"ubus": true,
+					"log": true,
+					"ronly": false,
+					"netns": false,
+					"userns": false,
+					"cgroupsns": false,
+					"console": false
+				},
+				"mount": {
+					"/bin/ubus": "0",
+					"/etc/TZ": "0",
+					"/etc/dnsmasq.conf": "0",
+					"/etc/ethers": "0",
+					"/etc/group": "0",
+					"/etc/hosts": "0",
+					"/etc/passwd": "0",
+					"/tmp/dhcp.leases": "1",
+					"/tmp/dnsmasq.cfg01411c.d": "0",
+					"/tmp/hosts": "0",
+					"/usr/bin/env": "0",
+					"/usr/bin/jshn": "0",
+					"/usr/lib/dnsmasq/dhcp-script.sh": "0",
+					"/usr/share/dnsmasq/dhcpbogushostname.conf": "0",
+					"/usr/share/dnsmasq/rfc6761.conf": "0",
+					"/usr/share/dnsmasq/trust-anchors.conf": "0",
+					"/usr/share/libubox/jshn.sh": "0",
+					"/var/etc/dnsmasq.conf.cfg01411c": "0",
+					"/var/run/dnsmasq/": "1"
+				}
+			}
+		}
+	}
+}

@@ -1,0 +1,11 @@
+=== RUN   TestHWConfirmKeepsAP
+HW {"confirmed_kept":true}
+HW {"ap_up_after_undo_s":0.005419662}
+HW {"ap_up_after_undo_ok":true}
+--- PASS: TestHWConfirmKeepsAP (20.24s)
+PASS
+TravelAP
+0
+/etc/greenfield-hw-txn:
+
+/tmp/greenfield-hw/guards:

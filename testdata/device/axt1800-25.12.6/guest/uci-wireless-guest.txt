@@ -1,0 +1,8 @@
+wireless.guest=wifi-iface
+wireless.guest.device='radio1'
+wireless.guest.mode='ap'
+wireless.guest.network='guest'
+wireless.guest.ssid='TGPlaybookGuest'
+wireless.guest.encryption='psk2'
+wireless.guest.isolate='1'
+wireless.guest.disabled='0'

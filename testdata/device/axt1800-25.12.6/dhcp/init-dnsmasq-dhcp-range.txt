@@ -1,0 +1,23 @@
+	config_get start "$cfg" start 100
+	config_get limit "$cfg" limit 150
+	config_get leasetime "$cfg" leasetime 12h
+	config_get options "$cfg" options
+	config_get_bool dynamicdhcp "$cfg" dynamicdhcp 1
+	config_get_bool dynamicdhcpv4 "$cfg" dynamicdhcpv4 $dynamicdhcp
+
+	# make sure the DHCP range is not empty
+	if [ "$dhcpv4" != "disabled" ]; then
+		unset START
+		unset END
+		unset NETMASK
+		ipcalc "$ipaddr/$prefix_or_netmask" "$start" "$limit"
+
+		if [ -z "$START" ] || [ -z "$END" ] || [ -z "$NETMASK" ]; then
+			logger -t dnsmasq \
+				"unable to set dhcp-range for dhcp uci config section '$cfg'" \
+				"on interface '$ifname', please check your config"
+		else
+			[ "$dynamicdhcpv4" = "0" ] && END="static"
+			xappend "--dhcp-range=$tags$nettag$START,$END,$NETMASK,$leasetime${options:+ $options}"
+		fi
+	fi

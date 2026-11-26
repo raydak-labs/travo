@@ -1,0 +1,6 @@
+{
+	"devices": [
+		"phy0-sta0",
+		"phy1-ap0"
+	]
+}

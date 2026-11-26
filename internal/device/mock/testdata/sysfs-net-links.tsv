@@ -1,0 +1,10 @@
+br-guest				bridge
+br-lan				bridge
+lan1	../../../3a001400.dp3	../../../../bus/platform/drivers/nss-dp	../../../../bus/platform	
+lan2	../../../3a001200.dp2	../../../../bus/platform/drivers/nss-dp	../../../../bus/platform	
+lo				
+miireg				
+phy0-sta0	../../../c000000.wifi	../../../../bus/platform/drivers/ath11k	../../../../bus/platform	wlan
+phy1-ap0	../../../c000000.wifi	../../../../bus/platform/drivers/ath11k	../../../../bus/platform	wlan
+phy1-ap1	../../../c000000.wifi	../../../../bus/platform/drivers/ath11k	../../../../bus/platform	wlan
+wan	../../../3a001000.dp1	../../../../bus/platform/drivers/nss-dp	../../../../bus/platform	

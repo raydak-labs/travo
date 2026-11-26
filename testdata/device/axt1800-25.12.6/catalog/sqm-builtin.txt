@@ -1,0 +1,24 @@
+# apk info -r sqm-scripts
+sqm-scripts-1.7.2-r1 is required by:
+luci-app-sqm-26.288.56989~75a306d
+# grep -n sqm /rom/etc/apk/world
+123:luci-app-sqm
+156:sqm-scripts
+# ubus call service list {"name":"sqm"}
+{
+	"sqm": {
+		
+	}
+}
+# /etc/init.d/sqm enabled; echo $?
+0
+# sed -n '/^enabled()/,/^}/p' /etc/rc.common
+enabled() {
+	name="$(basename "${initscript}")"
+	name="${name##[SK][0-9][0-9]}"
+	{
+		[ -z "${START:-}" ] || [ -L "$IPKG_INSTROOT/etc/rc.d/S${START}$name" ]
+	} && {
+		[ -z "${STOP:-}" ] || [ -L "$IPKG_INSTROOT/etc/rc.d/K${STOP}$name" ]
+	}
+}

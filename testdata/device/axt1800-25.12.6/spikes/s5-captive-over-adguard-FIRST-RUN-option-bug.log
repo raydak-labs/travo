@@ -1,0 +1,13 @@
+=== RUN   TestHWCaptiveOverAdGuardRestoresBase
+HW {"base":{"server":{"set":true,"values":["127.0.0.1#5353"],"scalar":true},"noresolv":{"set":true,"value":"1"},"rebind_protection":{"set":true,"value":"1"}}}
+HW {"captive_servers":["192.168.90.2"]}
+HW {"resolve_via_captive_ok":true}
+HW {"after":{"server":{"set":true,"values":["127.0.0.1#5353"],"scalar":true},"noresolv":{"set":true,"value":"1"},"rebind_protection":{"set":true,"value":"1"}}}
+HW {"base_restored_exact":true}
+HW {"resolve_after_pop_ok":false}
+--- PASS: TestHWCaptiveOverAdGuardRestoresBase (4.28s)
+PASS
+dhcp.cfg01411c.rebind_protection='1'
+dhcp.cfg01411c.noresolv='1'
+dhcp.cfg01411c.server='127.0.0.1#5353'
+0

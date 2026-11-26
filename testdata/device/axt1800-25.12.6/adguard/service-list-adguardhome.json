@@ -1,0 +1,48 @@
+{
+	"adguardhome": {
+		"instances": {
+			"adguardhome": {
+				"running": true,
+				"pid": 3731,
+				"command": [
+					"/usr/bin/AdGuardHome",
+					"--config",
+					"/etc/adguardhome/adguardhome.yaml",
+					"--logfile",
+					"syslog",
+					"--no-check-update",
+					"--work-dir",
+					"/var/lib/adguardhome"
+				],
+				"term_timeout": 5,
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				},
+				"no_new_privs": true,
+				"capabilities": "/etc/capabilities/adguardhome.json",
+				"user": "adguardhome",
+				"group": "adguardhome",
+				"jail": {
+					"name": "adguardhome",
+					"procfs": true,
+					"sysfs": false,
+					"ubus": false,
+					"log": true,
+					"ronly": false,
+					"netns": false,
+					"userns": false,
+					"cgroupsns": false,
+					"console": false
+				},
+				"mount": {
+					"/etc/adguardhome": "1",
+					"/etc/hosts": "0",
+					"/etc/ssl/certs": "0",
+					"/var/lib/adguardhome": "1"
+				}
+			}
+		}
+	}
+}

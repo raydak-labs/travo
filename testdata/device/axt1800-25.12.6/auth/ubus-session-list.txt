@@ -1,0 +1,11 @@
+'session' @08871495
+	"create":{"timeout":"Integer"}
+	"list":{"ubus_rpc_session":"String"}
+	"grant":{"ubus_rpc_session":"String","scope":"String","objects":"Array"}
+	"revoke":{"ubus_rpc_session":"String","scope":"String","objects":"Array"}
+	"access":{"ubus_rpc_session":"String","scope":"String","object":"String","function":"String"}
+	"set":{"ubus_rpc_session":"String","values":"Table"}
+	"get":{"ubus_rpc_session":"String","keys":"Array"}
+	"unset":{"ubus_rpc_session":"String","keys":"Array"}
+	"destroy":{"ubus_rpc_session":"String"}
+	"login":{"username":"String","password":"String","timeout":"Integer"}

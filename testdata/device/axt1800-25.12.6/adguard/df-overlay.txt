@@ -1,0 +1,2 @@
+Filesystem           1K-blocks      Used Available Use% Mounted on
+/dev/ubi0_2              79704      4568     71028   6% /overlay

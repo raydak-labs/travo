@@ -1,0 +1,31 @@
++ apk update
+ [https://downloads.openwrt.org/releases/25.12.6/targets/qualcommax/ipq60xx/packages/packages.adb]
+ [https://downloads.openwrt.org/releases/25.12.6/packages/aarch64_cortex-a53/base/packages.adb]
+ [https://downloads.openwrt.org/releases/25.12.6/targets/qualcommax/ipq60xx/kmods/6.12.112-1-b5fefb5a894e3008353ac9f988245f52/packages.adb]
+ [https://downloads.openwrt.org/releases/25.12.6/packages/aarch64_cortex-a53/luci/packages.adb]
+ [https://downloads.openwrt.org/releases/25.12.6/packages/aarch64_cortex-a53/packages/packages.adb]
+ [https://downloads.openwrt.org/releases/25.12.6/packages/aarch64_cortex-a53/routing/packages.adb]
+ [https://downloads.openwrt.org/releases/25.12.6/packages/aarch64_cortex-a53/telephony/packages.adb]
+ [https://downloads.openwrt.org/releases/25.12.6/packages/aarch64_cortex-a53/video/packages.adb]
+OK: 11223 distinct packages available
++ apk add tailscale
+(1/2) Installing kmod-tun (6.12.112-r1)
+  Executing kmod-tun-6.12.112-r1.post-install
+(2/2) Installing tailscale (1.104.1-r1)
+  Executing tailscale-1.104.1-r1.post-install
+  * 2026/11/17 23:10:40 You have disabled logging. Tailscale will not be able to provide support.
+  * 2026/11/17 23:10:40 Program starting: v1.104.1-1 (OpenWrt), Go 1.27.4: []string{"/usr/sbin/tailscaled", "--cleanup"}
+  * 2026/11/17 23:10:40 LogID: REDACTED
+  * 2026/11/17 23:10:40 logpolicy: using system state directory "/var/lib/tailscale"
+  * logpolicy.ConfigFromFile /var/lib/tailscale/tailscaled.log.conf: open /var/lib/tailscale/tailscaled.log.conf: no such file or directory
+  * logpolicy.Config.Validate for /var/lib/tailscale/tailscaled.log.conf: config is nil
+  * 2026/11/17 23:10:40 dns: [rc=unknown ret=direct]
+  * 2026/11/17 23:10:40 dns: using "direct" mode
+  * 2026/11/17 23:10:40 dns: using *dns.directManager
+  * 2026/11/17 23:10:40 dns: inotify: NewDirWatcher: context canceled
+  * 2026/11/17 23:10:41 linuxfw: clear ip6tables: exec: "ip6tables": executable file not found in $PATH
+  * 2026/11/17 23:10:41 router: enumerating tailscale0 addresses for cleanup failed: failed to look up link "tailscale0": Link not found
+  * 2026/11/17 23:10:41 flushing log.
+  * 2026/11/17 23:10:41 logger closing down
+OK: 84.5 MiB in 216 packages
+rc=0

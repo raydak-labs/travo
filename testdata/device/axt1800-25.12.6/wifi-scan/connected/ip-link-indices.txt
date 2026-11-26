@@ -1,0 +1,8 @@
+1: lo:
+2: miireg:
+3: wan:
+4: lan2:
+5: lan1:
+7: br-lan:
+14: phy1-ap0:
+59: phy0-sta0:

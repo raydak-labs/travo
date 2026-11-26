@@ -1,0 +1,3 @@
+kmod-wireguard-6.12.112-r1 aarch64_cortex-a53 {feeds/base/kernel/linux} (GPL-2.0-only) [installed]
+luci-proto-wireguard-26.288.56989~75a306d noarch {feeds/luci/feeds/luci/protocols/luci-proto-wireguard} (Apache-2.0) [installed]
+wireguard-tools-1.0.20260223-r1 aarch64_cortex-a53 {feeds/base/network/utils/wireguard-tools} (GPL-2.0) [installed]

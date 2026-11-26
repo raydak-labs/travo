@@ -1,0 +1,23 @@
+#!/bin/sh
+# First install: create the default config and enable the service. Keeps an existing config.
+[ -e /etc/config/travo-greenfield ] && exit 0
+
+# Names the router's own .lan host so the DNS-rebinding guard accepts it; empty hostname -> empty value.
+# Hostnames are [a-z0-9-]; anything else is dropped so the value is safe to pass to uci.
+# Explicit ranges: BusyBox tr has no [:upper:]/[:lower:] classes (it mangled OpenWrt to wenrt).
+# shellcheck disable=SC2018,SC2019 # [:upper:] is what breaks on BusyBox; hostnames are ASCII
+host_allow=$(uci -q get 'system.@system[0].hostname' | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9.-')
+[ -n "$host_allow" ] && host_allow="$host_allow.lan"
+
+touch /etc/config/travo-greenfield
+uci -q batch <<UCI
+set travo-greenfield.main=travo-greenfield
+set travo-greenfield.main.enabled='1'
+set travo-greenfield.main.listen='0.0.0.0:8090'
+set travo-greenfield.main.static_dir='/www/travo-greenfield'
+UCI
+uci -q set "travo-greenfield.main.host_allow=$host_allow"
+uci -q commit travo-greenfield
+
+/etc/init.d/travo-greenfield enable
+exit 0

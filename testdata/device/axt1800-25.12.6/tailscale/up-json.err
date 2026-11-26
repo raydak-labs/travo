@@ -1,0 +1,2 @@
+timeout waiting for Tailscale service to enter a Running state; check health with "tailscale status"
+rc=1

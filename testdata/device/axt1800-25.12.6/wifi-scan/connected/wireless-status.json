@@ -1,0 +1,87 @@
+{
+	"radio0": {
+		"up": true,
+		"pending": false,
+		"autostart": true,
+		"disabled": false,
+		"retry_setup_failed": false,
+		"config": {
+			"disabled": false,
+			"type": "mac80211",
+			"band": "5g",
+			"channel": "36",
+			"htmode": "HE80",
+			"path": "platform/soc@0/c000000.wifi"
+		},
+		"interfaces": [
+			{
+				"section": "wwan",
+				"config": {
+					"network": [
+						"wwan"
+					],
+					"device": [
+						"radio0"
+					],
+					"mode": "sta",
+					"encryption": "psk2",
+					"key": "REDACTED",
+					"ssid": "HomeUplink",
+					"radios": [
+						
+					]
+				},
+				"ifname": "phy0-sta0",
+				"vlans": [
+					
+				],
+				"stations": [
+					
+				]
+			}
+		]
+	},
+	"radio1": {
+		"up": true,
+		"pending": false,
+		"autostart": true,
+		"disabled": false,
+		"retry_setup_failed": false,
+		"config": {
+			"disabled": false,
+			"type": "mac80211",
+			"band": "2g",
+			"channel": "1",
+			"htmode": "HE20",
+			"path": "platform/soc@0/c000000.wifi+1"
+		},
+		"interfaces": [
+			{
+				"section": "default_radio1",
+				"config": {
+					"network": [
+						"lan"
+					],
+					"device": [
+						"radio1"
+					],
+					"mode": "ap",
+					"disabled": false,
+					"encryption": "psk2",
+					"key": "REDACTED",
+					"ssid": "TravelAP",
+					"radios": [
+						
+					]
+				},
+				"ifname": "phy1-ap0",
+				"vlans": [
+					
+				],
+				"stations": [
+					
+				]
+			}
+		]
+	}
+}

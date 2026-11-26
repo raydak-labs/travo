@@ -1,0 +1,33 @@
+Mon Nov  9 16:21:39 2026 daemon.info AdGuardHome[3642]: jail: exec-ing /usr/bin/AdGuardHome
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.721471 [info] starting adguard home version="AdGuard Home, version 0.107.79"
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.823642 [info] warning: no users in the configuration file; authentication is disabled
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.829943 [info] tls_manager: using default ciphers
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.837960 [info] webapi: initializing
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.841025 [info] dnsproxy: upstream mode is set mode=load_balance
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.841139 [info] dnsproxy: cache enabled size=4096
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.841196 [info] dnsproxy: max goroutines is set count=300
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.841449 [info] dnsproxy: cache ttl override is enabled min=120 max=86400
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.841503 [info] dnsproxy: server will refuse requests of type any
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.841550 [info] dnsproxy: upstream mode is set mode=load_balance
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.841590 [info] dnsproxy: cache enabled size=4194304
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.841670 [info] dnsproxy: max goroutines is set count=300
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.843456 [info] addrproc: processing addresses
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.843900 [info] webapi: AdGuard Home is available at the following addresses:
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.846717 [info] webapi: serving url=http://127.0.0.1:3000
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.847058 [info] webapi: serving url=http://[::1]:3000
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.847248 [info] webapi: serving url=http://192.168.1.1:3000
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.847371 [info] webapi: serving url=http://[fdc7:8957:dc2d::1]:3000
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.847502 [info] webapi: serving url=http://[fe80::9683:c4ff:fe1f:2838%25br-lan]:3000
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.847687 [info] webapi: serving url=http://192.168.90.241:3000
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.847802 [info] webapi: serving url=http://[fe80::9683:c4ff:fe1f:283a%25phy0-sta0]:3000
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.848245 [info] starting plain server server=plain addr=0.0.0.0:3000
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.862554 [info] dnsproxy: starting dns proxy server
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.862698 [info] dnsproxy: creating udp server socket addr=0.0.0.0:5353
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.862974 [info] dnsproxy: listening to udp addr=[::]:5353
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.863028 [info] dnsproxy: creating tcp server socket addr=0.0.0.0:5353
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.863221 [info] dnsproxy: listening to tcp addr=[::]:5353
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.863913 [info] dnsproxy: entering udp listener loop addr=[::]:5353
+Mon Nov  9 16:21:42 2026 user.notice AdGuardHome[1]: 2026/11/09 15:21:42.864090 [info] dnsproxy: entering listener loop proto=tcp addr=[::]:5353
+Mon Nov  9 17:09:08 2026 user.notice AdGuardHome[1]: 2026/11/09 16:09:08.397106 [info] filtering: saving contents id=3 path=/var/lib/adguardhome/data/filters/3.txt
+Mon Nov  9 17:09:08 2026 user.notice AdGuardHome[1]: 2026/11/09 16:09:08.397399 [info] filtering: filter updated id=3 bytes_written=5097982 rules_count=224288
+Mon Nov  9 17:09:08 2026 user.notice AdGuardHome[1]: 2026/11/09 16:09:08.397486 [info] filtering: updated filter id=3 rules_count=224288 prev_rules_count=0

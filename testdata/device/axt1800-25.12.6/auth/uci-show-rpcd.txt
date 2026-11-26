@@ -1,0 +1,8 @@
+rpcd.@rpcd[0]=rpcd
+rpcd.@rpcd[0].socket='/var/run/ubus/ubus.sock'
+rpcd.@rpcd[0].timeout='30'
+rpcd.@login[0]=login
+rpcd.@login[0].username='root'
+rpcd.@login[0].password='$p$root'
+rpcd.@login[0].read='*'
+rpcd.@login[0].write='*'

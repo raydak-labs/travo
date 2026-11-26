@@ -1,0 +1,51 @@
+	parse_redirect: function(data) {
+		let redir = this.parse_options(data, {
+			enabled: [ "bool", "1" ],
+
+			name: [ "string", this.section_id(data[".name"]) ],
+			_name: [ "string", null, DEPRECATED ],
+			family: [ "family" ],
+
+			src: [ "zone_ref" ],
+			dest: [ "zone_ref" ],
+
+			ipset: [ "setmatch" ],
+			helper: [ "cthelper", null, NO_INVERT ],
+
+			proto: [ "protocol", "tcpudp", PARSE_LIST | FLATTEN_LIST ],
+
+			src_ip: [ "network" ],
+			src_mac: [ "mac", null, PARSE_LIST ],
+			src_port: [ "port" ],
+
+			src_dip: [ "network" ],
+			src_dport: [ "port" ],
+
+			dest_ip: [ "network" ],
+			dest_port: [ "port" ],
+
+			extra: [ "string", null, UNSUPPORTED ],
+
+			limit: [ "limit" ],
+			limit_burst: [ "int" ],
+
+			utc_time: [ "bool" ],
+			start_date: [ "date" ],
+			stop_date: [ "date" ],
+			start_time: [ "time" ],
+			stop_time: [ "time" ],
+			weekdays: [ "weekdays" ],
+			monthdays: [ "monthdays", null, UNSUPPORTED ],
+
+			mark: [ "mark" ],
+
+			reflection: [ "bool", "1" ],
+			reflection_src: [ "reflection_source", "internal" ],
+
+			reflection_zone: [ "zone_ref", null, PARSE_LIST ],
+
+			counter: [ "bool", "1" ],
+			log: [ "string" ],
+			log_limit: [ "limit" ],
+
+			target: [ "target", "dnat" ]
