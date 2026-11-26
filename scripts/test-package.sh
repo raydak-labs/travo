@@ -133,7 +133,9 @@ dx '[ ! -e /usr/bin/travo ]' || fail "a refused install left files behind"
 echo "ok: refused: $(echo "$out" | head -n 1)"
 
 step "signature: --insecure installs without writing the key"
-dx 'sh /tmp/tg-nosig/install.sh --insecure'
+dx 'sh /tmp/tg-nosig/install.sh --insecure --keep-lan'
+# shellcheck disable=SC2016 # expands in the container
+dx '[ "$(uci -q get network.lan.ipaddr)" = 192.168.1.1/24 ]' || fail "--keep-lan changed the LAN address"
 dx '[ -x /usr/bin/travo ]' || fail "--insecure install did not install"
 dx '[ ! -e /etc/travo/minisign.pub ]' || fail "--insecure install wrote the trusted key"
 dx 'sh /tmp/tg-nosig/install.sh --uninstall --purge'
@@ -142,7 +144,28 @@ echo "ok: --insecure installed, no key written"
 
 step "install"
 listeners >"$tmp/listeners-before.txt"
-dx 'sh /tmp/tg/install.sh'
+# OpenWrt's factory WiFi (testdata/device/axt1800-25.12.6/factory-default/uci-show-wireless.txt);
+# the container has no radios, so only the staged UCI is checked, not a live AP.
+# shellcheck disable=SC2016 # expands in the container
+dx 'for r in 0:5g 1:2g; do printf "config wifi-device radio%s\n\toption band %s\n\nconfig wifi-iface default_radio%s\n\toption device radio%s\n\toption network lan\n\toption mode ap\n\toption ssid OpenWrt\n\toption encryption none\n\toption disabled 1\n\n" "${r%:*}" "${r#*:}" "${r%:*}" "${r%:*}"; done > /etc/config/wireless'
+[ "$(dx 'uci -q get network.lan.ipaddr')" = 192.168.1.1/24 ] || fail "container LAN is not the factory address"
+docker exec -e TRAVO_WIFI_PASSWORD="it's a test" "$NAME" sh /tmp/tg/install.sh
+[ "$(dx 'uci -q get network.lan.ipaddr')" = 192.168.50.1/24 ] || fail "first install did not move the LAN to 192.168.50.1/24"
+for r in 0 1; do
+  [ "$(dx "uci -q get wireless.default_radio$r.ssid") $(dx "uci -q get wireless.default_radio$r.encryption") $(dx "uci -q get wireless.default_radio$r.disabled")" = "Travo sae-mixed 0" ] ||
+    fail "first install did not set up default_radio$r"
+  [ "$(dx "uci -q get wireless.default_radio$r.key")" = "it's a test" ] || fail "WiFi key of default_radio$r differs"
+done
+dx 'uci changes' | grep -q . && fail "first install left uncommitted UCI changes"
+echo "ok: first install moved the LAN to 192.168.50.1/24 and set up WiFi Travo on both radios"
+# The detached reload restarts travo once (new certificate for the new address); wait for it.
+pid=$(dx 'pidof travo')
+attempts=0
+while [ "$(dx 'pidof travo' || true)" = "$pid" ]; do
+  attempts=$((attempts + 1))
+  [ "$attempts" -le 60 ] || fail "travo was not restarted after the network reload"
+  sleep 1
+done
 wait_health "after install" 80
 dx 'cat /etc/travo/minisign.pub' | cmp - "$tmp/k1.pub" || fail "signed install did not store the tarball key"
 echo "ok: signed install stored the key"
