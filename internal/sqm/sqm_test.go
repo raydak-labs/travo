@@ -37,7 +37,6 @@ func (a *directApply) Apply(ctx context.Context, configs []string, stage func(co
 func newTestService(t *testing.T, installed bool) (*Service, *mock.Device, *directApply) {
 	t.Helper()
 	dev := mock.New()
-	dev.SetService(InitScript, true, false)
 	raw, err := os.ReadFile("../../testdata/device/axt1800-25.12.6/sqm/uci-export-sqm.txt")
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +55,7 @@ func newTestService(t *testing.T, installed bool) (*Service, *mock.Device, *dire
 		}
 	}
 	ap := &directApply{dev: dev}
-	return &Service{UCI: dev, Packages: pm, Services: dev, Apply: ap}, dev, ap
+	return &Service{UCI: dev, Packages: pm, Apply: ap}, dev, ap
 }
 
 func TestGetFromStockFixture(t *testing.T) {
@@ -116,6 +115,9 @@ func TestSetPreservesSectionNameAndUnknownOptions(t *testing.T) {
 	if len(ap.configs) != 1 || ap.configs[0] != Config {
 		t.Fatalf("Apply configs = %v, want [sqm]", ap.configs)
 	}
+	if len(dev.ServiceActions) != 0 {
+		t.Fatalf("unexpected direct service actions (txn.Apply already reloads sqm): %v", dev.ServiceActions)
+	}
 	secs, err := dev.Show(context.Background(), Config)
 	if err != nil {
 		t.Fatal(err)
@@ -158,11 +160,10 @@ func TestSetNoOpSkipsApply(t *testing.T) {
 
 func TestSetCreatesQueueSectionWhenConfigMissing(t *testing.T) {
 	dev := mock.New()
-	dev.SetService(InitScript, true, false)
 	pm := pkgmgr.NewMock()
 	_ = pm.Install(context.Background(), Package)
 	ap := &directApply{dev: dev}
-	svc := &Service{UCI: dev, Packages: pm, Services: dev, Apply: ap}
+	svc := &Service{UCI: dev, Packages: pm, Apply: ap}
 
 	want := Settings{
 		Enabled: true, Interface: "eth1", Download: 30000, Upload: 5000,

@@ -16,12 +16,12 @@ import (
 )
 
 const (
-	Package        = "sqm-scripts"
-	Config         = "sqm"
-	InitScript     = "sqm"
-	DefaultSection = "eth1"
-	MaxBandwidth   = 10_000_000 // 10 Gbit/s in kbit/s
-	MaxOverhead    = 256
+	Package          = "sqm-scripts"
+	Config           = "sqm"
+	DefaultSection   = "eth1"
+	DefaultInterface = "eth1"
+	MaxBandwidth     = 10_000_000 // 10 Gbit/s in kbit/s
+	MaxOverhead      = 256
 )
 
 var (
@@ -57,7 +57,6 @@ type Applier interface {
 type Service struct {
 	UCI      device.UCI
 	Packages pkgmgr.PackageManager
-	Services device.Services
 	Apply    Applier
 
 	mu sync.Mutex
@@ -105,11 +104,6 @@ func (s *Service) Set(ctx context.Context, want Settings) (Settings, error) {
 	if err != nil {
 		return Settings{}, err
 	}
-	if s.Services != nil {
-		if err := s.Services.ServiceAction(ctx, InitScript, "restart"); err != nil {
-			return Settings{}, err
-		}
-	}
 	return s.Get(ctx)
 }
 
@@ -140,7 +134,7 @@ func (s *Service) show(ctx context.Context) ([]device.Section, error) {
 
 func Parse(secs []device.Section) (string, Settings) {
 	out := Settings{
-		Interface: DefaultSection,
+		Interface: DefaultInterface,
 		Qdisc:     "cake",
 		Script:    "piece_of_cake.qos",
 		Linklayer: "none",
@@ -230,7 +224,7 @@ func Stage(ctx context.Context, u device.UCI, secs []device.Section, want Settin
 			}
 		}
 	}
-	// Stock config omits `overhead` when 0; only write it when non-zero or already set to a different value.
+	// Stock config omits overhead; don't add overhead '0'.
 	wantOverhead := strconv.Itoa(want.Overhead)
 	if curOverhead, ok := curOpts["overhead"]; (ok && curOverhead != wantOverhead) || (!ok && want.Overhead > 0) {
 		if err := u.Set(ctx, Config, name, "overhead", wantOverhead); err != nil {
