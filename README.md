@@ -37,7 +37,7 @@ Made for travellers who are not network admins, and for power users who want a c
 ```sh
 cd /tmp && mkdir -p travo && tar -xzf travo-*-aarch64.tar.gz -C travo
 cp checksums.txt.sig travo/
-sh travo/install.sh
+sh travo/install.sh --wifi
 ```
 
 The installer checks the release signature with the router's `usign` before it changes anything, and refuses an unsigned or tampered tarball.
@@ -45,6 +45,8 @@ The installer checks the release signature with the router's `usign` before it c
 | Option | Effect |
 |---|---|
 | `--port N` | Serve Travo on `http://<router>:N` and leave LuCI on port 80 |
+| `--wifi` | Turn on the router's WiFi: asks for a password, the network is called **Travo** on every band (WPA2/WPA3). `--wifi-name NAME` picks another name; `TRAVO_WIFI_PASSWORD` skips the question in scripts |
+| `--lan CIDR` / `--keep-lan` | The router's address. A first install moves OpenWrt's `192.168.1.1/24`, which hotel networks often use too, to `192.168.50.1/24` |
 | `--adguard-bundle <file>` | Install AdGuard Home offline from the release's `adguardhome-*.apk` |
 | `--rotate-key` | Accept a new signing key once, when the release notes announce one |
 | `--insecure` | Install an unsigned build you made yourself |
@@ -52,7 +54,10 @@ The installer checks the release signature with the router's `usign` before it c
 
 ## First use
 
-Open `http://<router>/` (usually `http://192.168.1.1/`) and choose the admin password. LuCI moves to `http://<router>:8080/`.
+The router's address is now `192.168.50.1`. Unplug and replug the cable (or join the **Travo** WiFi), open `http://192.168.50.1/` and choose the admin password. LuCI moves to `http://192.168.50.1:8080/`.
+
+- Installed without `--wifi`? The banner says the WiFi is off; **WiFi → Set up WiFi** turns it on.
+- To get online, press **Connect to WiFi** on the dashboard and pick the hotel's network.
 
 - After `--port N`, open `http://<router>:N/` instead; LuCI stays on port 80.
 - `https://<router>/` serves the same UI with a certificate the router made itself. Its fingerprint is in `logread -e travo`.
