@@ -15,8 +15,8 @@ function mockClient(status: number, body: unknown) {
 
 describe('sqm api', () => {
   it('maps stable error codes without parsing error text', () => {
-    expect(sqmError('invalid_request')).toContain('rejected');
-    expect(sqmError('sqm_not_installed')).toContain('sqm-scripts');
+    expect(sqmError('invalid_request')).toContain('Invalid value');
+    expect(sqmError('sqm_not_installed')).toContain('Install SQM from Services');
     expect(sqmError('uci_busy')).toContain('in progress');
     expect(sqmError('transaction_pending')).toBeTruthy();
     expect(sqmError(undefined)).toContain('Could not load or save SQM');
@@ -62,6 +62,6 @@ describe('sqm api', () => {
       sample,
       mockClient(503, { error: 'sqm-scripts is not installed', code: 'sqm_not_installed' }),
     );
-    expect('error' in missing && missing.error).toContain('sqm-scripts');
+    expect('error' in missing && missing.error).toContain('Install SQM from Services');
   });
 });
