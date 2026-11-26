@@ -12,11 +12,12 @@ import (
 	"github.com/raydak-labs/travo/internal/datausage"
 	"github.com/raydak-labs/travo/internal/device/facts"
 	"github.com/raydak-labs/travo/internal/firmware"
+	"github.com/raydak-labs/travo/internal/wifi"
 	"github.com/raydak-labs/travo/internal/wifireconnect"
 )
 
 // newAlerts wires the alert sources. Mock mode has no flash or mount table to read.
-func newAlerts(deps app.Deps, agh *adguard.Service, reconnect api.WiFiReconnectReader, usage *datausage.Service, fw *firmware.Service) *alerts.Service {
+func newAlerts(deps app.Deps, agh *adguard.Service, reconnect api.WiFiReconnectReader, usage *datausage.Service, fw *firmware.Service, aps api.WiFiAPEditor) *alerts.Service {
 	src := alerts.Sources{Now: time.Now, Guards: deps.Guards.Stale}
 	if !deps.Mock {
 		src.OverlayFree = adguard.FreeBytes("/overlay")
@@ -50,6 +51,12 @@ func newAlerts(deps app.Deps, agh *adguard.Service, reconnect api.WiFiReconnectR
 	}
 	if fw != nil {
 		src.FirmwareCompleted = fw.Completed
+	}
+	if aps != nil {
+		src.WiFiNotSetUp = func(ctx context.Context) (bool, error) {
+			list, err := aps.AccessPoints(ctx)
+			return wifi.NotSetUp(list), err
+		}
 	}
 	return &alerts.Service{Sources: src}
 }

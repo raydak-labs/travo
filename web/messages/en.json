@@ -1186,6 +1186,7 @@
   "alert_data_budget_warning": "The data budget is almost used up.",
   "alert_data_budget_exceeded": "The data budget for this billing period is used up.",
   "alert_firmware_upgrade_completed": "The firmware upgrade finished. Features paused during the upgrade are back on.",
+  "alert_wifi_not_set_up": "WiFi is off: only devices on a cable can reach the router. Set up its WiFi.",
   "alert_memory_low": "The router is low on memory. The kernel may stop services; a reboot frees memory.",
   "nav_internet": "Internet",
   "nav_network_wan": "WAN",

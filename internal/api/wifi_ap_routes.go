@@ -29,12 +29,31 @@ type updateAPInput struct {
 	}
 }
 
+type setupAPsInput struct {
+	Body struct {
+		SSID string `json:"ssid" doc:"Name of the router's WiFi on every band"`
+		Key  string `json:"key" writeOnly:"true" doc:"WPA key, 8 to 63 printable ASCII characters"`
+	}
+}
+
 func (s *server) registerWiFiAPs(a huma.API) {
 	register(s, false, op("getWiFiAccessPoints", http.MethodGet, "/api/v1/wifi/aps", "Configured access points", "wifi", 503), a, s.getWiFiAPs)
 	update := op("updateWiFiAccessPoint", http.MethodPost, "/api/v1/wifi/aps/{section}", "Edit one access point (guarded transaction)", "wifi", 400, 404, 409, 503)
 	update.DefaultStatus = http.StatusAccepted
 	update.MaxBodyBytes = 4096
 	register(s, false, update, a, s.updateWiFiAP)
+	setup := op("setupWiFiAccessPoints", http.MethodPost, "/api/v1/wifi/setup", "Turn on the router's WiFi: every main access point with one name and key (guarded transaction)", "wifi", 400, 404, 409, 503)
+	setup.DefaultStatus = http.StatusAccepted
+	setup.MaxBodyBytes = 4096
+	register(s, false, setup, a, s.setupWiFiAPs)
+}
+
+func (s *server) setupWiFiAPs(ctx context.Context, in *setupAPsInput) (*txnOutput, error) {
+	if s.WiFiAPs == nil {
+		return nil, wifiDeviceUnavailable()
+	}
+	st, err := s.WiFiAPs.SetupAPs(ctx, wifi.SetupRequest{SSID: in.Body.SSID, Key: in.Body.Key})
+	return apTxnResult(st, err)
 }
 
 func (s *server) getWiFiAPs(ctx context.Context, _ *struct{}) (*wifiAPsOutput, error) {
@@ -57,6 +76,11 @@ func (s *server) updateWiFiAP(ctx context.Context, in *updateAPInput) (*txnOutpu
 	caller, _ := netip.ParseAddr(infoOf(ctx).ip)
 	b := in.Body
 	st, err := s.WiFiAPs.UpdateAP(ctx, wifi.APRequest{Section: in.Section, SSID: b.SSID, Key: b.Key, Enabled: b.Enabled, Acknowledge: b.AcknowledgeLockout, Caller: caller})
+	return apTxnResult(st, err)
+}
+
+// apTxnResult maps an AP transaction's outcome; a rolled-back transaction is a 202 with its state.
+func apTxnResult(st txn.Status, err error) (*txnOutput, error) {
 	if err == nil || (st.ID != "" && (st.State == txn.RolledBack || st.State == txn.Restoring || st.State == txn.RollbackFailed)) {
 		return txnResponse(st), nil
 	}

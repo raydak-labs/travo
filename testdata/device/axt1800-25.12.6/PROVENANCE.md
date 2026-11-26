@@ -127,3 +127,10 @@ Captured from the AXT1800 (25.12.6, mwan3 2.12.0-r3, iptables-nft 1.8.10) during
 - interfaces-wan-usbtether-online.txt: the `interface` lines of `mwan3 interfaces` 6 s into the failed probe (`grep interface`; the "Interface status:" header and blank line dropped).
 - mangle-probe-no-hook.txt: the same sample's `iptables -t mangle -w -S` lines matching `mwan3_(rules|policy_travo|hook)|^-A (PRE|OUT)` (grep-filtered; no hook line existed).
 - interface-wan-status-failover.json, interface-wwan-status-failover.json, interface-usbtether-status-failover.json: `ubus call network.interface.<name> status` with all three uplinks up (wan and wwan in 10.0.1.0/24).
+
+## factory-default/
+
+Captured read-only on 2026-11-26 from the same GL-AXT1800 (OpenWrt 25.12.6 r33311-981c978eff) right after `firstboot -y && reboot` and before any Travo change to WiFi or the LAN. Caller on Ethernet (LAN). Verbatim, nothing redacted: the factory configs hold no keys or MAC addresses.
+
+- factory-default/uci-show-wireless.txt: `uci show wireless` (both APs `OpenWrt`, open, disabled)
+- factory-default/uci-show-network.txt: `uci show network` (lan `192.168.1.1/24`)

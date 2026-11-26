@@ -61,6 +61,7 @@ type WiFiJoiner interface {
 type WiFiAPEditor interface {
 	AccessPoints(context.Context) ([]wifi.APConfig, error)
 	UpdateAP(context.Context, wifi.APRequest) (txn.Status, error)
+	SetupAPs(context.Context, wifi.SetupRequest) (txn.Status, error)
 }
 
 // WiFiGuestEditor reads and applies the guest AP through guarded transactions.
