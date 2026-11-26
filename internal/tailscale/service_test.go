@@ -81,15 +81,79 @@ func TestInstallPinsDNSOffAndReleasesGuard(t *testing.T) {
 	if err := r.svc.Install(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(r.dev.ServiceActions, []string{"tailscale enable", "tailscale restart"}) {
+	// DNS is pinned off while it runs, then Tailscale stays off until the user switches it on.
+	want := []string{"tailscale restart", "tailscale stop", "tailscale disable"}
+	if !slices.Equal(r.dev.ServiceActions, want) {
 		t.Fatalf("actions %v", r.dev.ServiceActions)
 	}
 	if len(r.cli.Calls) != 1 || !slices.Equal(r.cli.Calls[0], []string{"set", "--accept-dns=false"}) {
 		t.Fatalf("calls %v", r.cli.Calls)
 	}
 	st, err := r.svc.Status(context.Background())
-	if err != nil || !st.Installed || !st.Running || st.Busy || st.Prefs.AcceptDNS {
+	if err != nil || !st.Installed || st.Running || st.Busy {
 		t.Fatalf("%+v %v", st, err)
+	}
+}
+
+func TestSetRunningSwitchesTheDaemonAndKeepsTheLogin(t *testing.T) {
+	r := newRig(t)
+	r.installed(t)
+	st, err := r.svc.SetRunning(context.Background(), false)
+	if err != nil || st.Running {
+		t.Fatalf("off: %+v %v", st, err)
+	}
+	if !slices.Equal(r.dev.ServiceActions, []string{"tailscale stop", "tailscale disable"}) {
+		t.Fatalf("off actions %v", r.dev.ServiceActions)
+	}
+	r.dev.ServiceActions = nil
+	st, err = r.svc.SetRunning(context.Background(), true)
+	if err != nil || !st.Running {
+		t.Fatalf("on: %+v %v", st, err)
+	}
+	if !slices.Equal(r.dev.ServiceActions, []string{"tailscale enable", "tailscale start"}) {
+		t.Fatalf("on actions %v", r.dev.ServiceActions)
+	}
+	// Switching is not a logout: no CLI write touched the login.
+	for _, c := range r.cli.Calls {
+		if len(c) > 0 && c[0] == "logout" {
+			t.Fatalf("switching logged out: %v", r.cli.Calls)
+		}
+	}
+	if r.held(t, ChangeGuard) {
+		t.Fatal("change guard left after a clean switch")
+	}
+}
+
+func TestSetRunningRefusesWhenAbsentOrInstalling(t *testing.T) {
+	r := newRig(t)
+	if _, err := r.svc.SetRunning(context.Background(), true); !errors.Is(err, pkgmgr.ErrNotInstalled) {
+		t.Fatalf("absent: %v", err)
+	}
+	r.installed(t)
+	if err := r.svc.Guards.Acquire(InstallGuard); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.svc.SetRunning(context.Background(), true); !errors.Is(err, ErrBusy) {
+		t.Fatalf("installing: %v", err)
+	}
+	if len(r.dev.ServiceActions) != 0 {
+		t.Fatalf("refusal wrote: %v", r.dev.ServiceActions)
+	}
+}
+
+func TestSetRunningFailureKeepsTheChangeGuard(t *testing.T) {
+	r := newRig(t)
+	r.installed(t)
+	r.dev.ServiceErr = errors.New("procd down")
+	if _, err := r.svc.SetRunning(context.Background(), false); err == nil {
+		t.Fatal("want error")
+	}
+	if !r.held(t, ChangeGuard) {
+		t.Fatal("a failed switch must keep the change guard")
+	}
+	r.dev.ServiceErr = nil
+	if _, err := r.svc.SetRunning(context.Background(), false); err != nil || r.held(t, ChangeGuard) {
+		t.Fatalf("retry: %v held=%v", err, r.held(t, ChangeGuard))
 	}
 }
 

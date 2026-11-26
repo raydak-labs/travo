@@ -21,6 +21,8 @@ type Tailscale interface {
 	Install(context.Context) error
 	Login(context.Context) (tailscale.Status, error)
 	Logout(context.Context) (tailscale.Status, error)
+	// SetRunning starts (and enables at boot) or stops (and disables) tailscaled.
+	SetRunning(context.Context, bool) (tailscale.Status, error)
 	SetSettings(context.Context, tailscale.Settings) (tailscale.Status, error)
 	// ApplyFirewall begins the firewall transaction for the travo_ts zone.
 	ApplyFirewall(context.Context) (txn.Status, error)
@@ -28,6 +30,12 @@ type Tailscale interface {
 
 type tailscaleSettingsInput struct {
 	Body tailscale.Settings
+}
+
+type tailscaleRunningInput struct {
+	Body struct {
+		Enabled bool `json:"enabled" doc:"true starts tailscaled and starts it at boot; false stops it (not a logout)"`
+	}
 }
 
 type tailscaleStatusOutput struct {
@@ -55,6 +63,10 @@ func (s *server) registerTailscale(a huma.API) {
 			register(s, false, x, a, o.h)
 		}
 	}
+	// Session-only: switching on rejoins the tailnet with the saved node key (Tailscale SSH included).
+	running := op("setTailscaleRunning", http.MethodPut, "/api/v1/tailscale/running", "Switch tailscaled on or off", "tailscale", 400, 409, 503)
+	running.MaxBodyBytes = 1024
+	registerSessionOnly(s, running, a, s.setTailscaleRunning)
 	set := op("setTailscaleSettings", http.MethodPut, "/api/v1/tailscale/settings", "Set exit node, LAN advertisement and Tailscale SSH", "tailscale", 400, 409, 503)
 	set.MaxBodyBytes = 1024
 	registerSessionOnly(s, set, a, s.setTailscaleSettings)
@@ -67,6 +79,12 @@ func (s *server) registerTailscale(a huma.API) {
 func (s *server) setTailscaleSettings(ctx context.Context, in *tailscaleSettingsInput) (*tailscaleStatusOutput, error) {
 	return s.tailscaleChange(ctx, "settings", func(ctx context.Context) (tailscale.Status, error) {
 		return s.Tailscale.SetSettings(ctx, in.Body)
+	})
+}
+
+func (s *server) setTailscaleRunning(ctx context.Context, in *tailscaleRunningInput) (*tailscaleStatusOutput, error) {
+	return s.tailscaleChange(ctx, "running", func(ctx context.Context) (tailscale.Status, error) {
+		return s.Tailscale.SetRunning(ctx, in.Body.Enabled)
 	})
 }
 

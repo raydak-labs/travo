@@ -42,6 +42,11 @@ func (f *fakeTailscale) Logout(context.Context) (tailscale.Status, error) {
 	return f.status, f.err
 }
 
+func (f *fakeTailscale) SetRunning(_ context.Context, on bool) (tailscale.Status, error) {
+	f.calls = append(f.calls, fmt.Sprintf("running %v", on))
+	return f.status, f.err
+}
+
 func (f *fakeTailscale) SetSettings(_ context.Context, in tailscale.Settings) (tailscale.Status, error) {
 	f.calls = append(f.calls, fmt.Sprintf("settings %+v", in))
 	return f.status, f.err
@@ -92,6 +97,32 @@ func TestTailscaleSettingsRoute(t *testing.T) {
 		if got.Code != 409 || errCode(t, got) != tc.want {
 			t.Fatalf("%v: %d %s", tc.err, got.Code, got.Body)
 		}
+	}
+}
+
+func TestTailscaleRunningRoute(t *testing.T) {
+	fake := &fakeTailscale{}
+	e := newEnvWithDashboard(t, nil, nil, nil, func(d *Deps) { d.Tailscale = fake })
+	cookie, csrf := e.login()
+	put := func(body string) *httptest.ResponseRecorder {
+		return e.do(req{method: "PUT", path: "/api/v1/tailscale/running", body: body, cookie: cookie, csrf: csrf})
+	}
+	for _, bad := range []string{`{}`, `{"enabled":"yes"}`, `{"enabled":true,"x":1}`} {
+		if got := put(bad); got.Code != 400 {
+			t.Fatalf("%s: %d", bad, got.Code)
+		}
+	}
+	for _, body := range []string{`{"enabled":true}`, `{"enabled":false}`} {
+		if got := put(body); got.Code != 200 {
+			t.Fatalf("%s: %d %s", body, got.Code, got.Body)
+		}
+	}
+	if len(fake.calls) != 2 || fake.calls[0] != "running true" || fake.calls[1] != "running false" {
+		t.Fatalf("calls %v", fake.calls)
+	}
+	fake.err = tailscale.ErrFailover
+	if got := put(`{"enabled":true}`); got.Code != 409 || errCode(t, got) != "tailscale_failover_conflict" {
+		t.Fatalf("failover: %d %s", got.Code, got.Body)
 	}
 }
 

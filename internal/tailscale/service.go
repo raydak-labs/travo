@@ -191,21 +191,76 @@ func (s *Service) Install(ctx context.Context) error {
 	return s.Guards.Release(InstallGuard)
 }
 
-// install: the package's post-install already starts tailscaled (apk-add.txt); enable and
-// restart make the boot link and the running instance explicit, then DNS is pinned off.
+// install: the package's post-install already starts tailscaled (apk-add.txt). Restart makes
+// the running instance explicit so DNS can be pinned off, then Tailscale is stopped and its
+// boot link removed: it stays off until the user switches it on (SetRunning).
 func (s *Service) install(ctx context.Context) error {
 	if err := s.Packages.Install(ctx, Package); err != nil {
 		return fmt.Errorf("install %s: %w", Package, err)
 	}
-	for _, a := range []string{"enable", "restart"} {
-		if err := s.Services.ServiceAction(ctx, Package, a); err != nil {
-			return fmt.Errorf("%s %s: %w", Package, a, err)
-		}
+	if err := s.Services.ServiceAction(ctx, Package, "restart"); err != nil {
+		return fmt.Errorf("%s restart: %w", Package, err)
 	}
 	if err := s.waitReady(ctx); err != nil {
 		return fmt.Errorf("tailscaled not answering after install: %w", err)
 	}
-	return s.CLI.Set(ctx, []string{"--accept-dns=false"})
+	if err := s.CLI.Set(ctx, []string{"--accept-dns=false"}); err != nil {
+		return err
+	}
+	return s.serviceActions(ctx, "stop", "disable")
+}
+
+func (s *Service) serviceActions(ctx context.Context, actions ...string) error {
+	for _, a := range actions {
+		if err := s.Services.ServiceAction(ctx, Package, a); err != nil {
+			return fmt.Errorf("%s %s: %w", Package, a, err)
+		}
+	}
+	return nil
+}
+
+// SetRunning switches tailscaled on (boot link, start, wait until it answers) or off (stop,
+// no boot link). Off is not a logout: the node key and preferences stay in the state file, so
+// switching on again rejoins the same tailnet. The DNS reconciler pops the MagicDNS layer
+// while the daemon is stopped (Want).
+func (s *Service) SetRunning(ctx context.Context, on bool) (Status, error) {
+	err := func() error {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		defer s.exclusive()()
+		if held, err := s.guardHeld(InstallGuard); err != nil || held {
+			return errors.Join(err, busyIf(held))
+		}
+		if _, err := s.Packages.Version(ctx, Package); err != nil {
+			return err
+		}
+		if on {
+			if err := s.failoverOff(); err != nil {
+				return err
+			}
+		}
+		if err := s.Guards.Clear(ChangeGuard); err != nil {
+			return err
+		}
+		if err := s.Guards.Acquire(ChangeGuard); err != nil {
+			return err
+		}
+		if on {
+			if err := s.serviceActions(ctx, "enable", "start"); err != nil {
+				return fmt.Errorf("%w (guard %s kept)", err, ChangeGuard)
+			}
+			if err := s.waitReady(ctx); err != nil {
+				return fmt.Errorf("tailscaled not answering: %w (guard %s kept)", err, ChangeGuard)
+			}
+		} else if err := s.serviceActions(ctx, "stop", "disable"); err != nil {
+			return fmt.Errorf("%w (guard %s kept)", err, ChangeGuard)
+		}
+		return s.Guards.Release(ChangeGuard)
+	}()
+	if err != nil {
+		return Status{}, err
+	}
+	return s.Status(ctx)
 }
 
 func (s *Service) waitReady(ctx context.Context) error {
