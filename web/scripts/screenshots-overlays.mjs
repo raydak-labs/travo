@@ -157,6 +157,68 @@ async function resultToast(chrome, base, vp, shoot) {
   await shoot('vpn-error-toast');
 }
 
+/** Dashboard and Internet open the same dialog; it scans on opening (the mock answers in ~1 s). */
+async function connectDialog(chrome, base, vp, shoot) {
+  // The ?connect deep link drops itself from the URL, which chrome.open would wait for: click.
+  await chrome.open(`${base}/#/internet`, vp);
+  await clickWhenReady(chrome, 'main header', 'Connect to WiFi');
+  await waitFor(
+    chrome,
+    `document.querySelector('[role="dialog"]')?.textContent.includes('HomeUplink') ?? false`,
+    'scan results in the connect dialog',
+  );
+  await sleep(300);
+  await shoot('internet-connect-dialog');
+}
+
+// testdata/device/axt1800-25.12.6/factory-default/uci-show-wireless.txt as the API lists it.
+const FACTORY_APS = {
+  aps: ['radio0', 'radio1'].map((radio, i) => ({
+    section: `default_${radio}`,
+    radio,
+    band: i === 0 ? '5g' : '2g',
+    ssid: 'OpenWrt',
+    enabled: false,
+    guest: false,
+    security: 'open',
+  })),
+};
+
+/** A fresh install: the banner on every page and the setup card first on the WiFi page. */
+async function wifiFirstRun(chrome, base, vp, shoot) {
+  const { identifier } = await chrome.send('Page.addScriptToEvaluateOnNewDocument', {
+    source: stubFetch([
+      ['GET', /^\/api\/v1\/wifi\/aps$/, 200, FACTORY_APS],
+      ['GET', /^\/api\/v1\/wifi$/, 200, { radios: [], stas: [], aps: [] }],
+      // No event stream: the shell falls back to polling, which reads the stubbed alerts.
+      ['GET', /^\/api\/v1\/dashboard\/events$/, 503, { code: 'unavailable' }],
+      [
+        'GET',
+        /^\/api\/v1\/system\/alerts$/,
+        200,
+        {
+          alerts: [
+            { id: 'wifi_not_set_up', severity: 'danger', code: 'wifi_not_set_up', since: null },
+          ],
+        },
+      ],
+    ]),
+  });
+  try {
+    await chrome.open(`${base}/#/wifi`, vp);
+    await waitFor(
+      chrome,
+      `document.querySelector('main')?.textContent.includes('Turn on WiFi') ?? false`,
+      'setup card',
+    );
+    await waitFor(chrome, `document.body.textContent.includes('WiFi is off')`, 'banner');
+    await sleep(300);
+    await shoot('wifi-first-run');
+  } finally {
+    await chrome.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+  }
+}
+
 /** Runs every overlay flow at each viewport and scheme; `out(name, vp, scheme)` names the file. */
 export async function shootOverlays(chrome, base, viewports, schemes, out) {
   const { identifier } = await chrome.send('Page.addScriptToEvaluateOnNewDocument', {
@@ -175,6 +237,8 @@ export async function shootOverlays(chrome, base, viewports, schemes, out) {
       resultToast,
       navSheet,
       headerMenu,
+      connectDialog,
+      wifiFirstRun,
     ]) {
       for (const viewport of viewports) {
         for (const scheme of schemes) {

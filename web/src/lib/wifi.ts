@@ -49,3 +49,11 @@ export function wifiScanErrorMessage(error: unknown): string {
   if (code === 'wifi_unavailable') return m.wifi_unavailable();
   return error instanceof Error && error.message ? error.message : m.wifi_unavailable();
 }
+
+/** Mirrors the daemon's wifi.NotSetUp: every main AP still off and open, as OpenWrt ships it. */
+export function wifiNotSetUp(
+  aps: { guest: boolean; enabled: boolean; security: string }[],
+): boolean {
+  const main = aps.filter((ap) => !ap.guest);
+  return main.length > 0 && main.every((ap) => !ap.enabled && ap.security === 'open');
+}

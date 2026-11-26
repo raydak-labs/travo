@@ -102,7 +102,7 @@ describe('Dashboard connectivity', () => {
 
     expect(body).toContain('Connect to WiFi');
     expect(body.replace(/<!--.*?-->/g, '')).toMatch(
-      /<a[^>]*href="#\/wifi"[^>]*>[\s\S]*?Connect to WiFi<\/a>/,
+      /<a[^>]*href="#\/internet\?connect"[^>]*>[\s\S]*?Connect to WiFi<\/a>/,
     );
   });
 

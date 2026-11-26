@@ -8,7 +8,7 @@ import { fetchVpnStatus } from '../api/vpn-status';
 import { captiveCardVisible } from '../captive';
 import type { dashboardEvents } from '../dashboard-events.svelte';
 import { m } from '../paraglide/messages.js';
-import { href } from '../router';
+import { connectHref } from '../router';
 import { topologyModel } from '../topology';
 import { createLoader } from '../ui/loader.svelte';
 import PageHeader from '../ui/PageHeader.svelte';
@@ -63,7 +63,7 @@ let trafficOpen = $state(false);
 <div class="flex flex-col gap-6">
   <PageHeader title={m.nav_dashboard()} description={m.dashboard_description()}>
     {#snippet actions()}
-      <Button variant="outline" size="sm" href={href('wifi')}><Wifi aria-hidden="true" />{m.dashboard_connect_to_wifi()}</Button>
+      <Button variant="outline" size="sm" href={connectHref()}><Wifi aria-hidden="true" />{m.wifi_connect()}</Button>
     {/snippet}
   </PageHeader>
 

@@ -1,8 +1,9 @@
 <script lang="ts">
 import Radar from '@lucide/svelte/icons/radar';
 import RefreshCw from '@lucide/svelte/icons/refresh-cw';
-import { onDestroy, onMount } from 'svelte';
+import { onDestroy, onMount, untrack } from 'svelte';
 import Button from '$lib/components/ui/button/button.svelte';
+import * as Dialog from '$lib/components/ui/dialog';
 import {
   confirmTransaction,
   getTransaction,
@@ -44,6 +45,7 @@ import WiFiReconnect from './WiFiReconnect.svelte';
 import WiFiSavedUplinks from './WiFiSavedUplinks.svelte';
 import WiFiScanList from './WiFiScanList.svelte';
 import WiFiScheduleCard from './WiFiScheduleCard.svelte';
+import WiFiSetupCard from './WiFiSetupCard.svelte';
 import WiFiSummary from './WiFiSummary.svelte';
 import WiFiUplinkMAC from './WiFiUplinkMAC.svelte';
 
@@ -52,10 +54,13 @@ const idle: LoadStatus = { state: 'ready' };
 // Internet page (networks it joins). Both share the join/AP transaction handling below.
 let {
   part = 'access',
+  connectOpen = $bindable(false),
   initialScanStatus = idle,
   initialScanData,
 }: {
   part?: 'access' | 'uplink';
+  // The Connect to WiFi dialog (uplink part): scan, then pick a network to join.
+  connectOpen?: boolean;
   initialScanStatus?: LoadStatus;
   initialScanData?: ScanResult;
 } = $props();
@@ -268,6 +273,11 @@ async function saveProfile(body: JoinWiFiData['body']): Promise<string | undefin
   }
 }
 
+// Every opening scans afresh: the list is only useful while it is current.
+$effect(() => {
+  if (connectOpen) untrack(() => void scan());
+});
+
 async function scan() {
   if (scanStatus.state === 'loading') return;
   scanStatus = { state: 'loading' };
@@ -295,6 +305,10 @@ async function scan() {
       {/if}
     {/snippet}
   </PageHeader>
+
+  {#key apVersion}
+    <WiFiSetupCard {...{ busy, apply: submitChange }} />
+  {/key}
 
   <LoadState status={summary.status} retry={summary.retry} stale={summary.data !== undefined}>
     {#if summary.data}
@@ -335,31 +349,6 @@ async function scan() {
       {/if}
     </LoadState>
   </Section>
-  <Section title={m.wifi_scan_title()}>
-    {#snippet actions()}
-      {#if scanStatus.state !== 'error'}
-        <Button variant="outline" size="sm"
-          type="button"
-          disabled={scanStatus.state === 'loading'}
-          aria-busy={scanStatus.state === 'loading'}
-          onclick={scan}
-        >
-          {scanStatus.state === 'loading'
-            ? m.wifi_scanning()
-            : scanData
-              ? m.wifi_scan_again()
-              : m.wifi_scan()}
-        </Button>
-      {/if}
-    {/snippet}
-    <LoadState status={scanStatus} retry={scan} stale={scanData !== undefined}>
-      {#if scanData}
-        <WiFiScanList result={scanData} join={(network) => { joinTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null; selected = network; }} {busy} />
-      {:else}
-        <EmptyState icon={Radar} title={m.wifi_scan_idle()} />
-      {/if}
-    </LoadState>
-  </Section>
   <Section title={m.wifi_mac_title()} description={m.wifi_mac_description()}>
     {#key apVersion}
       <WiFiUplinkMAC {...{ busy, apply: submitChange }} />
@@ -367,6 +356,31 @@ async function scan() {
   </Section>
 </div>
 {/if}
+
+<Dialog.Root bind:open={connectOpen}>
+<Dialog.Content portalProps={{ disabled: typeof window === "undefined" }}
+ class="flex max-h-[85vh] w-[min(92vw,36rem)] flex-col gap-4 rounded-lg border border-border bg-surface p-5 text-fg">
+  <div class="flex items-center justify-between gap-3 pr-8">
+    <Dialog.Title level={2} class="text-lg font-semibold">{m.wifi_connect()}</Dialog.Title>
+    {#if scanStatus.state !== 'error'}
+      <Button variant="outline" size="sm" type="button" disabled={scanStatus.state === 'loading'}
+        aria-busy={scanStatus.state === 'loading'} onclick={scan}>
+        <RefreshCw aria-hidden="true" />{scanStatus.state === 'loading' ? m.wifi_scanning() : m.wifi_scan_again()}
+      </Button>
+    {/if}
+  </div>
+  <Dialog.Description class="text-sm text-muted-foreground">{m.wifi_connect_description()}</Dialog.Description>
+  <div class="min-h-0 overflow-y-auto">
+    <LoadState status={scanStatus} retry={scan} stale={scanData !== undefined}>
+      {#if scanData}
+        <WiFiScanList result={scanData} join={(network) => { connectOpen = false; joinTrigger = null; selected = network; }} {busy} />
+      {:else}
+        <EmptyState icon={Radar} title={m.wifi_scanning()} />
+      {/if}
+    </LoadState>
+  </div>
+</Dialog.Content>
+</Dialog.Root>
 
 {#if selected}
   <WiFiJoinDialog {...{ network: selected, summary: summary.data, returnFocus: joinTrigger, busy: joining.state === 'joining', submit: submitJoin, save: saveProfile, close: () => { selected = undefined; } }} />
