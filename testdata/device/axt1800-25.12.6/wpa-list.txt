@@ -1,0 +1,5 @@
+'wpa_supplicant.phy0-sta0' @b2b845e8
+	"reload":{}
+	"wps_start":{"multi_ap":"Boolean"}
+	"wps_cancel":{}
+	"control":{"command":"String"}

@@ -1,0 +1,39 @@
+{
+	"phy": "phy0",
+	"bssid": "94:83:C4:1F:28:3A",
+	"country": "US",
+	"mode": "Client",
+	"frequency_offset": 0,
+	"txpower": 24,
+	"txpower_offset": 0,
+	"quality_max": 70,
+	"htmodes": [
+		"HT20",
+		"HT40",
+		"VHT20",
+		"VHT40",
+		"VHT80",
+		"HE20",
+		"HE40",
+		"HE80",
+		"HE80+80",
+		"HE160"
+	],
+	"hwmodes": [
+		"n",
+		"ac",
+		"ax"
+	],
+	"hwmodes_text": "ac/ax/n",
+	"hwmode": "n",
+	"htmode": "NOHT",
+	"hardware": {
+		"id": [
+			0,
+			0,
+			0,
+			0
+		],
+		"name": "Qualcomm Atheros IPQ6018"
+	}
+}

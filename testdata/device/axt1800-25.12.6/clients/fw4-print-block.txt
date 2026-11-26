@@ -1,0 +1,5 @@
+48-
+49-		ct state vmap { established : accept, related : accept } comment "!fw4: Handle forwarded flows"
+50:		ether saddr 46:ba:e6:8d:7d:6b counter jump handle_reject comment "!fw4: Travo block 46:ba:e6:8d:7d:6b"
+51-		iifname "br-lan" jump forward_lan comment "!fw4: Handle lan IPv4/IPv6 forward traffic"
+52-		iifname { "wan", "phy0-sta0" } jump forward_wan comment "!fw4: Handle wan IPv4/IPv6 forward traffic"

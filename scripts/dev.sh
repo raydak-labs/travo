@@ -1,54 +1,15 @@
-#!/usr/bin/env bash
-#
-# dev.sh — run frontend (Vite) and backend (Go) together for local development.
-#
-# Usage:
-#   ./scripts/dev.sh
-#   make dev
-#
-# Arguments:
-#   (none)
-#
-# Environment:
-#   (none required)
-#
-# Behavior:
-#   - Backend: if `air` is on PATH, runs `air` in backend/; else `go run ./cmd/server`.
-#   - Frontend: `pnpm dev` in frontend/.
-#   - Listens on http://localhost:3000 (API) and http://localhost:5173 (UI).
-#   - SIGINT/SIGTERM/EXIT stops child processes via `kill 0`.
-#
-set -euo pipefail
+#!/bin/sh
+# Runs the web UI against the mock daemon: daemon in the background, Vite dev in the foreground.
+# Usage: scripts/dev.sh [--firstrun]. Ports: DAEMON_PORT (18081), WEB_PORT (18092).
+set -eu
+cd "$(dirname "$0")/.."
+. scripts/lib/mock.sh
 
-# Force mise-managed toolchain versions, regardless of caller's PATH order.
-command -v mise >/dev/null 2>&1 && eval "$(mise env -s bash)"
+case "${1:-}" in
+  "") start_daemon ;;
+  --firstrun) start_daemon --mock-firstrun ;;
+  *) echo "usage: scripts/dev.sh [--firstrun]" >&2; exit 2 ;;
+esac
 
-# Colors for output
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-echo -e "${GREEN}Starting travo development servers...${NC}"
-
-# Trap to kill background processes on exit
-cleanup() {
-  echo -e "\n${YELLOW}Shutting down dev servers...${NC}"
-  kill 0 2>/dev/null
-  exit 0
-}
-trap cleanup SIGINT SIGTERM EXIT
-
-# Start backend (Go with auto-reload if air is installed, otherwise plain go run)
-echo -e "${GREEN}Starting backend on :3000...${NC}"
-if command -v air &> /dev/null; then
-  (cd backend && air) &
-else
-  (cd backend && go run ./cmd/server) &
-fi
-
-# Start frontend (Vite dev server)
-echo -e "${GREEN}Starting frontend on :5173...${NC}"
-(cd frontend && pnpm dev) &
-
-# Wait for all background processes
-wait
+require_free_port web "$WEB_PORT"
+DAEMON_URL="http://127.0.0.1:$DAEMON_PORT" pnpm -C web exec vite --port "$WEB_PORT" --strictPort

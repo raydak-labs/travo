@@ -1,0 +1,5 @@
+default dev wg0 proto static scope link 
+10.0.1.0/24 dev phy0-sta0 proto kernel scope link src 10.0.1.157 
+203.0.113.8 via 10.0.1.1 dev phy0-sta0 proto static 
+192.0.2.1 via 10.0.1.1 dev phy0-sta0 proto static 
+192.168.1.0/24 dev br-lan proto kernel scope link src 192.168.1.1 

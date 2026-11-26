@@ -1,0 +1,9 @@
+adguardhome.config=adguardhome
+adguardhome.config.config_file='/etc/adguardhome/adguardhome.yaml'
+adguardhome.config.work_dir='/var/lib/adguardhome'
+adguardhome.config.user='adguardhome'
+adguardhome.config.group='adguardhome'
+adguardhome.config.verbose='0'
+adguardhome.config.gc='0'
+adguardhome.config.maxprocs='0'
+adguardhome.config.memlimit='0'

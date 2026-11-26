@@ -1,0 +1,109 @@
+{
+	"external": false,
+	"present": true,
+	"type": "bridge",
+	"up": true,
+	"carrier": true,
+	"auth_status": false,
+	"link-advertising": [
+		
+	],
+	"link-partner-advertising": [
+		
+	],
+	"link-supported": [
+		
+	],
+	"speed": "1000F",
+	"autoneg": false,
+	"flow-control": {
+		"autoneg": true,
+		"supported": [
+			
+		],
+		"link-advertising": [
+			
+		],
+		"link-partner-advertising": [
+			
+		],
+		"negotiated": [
+			
+		]
+	},
+	"hw-tc-offload": false,
+	"devtype": "bridge",
+	"bridge-members": [
+		"lan1",
+		"lan2",
+		"phy1-ap0"
+	],
+	"bridge-attributes": {
+		"stp": false,
+		"forward_delay": 8,
+		"priority": 32767,
+		"ageing_time": 0,
+		"hello_time": 1,
+		"max_age": 10,
+		"igmp_snooping": false,
+		"bridge_empty": false,
+		"multicast_querier": false,
+		"hash_max": 512,
+		"robustness": 2,
+		"query_interval": 12500,
+		"query_response_interval": 1000,
+		"last_member_interval": 100,
+		"vlan_filtering": false,
+		"stp_kernel": false
+	},
+	"mtu": 1500,
+	"mtu6": 1500,
+	"macaddr": "94:83:c4:1f:28:38",
+	"txqueuelen": 1000,
+	"ipv6": true,
+	"ip6segmentrouting": false,
+	"promisc": false,
+	"rpfilter": 0,
+	"acceptlocal": false,
+	"igmpversion": 0,
+	"mldversion": 0,
+	"neigh4reachabletime": 30000,
+	"neigh6reachabletime": 30000,
+	"neigh4gcstaletime": 60,
+	"neigh6gcstaletime": 60,
+	"neigh4locktime": 100,
+	"dadtransmits": 1,
+	"multicast": true,
+	"sendredirects": true,
+	"drop_v4_unicast_in_l2_multicast": false,
+	"drop_v6_unicast_in_l2_multicast": false,
+	"drop_gratuitous_arp": false,
+	"drop_unsolicited_na": false,
+	"arp_accept": false,
+	"gro": true,
+	"statistics": {
+		"collisions": 0,
+		"rx_frame_errors": 0,
+		"tx_compressed": 0,
+		"multicast": 63,
+		"rx_length_errors": 0,
+		"tx_dropped": 9,
+		"rx_bytes": 363257,
+		"rx_missed_errors": 0,
+		"tx_errors": 0,
+		"rx_compressed": 0,
+		"rx_over_errors": 0,
+		"tx_fifo_errors": 0,
+		"rx_crc_errors": 0,
+		"rx_packets": 5048,
+		"tx_heartbeat_errors": 0,
+		"rx_dropped": 0,
+		"tx_aborted_errors": 0,
+		"tx_packets": 14163,
+		"rx_errors": 0,
+		"tx_bytes": 19858670,
+		"tx_window_errors": 0,
+		"rx_fifo_errors": 0,
+		"tx_carrier_errors": 0
+	}
+}

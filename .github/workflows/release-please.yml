@@ -1,0 +1,59 @@
+# Release PR on every push to main (from BlackDark/agent-presets).
+# Copy to .github/workflows/release-please.yml.
+# Copy release-please-config.json to the repo root.
+# Copy release-please-manifest.json to .release-please-manifest.json and set the version already
+# released; release-please will not release that version again.
+# - Conventional Commits drive the version, CHANGELOG.md and the version file. Merging the release
+#   PR tags vX.Y.Z and opens the GitHub release.
+# - A tag or push made with GITHUB_TOKEN starts no workflows. `publish` calls release.yml with the
+#   tag. release.yml is workflow_call and workflow_dispatch with a required string input `tag`:
+#   check out that ref, attach artifacts, do not `gh release create`. No `on.push.tags`.
+# - Config `release-type`: node (package.json), rust (Cargo.toml), go, or simple plus extra-files
+#   when several version files move together.
+# - Existing history: set bootstrap-sha to the last commit to ignore and release-as to the first
+#   version; remove both after that release.
+# - release-please does not update lockfiles. A frozen lock needs a commit on the release branch
+#   and a workflow_dispatch of CI; a GITHUB_TOKEN push will not start CI.
+# - Grant `publish` every permission release.yml uses (add packages: write for GHCR).
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write # release PR labels
+    outputs:
+      created: ${{ steps.rp.outputs.release_created }}
+      tag: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    # zizmor prefers `$/` (self-repository syntax); actionlint 1.7.12 rejects it, so keep `./` until it does.
+    uses: ./.github/workflows/release.yml # zizmor: ignore[self-repository]
+    with:
+      tag: ${{ needs.release-please.outputs.tag }}
+    secrets:
+      MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+      MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
+    permissions:
+      contents: write # a called workflow cannot exceed its caller; top-level permissions are empty

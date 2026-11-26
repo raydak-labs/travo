@@ -1,60 +1,30 @@
----
-title: Glossary
-description: Shared vocabulary for the Travo domain. No implementation details here.
-updated: 2026-10-05
-tags: [glossary, domain]
----
-
 # Glossary
 
-Terms used across this repository that mean something more specific than the
-word usually implies. Normative decisions live in
-[`docs/architecture/overview.md`](docs/architecture/overview.md) and the
-[ADRs](docs/adr/README.md); this file only fixes the words.
-
-## Card plane
-
-The single surface treatment every panel in the UI shares. One card plane means
-a user does not learn a second visual grammar per page. See
-[ADR 0012](docs/adr/0012-ui-consistency-and-status-language.md).
-
-## Summary band
-
-The always-visible row of facts at the top of a page that answers "is this
-working" without scrolling. Flat tiles, never collapsible: its purpose is to be
-seen before the user reads anything else.
-
-## Summary tile
-
-One cell of a summary band. A tile is not a page section — it cannot be
-collapsed, and it does not own actions.
-
-## Status tone
-
-A named state meaning — ok, warn, danger, info, inactive — that carries its own
-colour in light and dark mode. Tones are the vocabulary of status; colour alone
-is never the message.
-
-## Stale
-
-A value last seen before the connection carrying it dropped. Stale is weaker
-than a warning: the fact was true at some point and may not be true now. A stale
-value is still shown, marked as such.
-
-## Traffic history
-
-The bounded window of recent per-interface traffic samples the router holds in
-memory. It exists so a freshly loaded page has something to show instead of an
-empty axis. It is not persistent: a router restart ends the window.
-
-## Configured radio vs live radio
-
-A **configured radio** is what the router is set to do, read from its saved
-configuration. A **live radio** is what the radio is doing right now on the air.
-They disagree during lockout, disabled, and mid-apply states, so the UI must say
-which one it is showing rather than blending them into "the radio".
-
-## Internet reachable
-
-That the WAN reports carrier connectivity. It is not a reachability probe: an
-uplink that has a lease but is dead or captive-portaled still reads as reachable.
+- **Uplink**: the connection to the internet. One of `wan` (Ethernet), `wwan` (WiFi STA), `usbtether`.
+- **Medium**: what carries a netdev, read from sysfs, never from its name: `ethernet`, `wifi`, `usb` or `virtual` (no backing device).
+- **Tether link**: a USB netdev whose driver is a phone tethering driver (`rndis_host`, `cdc_ncm`, `cdc_ether`, `ipheth`); `network.usbtether` binds one.
+- **STA**: WiFi client interface (`mode=sta`) bound to `wwan`; joins hotel/home WiFi.
+- **Scan**: the on-demand, read-only per-radio site survey.
+- **Join**: the guarded configuration and verification of an uplink STA, followed by explicit confirmation or rollback.
+- **AP move (reconcile)**: during a join, moving the APs off the only band-compatible radio to the other radio in the same transaction.
+- **Saved uplink**: one entry in the ordered list of stored uplink credentials (`wifi-profiles.json`). Saving or forgetting one never changes the STA; selecting one is a Join.
+- **AP**: WiFi access point serving the LAN; one `wifi-iface` section with `mode=ap`, edited per section ("per radio"). **Guest AP**: separate SSID, key, subnet (192.168.2.0/24) and zone.
+- **Caller**: the client making an API request. Classified as ethernet / wifi-ap / wifi-client / unknown.
+- **Client (LAN)**: a device on the router's LAN side, keyed by MAC; `wifi` (on an AP's station list), `lan` (in the LAN neighbour table only) or `offline` (known from a lease, reservation, alias or block). **Reservation**: a `dhcp` `host` section pinning a MAC to an address. **Block**: the `travo_block_<mac>` firewall rule rejecting the client's forwarded traffic. **Kick**: a one-time deauthentication through hostapd.
+- **Lockout**: a change that would leave the caller without a way to reach the router.
+- **Device port**: the interface through which all `uci`/`ubus`/netifd access happens. Adapters: CLI (real), mock.
+- **Tunnel state**: the five WireGuard states `disabled`, `configured`, `enabled_not_up`, `no_handshake`, `connected`; only a recent handshake means connected.
+- **PackageManager port**: `update`/`install`/`remove`/`list-installed`; adapters apk and opkg.
+- **Services catalog**: the data table of optional OpenWrt services Travo installs, removes and turns on or off (`internal/catalog`); their settings stay in LuCI. **Autostart**: the init script's boot link (`/etc/init.d/<name> enable`).
+- **Transaction**: snapshot → commit/apply → watchdog → probe → user confirm. The only way to change live state.
+- **Watchdog**: out-of-process procd-run script that restores the snapshot unless the confirm file appears in time.
+- **Confirm**: the user's explicit acknowledgement that the router is still reachable. Never issued by the backend.
+- **Guard**: a file in `/etc/travo-greenfield-guards/` marking an in-progress live-state operation. Present guard = feature skips.
+- **Layer (DNS)**: one entry in the ordered DNS stack (`captive`, `vpn`, `adguard`, `tailscale`).
+- **Base DNS**: dnsmasq's DNS state captured before the first layer; restored when the last layer is popped.
+- **Fail open**: when a filter/service fails, fall back to working connectivity and say so loudly.
+- **AGH**: AdGuard Home.
+- **Topology (AdGuard)**: `default` = dnsmasq on :53 forwards to AGH on `127.0.0.1:5353`; `expert` = AGH on :53 forwards to dnsmasq on `127.0.0.1:5354` (ADR 0021).
+- **Fixture**: a verbatim captured device payload with provenance (device, firmware, date).
+- **Mock mode**: the daemon running against the mock `Device`, no router needed.
+- **Release source**: the GitHub repo the updater reads releases from; configurable.

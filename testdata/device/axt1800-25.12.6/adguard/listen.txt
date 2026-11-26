@@ -1,0 +1,3 @@
+tcp        0      0 :::3000                 :::*                    LISTEN      3667/AdGuardHome
+tcp        0      0 :::5353                 :::*                    LISTEN      3667/AdGuardHome
+udp        0      0 :::5353                 :::*                                3667/AdGuardHome

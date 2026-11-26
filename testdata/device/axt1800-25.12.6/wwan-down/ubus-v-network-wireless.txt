@@ -1,0 +1,8 @@
+'network.wireless' @499db5cc
+	"up":{"device":"String"}
+	"down":{"device":"String"}
+	"retry":{"device":"String"}
+	"reconf":{"device":"String"}
+	"status":{"device":"String"}
+	"notify":{"device":"String","command":"Integer","interface":"String","vlan":"String","data":"Table"}
+	"get_validate":{"device":"String"}

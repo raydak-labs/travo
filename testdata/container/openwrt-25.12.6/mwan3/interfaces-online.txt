@@ -1,0 +1,4 @@
+Interface status:
+ interface wwan is online and tracking is active (online 00h:00m:12s, uptime 00h:03m:33s)
+ interface usbtether is online and tracking is active (online 00h:03m:25s, uptime 00h:03m:33s)
+

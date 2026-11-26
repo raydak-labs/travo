@@ -1,0 +1,66 @@
+{
+	"values": {
+		"cfg01411c": {
+			".anonymous": true,
+			".type": "dnsmasq",
+			".name": "cfg01411c",
+			".index": 0,
+			"domainneeded": "1",
+			"localise_queries": "1",
+			"rebind_protection": "1",
+			"rebind_localhost": "1",
+			"local": "/lan/",
+			"domain": "lan",
+			"expandhosts": "1",
+			"cachesize": "1000",
+			"authoritative": "1",
+			"readethers": "1",
+			"leasefile": "/tmp/dhcp.leases",
+			"localservice": "1",
+			"ednspacket_max": "1232",
+			"noresolv": "1",
+			"port": "53",
+			"server": [
+				"127.0.0.1#5353"
+			]
+		},
+		"lan": {
+			".anonymous": false,
+			".type": "dhcp",
+			".name": "lan",
+			".index": 1,
+			"interface": "lan",
+			"start": "100",
+			"limit": "150",
+			"leasetime": "12h",
+			"dhcpv4": "server",
+			"dhcpv6": "server",
+			"ra": "server",
+			"ra_slaac": "1",
+			"ra_flags": [
+				"managed-config",
+				"other-config"
+			]
+		},
+		"wan": {
+			".anonymous": false,
+			".type": "dhcp",
+			".name": "wan",
+			".index": 2,
+			"interface": "wan",
+			"ignore": "1"
+		},
+		"odhcpd": {
+			".anonymous": false,
+			".type": "odhcpd",
+			".name": "odhcpd",
+			".index": 3,
+			"maindhcp": "0",
+			"leasefile": "/tmp/odhcpd.leases",
+			"leasetrigger": "/usr/sbin/odhcpd-update",
+			"loglevel": "4",
+			"piodir": "/tmp/odhcpd-piodir",
+			"hostsdir": "/tmp/hosts"
+		}
+	}
+}

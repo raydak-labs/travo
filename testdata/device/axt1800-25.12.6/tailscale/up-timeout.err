@@ -1,0 +1,11 @@
+
+To authenticate, visit:
+
+	https://login.tailscale.com/a/REDACTED
+
+timeout waiting for Tailscale service to enter a Running state; check health with "tailscale status"
+Command exited with non-zero status 1
+real	0m 8.06s
+user	0m 0.01s
+sys	0m 0.03s
+rc=1

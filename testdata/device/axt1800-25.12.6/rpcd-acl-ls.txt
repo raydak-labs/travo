@@ -1,0 +1,11 @@
+luci-app-attendedsysupgrade.json
+luci-app-firewall.json
+luci-app-package-manager.json
+luci-app-sqm.json
+luci-base.json
+luci-mod-network.json
+luci-mod-status-index.json
+luci-mod-status.json
+luci-mod-system.json
+luci-wireguard.json
+unauthenticated.json

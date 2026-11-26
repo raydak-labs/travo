@@ -1,0 +1,2 @@
+Logged out.
+rc=1

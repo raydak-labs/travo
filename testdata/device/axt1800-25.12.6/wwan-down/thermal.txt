@@ -1,0 +1,7 @@
+/sys/class/thermal/thermal_zone0 nss-top-thermal 45800
+/sys/class/thermal/thermal_zone1 nss-thermal 46100
+/sys/class/thermal/thermal_zone2 wcss-phya0-thermal 45100
+/sys/class/thermal/thermal_zone3 wcss-phya1-thermal 44800
+/sys/class/thermal/thermal_zone4 cpu-thermal 45800
+/sys/class/thermal/thermal_zone5 lpass-thermal 44800
+/sys/class/thermal/thermal_zone6 ddrss-top-thermal 45400

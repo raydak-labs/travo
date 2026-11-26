@@ -1,9 +1,0 @@
-node_modules
-dist
-build
-coverage
-backend/bin
-pnpm-lock.yaml
-shared/src/generated/
-frontend/src/api/
-shared/openapi.json

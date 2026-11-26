@@ -1,0 +1,24 @@
+phy#1
+	Interface phy1-ap0
+		ifindex 14
+		wdev 0x100000001
+		addr 94:83:c4:1f:28:39
+		ssid TravelAP
+		type AP
+		channel 1 (2412 MHz), width: 20 MHz, center1: 2412 MHz
+		txpower 25.00 dBm
+		multicast TXQ:
+			qsz-byt	qsz-pkt	flows	drops	marks	overlmt	hashcol	tx-bytes	tx-packets
+			0	0	0	0	0	0	0	0		0
+phy#0
+	Interface phy0-sta0
+		ifindex 13
+		wdev 0x2
+		addr 94:83:c4:1f:28:3a
+		ssid HomeUplink
+		type managed
+		channel 149 (5745 MHz), width: 80 MHz, center1: 5775 MHz
+		txpower 24.00 dBm
+		multicast TXQ:
+			qsz-byt	qsz-pkt	flows	drops	marks	overlmt	hashcol	tx-bytes	tx-packets
+			0	0	0	0	0	0	0	0		0

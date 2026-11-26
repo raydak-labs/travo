@@ -1,0 +1,19 @@
+=== RUN   TestHWAPChangeRestoresViaReloadConfig
+HW {"apply_s":0.110017967}
+HW {"new_ssid_live_after_apply_s":1.373304211}
+HW {"new_ssid_live_ok":true}
+HW {"ap_carrier_after_new_ssid_s":0.00549446}
+HW {"ap_carrier_ok":true}
+HW {"sta_carrier_during":true}
+HW {"restore_state":"rolled_back"}
+HW {"restored_after_begin_s":16.529760078}
+HW {"orig_ssid_live_after_restore_s":0.975377438}
+HW {"orig_ssid_live_ok":true}
+HW {"ap_carrier_after_restore_s":0.005245581}
+HW {"ap_carrier_after_restore_ok":true}
+HW {"sta_up_after_restore_s":0.005270331}
+HW {"default_route_after_restore":true}
+--- PASS: TestHWAPChangeRestoresViaReloadConfig (17.53s)
+PASS
+TravelAP
+phy1-ap0 ESSID: "TravelAP"

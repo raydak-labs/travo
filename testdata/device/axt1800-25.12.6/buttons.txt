@@ -1,0 +1,2 @@
+/sys/firmware/devicetree/base/keys/reset/label: reset
+/sys/firmware/devicetree/base/keys/switch/label: switch

@@ -1,0 +1,381 @@
+# Changelog
+
+## [0.5.0](https://github.com/blackdark-org/travo-greenfield/compare/v0.4.0...v0.5.0) (2026-11-26)
+
+
+### Features
+
+* **leds:** hold single LEDs off; night mode keeps the user's choice ([aa6cb6e](https://github.com/blackdark-org/travo-greenfield/commit/aa6cb6e1386feb57d4da3839d648fcd72f93ab41))
+* **tailscale:** switch tailscaled on or off; off after install ([9f37326](https://github.com/blackdark-org/travo-greenfield/commit/9f37326cc916b1457990344ec17c5a44d3b5ea73))
+* **web:** compact outline badges under the map's router ([b316768](https://github.com/blackdark-org/travo-greenfield/commit/b316768d4c54ae012a6d788f90c985ab51cef50a))
+* **web:** Internet holds every uplink, LAN takes DHCP, Firmware takes reset ([cc61cf7](https://github.com/blackdark-org/travo-greenfield/commit/cc61cf762cc87e402029a7888b0ad34c5d366078))
+* **web:** main switches in the page header; Tailscale and LED switches ([b35e573](https://github.com/blackdark-org/travo-greenfield/commit/b35e57324ed5fff10ef466399c3bee6456411168))
+
+
+### Bug Fixes
+
+* **packaging:** install.sh removes UI files the release does not list ([024235c](https://github.com/blackdark-org/travo-greenfield/commit/024235cbc6be79d0f4ce979c50e6b4aa428015e3))
+* **packaging:** prune every stale UI file, dot-dot names included ([bdedb5d](https://github.com/blackdark-org/travo-greenfield/commit/bdedb5dcf075b39497b07d088ea9bbd17cfdba15))
+* **scripts:** attach PR screenshots with gh pr edit --attach ([8d26a5a](https://github.com/blackdark-org/travo-greenfield/commit/8d26a5ae878155ee3c566e3597b2f346b00e7963))
+* **tailscale:** wait until procd lists tailscaled as stopped ([1d820d1](https://github.com/blackdark-org/travo-greenfield/commit/1d820d18139e49b170f2297de7ab183b8e073715))
+* **web:** Internet cards two per row; the WAN form needs the width ([4a43f6e](https://github.com/blackdark-org/travo-greenfield/commit/4a43f6edd299d7dce7cbdbda4b3cb4e8ab510643))
+* **web:** stale update result, Travo version tile, password dialog ([43a4d66](https://github.com/blackdark-org/travo-greenfield/commit/43a4d66b768a4fb609ae4ffd617946d56cbe4729))
+
+## [0.4.0](https://github.com/blackdark-org/travo-greenfield/compare/v0.3.0...v0.4.0) (2026-11-25)
+
+
+### Features
+
+* **web:** UI structure v2 ([#342](https://github.com/blackdark-org/travo-greenfield/issues/342)) ([9bcacc5](https://github.com/blackdark-org/travo-greenfield/commit/9bcacc5a70e21da8be8218de8766348419407eb9))
+
+## [0.3.0](https://github.com/blackdark-org/travo-greenfield/compare/v0.2.1...v0.3.0) (2026-11-25)
+
+
+### Features
+
+* **dashboard:** stream uplinks and clients for the topology diagram ([b0be739](https://github.com/blackdark-org/travo-greenfield/commit/b0be73914b2413f20f6a196960966903a0d59c71)), closes [#300](https://github.com/blackdark-org/travo-greenfield/issues/300)
+* **dashboard:** uplink protocol, gateway, band and signal ([a49d80a](https://github.com/blackdark-org/travo-greenfield/commit/a49d80af5a2009b76e4c8fa581f6c92945b9b3c7)), closes [#337](https://github.com/blackdark-org/travo-greenfield/issues/337)
+* **update:** say why update checks are disabled ([e311205](https://github.com/blackdark-org/travo-greenfield/commit/e311205f0347a213fb56cdd7643b8375864919a6)), closes [#338](https://github.com/blackdark-org/travo-greenfield/issues/338)
+* **web:** dashboard pass around the topology diagram ([c329b64](https://github.com/blackdark-org/travo-greenfield/commit/c329b64d30c9439aeb73d0b6ab917b84c18ceef8)), closes [#305](https://github.com/blackdark-org/travo-greenfield/issues/305)
+* **web:** dashboard topology diagram ([3d898ec](https://github.com/blackdark-org/travo-greenfield/commit/3d898ec54f6be9f66e684d9bd0bf4095091527d7)), closes [#304](https://github.com/blackdark-org/travo-greenfield/issues/304)
+* **web:** grouped sidebar navigation with Network and System sub-pages ([d1eb484](https://github.com/blackdark-org/travo-greenfield/commit/d1eb4842de4677d9daf04efe5ad906796ed042a6)), closes [#301](https://github.com/blackdark-org/travo-greenfield/issues/301)
+* **web:** header menu, Travo logo and version ([69b77ca](https://github.com/blackdark-org/travo-greenfield/commit/69b77ca62b38d3eced88f7b2a09308bdacea725c)), closes [#331](https://github.com/blackdark-org/travo-greenfield/issues/331)
+* **web:** layout pass for Internet, VPN & Tailscale and Clients ([0122f91](https://github.com/blackdark-org/travo-greenfield/commit/0122f9136d6e6206519494d4a721e1c0b2a13ba0)), closes [#306](https://github.com/blackdark-org/travo-greenfield/issues/306)
+* **web:** layout pass for the Network sub-pages ([a8ad81c](https://github.com/blackdark-org/travo-greenfield/commit/a8ad81cbb5492b4fba604bc278ea3dc7fa5127f0)), closes [#307](https://github.com/blackdark-org/travo-greenfield/issues/307)
+* **web:** layout pass for the System sub-pages, Services, Login and Setup ([96de85b](https://github.com/blackdark-org/travo-greenfield/commit/96de85b305613ad7508d3c41820c26887ce54a6f)), closes [#308](https://github.com/blackdark-org/travo-greenfield/issues/308)
+* **web:** layout wrappers for pages ([38f44b3](https://github.com/blackdark-org/travo-greenfield/commit/38f44b3ddbb04f7bcb1ded74bf7ec16b0265151b))
+* **web:** let a Section render without a body ([767b10e](https://github.com/blackdark-org/travo-greenfield/commit/767b10ecb8a348706847b78fcf774217a6c74ef4))
+* **web:** network map in the original Travo style; dashboard cards ([4c6c1e7](https://github.com/blackdark-org/travo-greenfield/commit/4c6c1e7c7a1f51cc837b293526d8580b68e491c4)), closes [#332](https://github.com/blackdark-org/travo-greenfield/issues/332)
+* **web:** shadcn Select replaces the native selects ([1c3e62f](https://github.com/blackdark-org/travo-greenfield/commit/1c3e62fdf043aabf294a90456a11e3f845bcc3bc)), closes [#330](https://github.com/blackdark-org/travo-greenfield/issues/330)
+* **web:** topology model from the dashboard sources ([2cf3856](https://github.com/blackdark-org/travo-greenfield/commit/2cf3856129f934b0bcd1c006e4c140eac9a536d3)), closes [#303](https://github.com/blackdark-org/travo-greenfield/issues/303)
+* **web:** uplink cards show protocol, gateway, band and signal ([09c5583](https://github.com/blackdark-org/travo-greenfield/commit/09c558383c075f6c3602ff41d39516eb346ef5e0)), closes [#337](https://github.com/blackdark-org/travo-greenfield/issues/337)
+* **web:** WiFi page on the layout system ([e53ec8f](https://github.com/blackdark-org/travo-greenfield/commit/e53ec8f6aa4d6b7842491aeed45d7476fb925db2)), closes [#302](https://github.com/blackdark-org/travo-greenfield/issues/302)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/danielgtaylor/huma/v2 to v2.41.0 ([#317](https://github.com/blackdark-org/travo-greenfield/issues/317)) ([463f898](https://github.com/blackdark-org/travo-greenfield/commit/463f898dde0722a228d893d11c05d084978e7ba3))
+* **web:** dashboard cards keep the stale rules and show internet ([9d340c5](https://github.com/blackdark-org/travo-greenfield/commit/9d340c584a43d82286450c8e1e3388d317a3973b))
+* **web:** design review findings (round 1) ([c1752ed](https://github.com/blackdark-org/travo-greenfield/commit/c1752ed124b916e373cb16747afa2fbe80d59a69))
+* **web:** design review findings (round 2) ([64e6575](https://github.com/blackdark-org/travo-greenfield/commit/64e6575ef06eea21638e02979f56066d68b41421))
+* **web:** keep uplink addresses on one line ([2d82179](https://github.com/blackdark-org/travo-greenfield/commit/2d821798da5414a13fe44cfeb0d8e16cf49a194f))
+* **web:** LED schedule times are disabled while the schedule is off ([ff084b8](https://github.com/blackdark-org/travo-greenfield/commit/ff084b8c8709588ffe5ceb37a7b83f63c4302707)), closes [#338](https://github.com/blackdark-org/travo-greenfield/issues/338)
+* **web:** load errors render as a plain row, not a box in the card ([a87a547](https://github.com/blackdark-org/travo-greenfield/commit/a87a547b0eb819aaffebf37eb033ff2be0e7f6a3)), closes [#338](https://github.com/blackdark-org/travo-greenfield/issues/338)
+* **web:** narrow topology stale marking to the failing source ([941bea0](https://github.com/blackdark-org/travo-greenfield/commit/941bea0e11c33852bade6ee020a99f667318539a))
+* **web:** route moved-feature alerts to their new pages ([aeb514b](https://github.com/blackdark-org/travo-greenfield/commit/aeb514b1e35e5f13cada5e4cb3a96e2d5d58a93e))
+* **web:** show an unset guest network once ([8f3e985](https://github.com/blackdark-org/travo-greenfield/commit/8f3e9852493989305b9425201a7042019a3ee02b))
+
+
+### Refactoring
+
+* **web:** build per-source dashboard state from SOURCE_NAMES ([432f0c0](https://github.com/blackdark-org/travo-greenfield/commit/432f0c05939c776acc94ae46825714f077ef64dd))
+* **web:** extract SummaryBand and SummaryTile from the WiFi summary ([0ebc4fe](https://github.com/blackdark-org/travo-greenfield/commit/0ebc4fe365e008a419e14f850037af0cd547e1bb))
+* **web:** move the last cards to Section and delete ui/Card ([3c16b8f](https://github.com/blackdark-org/travo-greenfield/commit/3c16b8f7183bb96a4bbf7272070dc8e306b24d6b))
+* **web:** share the restart flow in restart.svelte.ts ([2cbe7d3](https://github.com/blackdark-org/travo-greenfield/commit/2cbe7d3b0fde1dc6054a22486a18f3a390db977e))
+* **web:** share the topology test inputs ([4fb32df](https://github.com/blackdark-org/travo-greenfield/commit/4fb32dfb3f028555cc2aa62df4906115420d7be5))
+
+
+### Documentation
+
+* **spikes:** uplink details pass on the AXT1800 ([00b0c12](https://github.com/blackdark-org/travo-greenfield/commit/00b0c1243282d8bc8478e1ab7a0ac4ce22e16551))
+* web UI and README match the overhauled UI ([415e35a](https://github.com/blackdark-org/travo-greenfield/commit/415e35a6e09e1cd7d92bdc3f37cc8c724856b1d3))
+
+## [0.2.1](https://github.com/blackdark-org/travo-greenfield/compare/v0.2.0...v0.2.1) (2026-11-20)
+
+
+### Bug Fixes
+
+* **update:** accept signed release additions and stage with the previous release in CI ([7586411](https://github.com/blackdark-org/travo-greenfield/commit/7586411418b000f84745d7b2a15660637702a255))
+* **vpn:** DNS layer follows the applied profile's resolvers ([#295](https://github.com/blackdark-org/travo-greenfield/issues/295)) ([c9e39d4](https://github.com/blackdark-org/travo-greenfield/commit/c9e39d460b3573571d3dcd6bce3d10c0d9d9ddde))
+
+
+### Documentation
+
+* clean up docs and README after 0.2.0 ([#291](https://github.com/blackdark-org/travo-greenfield/issues/291)) ([865a3e9](https://github.com/blackdark-org/travo-greenfield/commit/865a3e9f61ac4b6105a1597707d5f8a41efa07b4))
+* record self-update forward compatibility (ADR 0032) ([d41faf5](https://github.com/blackdark-org/travo-greenfield/commit/d41faf55ff6c575b1ea2b2fc00a35ef0d294953d))
+
+## [0.2.0](https://github.com/blackdark-org/travo-greenfield/compare/v0.1.0...v0.2.0) (2026-11-20)
+
+
+### Features
+
+* **adguard:** expert topology with AdGuard Home on :53 ([192b381](https://github.com/blackdark-org/travo-greenfield/commit/192b381c5346c1f8cfcebde511cf38ff712a3162)), closes [#186](https://github.com/blackdark-org/travo-greenfield/issues/186)
+* **adguard:** offline AdGuard Home bundle for the first install ([67d0a2d](https://github.com/blackdark-org/travo-greenfield/commit/67d0a2d099db5a234ce297be47a106b9b108fc97)), closes [#184](https://github.com/blackdark-org/travo-greenfield/issues/184)
+* **alerts:** warn when the router runs low on memory ([abdd33f](https://github.com/blackdark-org/travo-greenfield/commit/abdd33f88274c0d5f3069285c9a54a4aa3785455))
+* **api:** accept API tokens as bearer auth beside the cookie session ([439295a](https://github.com/blackdark-org/travo-greenfield/commit/439295a882abd2e3f55514b7ed6d9a6dc497ef52)), closes [#172](https://github.com/blackdark-org/travo-greenfield/issues/172)
+* **api:** prime a late dashboard subscriber with the last event per source ([8c046e0](https://github.com/blackdark-org/travo-greenfield/commit/8c046e0854390901fb8cc21d1b00925635b3cd4a)), closes [#93](https://github.com/blackdark-org/travo-greenfield/issues/93)
+* **auth:** add a hashed API token store ([6fe72af](https://github.com/blackdark-org/travo-greenfield/commit/6fe72af8848d2e6c1c7aed762b2c20674d187320)), closes [#172](https://github.com/blackdark-org/travo-greenfield/issues/172)
+* **captive:** auto-accept step walker for click-through portals ([ad38f4a](https://github.com/blackdark-org/travo-greenfield/commit/ad38f4a48023e47ed9d9c70e78686ffe789e2374)), closes [#222](https://github.com/blackdark-org/travo-greenfield/issues/222)
+* **clients:** list LAN clients with aliases, reservations, block and kick ([c30e592](https://github.com/blackdark-org/travo-greenfield/commit/c30e59231b29eefd1e343c50ce257f752d2a4d49)), closes [#218](https://github.com/blackdark-org/travo-greenfield/issues/218) [#219](https://github.com/blackdark-org/travo-greenfield/issues/219)
+* **daemon:** 32 MiB Go soft memory limit at start ([bdb8d78](https://github.com/blackdark-org/travo-greenfield/commit/bdb8d78a9a2802f4ac1ed108292b72a830208e38))
+* **daemon:** self-signed HTTPS beside plain HTTP ([ab61c73](https://github.com/blackdark-org/travo-greenfield/commit/ab61c7388141a8fadf24c3ea5dccd7275d5bce7e)), closes [#183](https://github.com/blackdark-org/travo-greenfield/issues/183)
+* **device:** Diagnoser port for ping, traceroute and nslookup ([4a1e80b](https://github.com/blackdark-org/travo-greenfield/commit/4a1e80bf7dfe71c46ca0748219a2b10d38f12b27))
+* **device:** interface status uptime and an InterfaceRestarter port ([9a4f50f](https://github.com/blackdark-org/travo-greenfield/commit/9a4f50f2289aa84485798270cb13d789da7e2fa8))
+* **dns:** DNS over HTTPS as AdGuard Home's upstream ([8630c41](https://github.com/blackdark-org/travo-greenfield/commit/8630c4102b38324692805048a6dc13eaf1196077)), closes [#245](https://github.com/blackdark-org/travo-greenfield/issues/245)
+* **facts:** interface dump carries proto, uptime and IPv6 ([b61ce9c](https://github.com/blackdark-org/travo-greenfield/commit/b61ce9c673605aec2b725d99fd14c1941336bccd))
+* **failover:** guarded mwan3 install, staged apply and status API ([477fbf2](https://github.com/blackdark-org/travo-greenfield/commit/477fbf2882edad1fae2f33786ead358371c30564)), closes [#209](https://github.com/blackdark-org/travo-greenfield/issues/209)
+* **failover:** mwan3 config model with provenance ownership ([3429c31](https://github.com/blackdark-org/travo-greenfield/commit/3429c319672f05ecbb40b3122291701d392de53b)), closes [#208](https://github.com/blackdark-org/travo-greenfield/issues/208)
+* **network:** data usage, budget and uptime log from the stats history ([71aaa3d](https://github.com/blackdark-org/travo-greenfield/commit/71aaa3d995620bc0ee597851bd6742432a5c14c2)), closes [#246](https://github.com/blackdark-org/travo-greenfield/issues/246)
+* **network:** DHCP server settings and local DNS names ([c32c474](https://github.com/blackdark-org/travo-greenfield/commit/c32c47490e8832ec158ea911eff87ec87b15897c)), closes [#239](https://github.com/blackdark-org/travo-greenfield/issues/239)
+* **network:** diagnostics card (ping, traceroute, DNS lookup) ([774d02f](https://github.com/blackdark-org/travo-greenfield/commit/774d02fe71c1c5b55ce3e61b3f6d7957527bf6fd)), closes [#236](https://github.com/blackdark-org/travo-greenfield/issues/236)
+* **network:** dynamic DNS through ddns-scripts ([ad735b1](https://github.com/blackdark-org/travo-greenfield/commit/ad735b104b68ebd46de0d64a09ae58b7647ea83b)), closes [#245](https://github.com/blackdark-org/travo-greenfield/issues/245)
+* **network:** guarded uplink restart ([46144aa](https://github.com/blackdark-org/travo-greenfield/commit/46144aadea9db35bf800fddc98a6a2b7535fd1ec)), closes [#242](https://github.com/blackdark-org/travo-greenfield/issues/242)
+* **network:** IPv6 on/off for uplinks and LAN ([fdb0748](https://github.com/blackdark-org/travo-greenfield/commit/fdb07482d45d094e176441be6c788fd14ef54c91)), closes [#245](https://github.com/blackdark-org/travo-greenfield/issues/245)
+* **network:** LAN address change confirmed from the new address ([9583fd2](https://github.com/blackdark-org/travo-greenfield/commit/9583fd27fd706756d81c7af6f5ff1583e4547a51)), closes [#244](https://github.com/blackdark-org/travo-greenfield/issues/244)
+* **network:** port forwards (wan DNAT to lan hosts) ([9558db2](https://github.com/blackdark-org/travo-greenfield/commit/9558db21189aaa4aa7f875338336721157ea6ea9)), closes [#238](https://github.com/blackdark-org/travo-greenfield/issues/238)
+* **network:** read-only interfaces and firewall zones view ([e41b8ad](https://github.com/blackdark-org/travo-greenfield/commit/e41b8ad61897f83bb26859d503af6cea8f9f8912)), closes [#237](https://github.com/blackdark-org/travo-greenfield/issues/237)
+* **network:** Wake-on-LAN magic packet from the router ([f7224d3](https://github.com/blackdark-org/travo-greenfield/commit/f7224d319d065a3c9c99416d6fb92d287b36f5bc)), closes [#247](https://github.com/blackdark-org/travo-greenfield/issues/247)
+* **network:** WAN settings (DHCP, static, PPPoE) ([27d32f2](https://github.com/blackdark-org/travo-greenfield/commit/27d32f2468f5130612d073b7d55d16c6db2ea8bd)), closes [#240](https://github.com/blackdark-org/travo-greenfield/issues/240)
+* **services:** services catalog for SQM, cloudflared, vnstat, watchcat, speedtest ([3c63623](https://github.com/blackdark-org/travo-greenfield/commit/3c63623e7b46fe28735e997d4958a46de9191751)), closes [#268](https://github.com/blackdark-org/travo-greenfield/issues/268)
+* **stats:** persisted history store with bounded flush and read API ([5c3be42](https://github.com/blackdark-org/travo-greenfield/commit/5c3be426e258a4322a37f96402a77e1c5adacbeb)), closes [#231](https://github.com/blackdark-org/travo-greenfield/issues/231)
+* **system:** alerts for stuck guards, low flash and degraded persistence ([fa64012](https://github.com/blackdark-org/travo-greenfield/commit/fa64012214f48f226cc9b560743d96109c5c6df9))
+* **system:** firmware upgrade from an uploaded image (guarded) ([08522be](https://github.com/blackdark-org/travo-greenfield/commit/08522be859a392de9ac40c1688cfc8af7b886510)), closes [#198](https://github.com/blackdark-org/travo-greenfield/issues/198)
+* **system:** guarded factory reset ([705086d](https://github.com/blackdark-org/travo-greenfield/commit/705086db64ad89f3ca2e448aaf732fd9ec1de231))
+* **system:** hardware button detection and slide switch actions ([1e021cf](https://github.com/blackdark-org/travo-greenfield/commit/1e021cf33d0c050e623b821cdb0865c30e6e35bb)), closes [#195](https://github.com/blackdark-org/travo-greenfield/issues/195)
+* **system:** hostname, time zone and NTP settings ([a00cc71](https://github.com/blackdark-org/travo-greenfield/commit/a00cc71cf82067a5f006877bd7d5f25c5328d6d4))
+* **system:** LED on/off and night schedule ([95abb2e](https://github.com/blackdark-org/travo-greenfield/commit/95abb2e71bb531ed1c9549f4889b328c18d63bd8)), closes [#194](https://github.com/blackdark-org/travo-greenfield/issues/194)
+* **system:** manage root SSH keys (dropbear authorized_keys) ([849b86f](https://github.com/blackdark-org/travo-greenfield/commit/849b86f422360dc85fd892a2cd4f2a719a3bc11f))
+* **system:** OpenWrt release and package update check ([a27739b](https://github.com/blackdark-org/travo-greenfield/commit/a27739b18f41ac1aa80c4bead462f2b08f67935f))
+* **system:** read-only system log viewer ([8a3ad57](https://github.com/blackdark-org/travo-greenfield/commit/8a3ad57bc87788360d3fc69a543d73a9c69bd7b5))
+* **system:** shared crontab writer and daemon hook socket (ADR 0024) ([580b736](https://github.com/blackdark-org/travo-greenfield/commit/580b73650bcabeef0de2a7d75fb558f892517d8a))
+* **tailscale:** exit node, LAN advertisement, SSH and the firewall zone ([e5cd4c7](https://github.com/blackdark-org/travo-greenfield/commit/e5cd4c79ce53bd7c46df850802285248b8d9cbd6)), closes [#180](https://github.com/blackdark-org/travo-greenfield/issues/180)
+* **tailscale:** install, status, login and the MagicDNS layer ([1eb0a5c](https://github.com/blackdark-org/travo-greenfield/commit/1eb0a5ca92267f44128d38264a2f0fd65d7db696)), closes [#179](https://github.com/blackdark-org/travo-greenfield/issues/179)
+* **txn:** per-transaction confirm window (BeginWindow) ([cb72b58](https://github.com/blackdark-org/travo-greenfield/commit/cb72b58566aa9c2ce98e71da2cee04452c9f04dc)), closes [#244](https://github.com/blackdark-org/travo-greenfield/issues/244)
+* **usbtether:** detect tethered phones by medium and report the USB uplink ([7c71f83](https://github.com/blackdark-org/travo-greenfield/commit/7c71f83935ef5563724eba4c4004a339bebbf7bc)), closes [#175](https://github.com/blackdark-org/travo-greenfield/issues/175)
+* **usbtether:** guarded driver install and the USB uplink transaction ([e792e4d](https://github.com/blackdark-org/travo-greenfield/commit/e792e4d0c5434b9d0515f376a53a9be7590dc5ae)), closes [#176](https://github.com/blackdark-org/travo-greenfield/issues/176) [#177](https://github.com/blackdark-org/travo-greenfield/issues/177)
+* **web:** API tokens settings page ([4627280](https://github.com/blackdark-org/travo-greenfield/commit/46272803d2dfc5c49b9d49c2f203b8cdcac2f0bc))
+* **web:** Clients page with names, reservations, block and disconnect ([b4887e4](https://github.com/blackdark-org/travo-greenfield/commit/b4887e4336b9f1571896fe4d41bc978752e22a40)), closes [#220](https://github.com/blackdark-org/travo-greenfield/issues/220)
+* **web:** confirm risky changes in dialogs and report results as toasts ([3af379d](https://github.com/blackdark-org/travo-greenfield/commit/3af379d0f5d820b126b25fbbeb8093896940bb10)), closes [#170](https://github.com/blackdark-org/travo-greenfield/issues/170)
+* **web:** dashboard history card with SVG sparklines ([7080d35](https://github.com/blackdark-org/travo-greenfield/commit/7080d35ad55c9142776a943e3453bb919acafd72)), closes [#232](https://github.com/blackdark-org/travo-greenfield/issues/232)
+* **web:** failover card on the Network page ([cb72cfd](https://github.com/blackdark-org/travo-greenfield/commit/cb72cfd90cee289eb9913bd4ee8dccc9385c89ea)), closes [#210](https://github.com/blackdark-org/travo-greenfield/issues/210)
+* **web:** nested subpage routes with the parent highlighted in the nav ([0718b4d](https://github.com/blackdark-org/travo-greenfield/commit/0718b4df7b0b92605b6da501586dfc24719b9f90))
+* **web:** Network page with the USB tethering card ([c1bb7f1](https://github.com/blackdark-org/travo-greenfield/commit/c1bb7f194a14f20910b4fe623cb7f8b62f371c1a)), closes [#178](https://github.com/blackdark-org/travo-greenfield/issues/178)
+* **web:** report device settings results as toasts (docs/web-ui.md) ([90379ff](https://github.com/blackdark-org/travo-greenfield/commit/90379ff53ad24895c29e1eb6d042f2c254eb885f))
+* **web:** Tailscale page and dashboard status ([eece20e](https://github.com/blackdark-org/travo-greenfield/commit/eece20eec6e5cdf4a8dabb7efd14e2a3b216e1ca)), closes [#181](https://github.com/blackdark-org/travo-greenfield/issues/181)
+* **web:** tell how to prepare an iPhone before USB tethering ([13916ad](https://github.com/blackdark-org/travo-greenfield/commit/13916ada7c208f3eb229839df2af5ce159c87634))
+* **web:** try automatic hotel login from the captive card ([529c9ea](https://github.com/blackdark-org/travo-greenfield/commit/529c9eae063bc0dfd5d981ae68e79b243898957a)), closes [#223](https://github.com/blackdark-org/travo-greenfield/issues/223)
+* **wifi:** AP on/off schedule through the hook socket and the AP transaction ([8ea00f4](https://github.com/blackdark-org/travo-greenfield/commit/8ea00f4dcab6292b10d324981c3812b77c89be57)), closes [#241](https://github.com/blackdark-org/travo-greenfield/issues/241)
+* **wifi:** schedule card with lockout warning ([5e24ebe](https://github.com/blackdark-org/travo-greenfield/commit/5e24ebefafe940f08bd7beddb10d5d38a1697946))
+
+
+### Bug Fixes
+
+* **adguard:** an unfinished retry clears an older migration failure ([2502401](https://github.com/blackdark-org/travo-greenfield/commit/25024013e48bfce14f872a202f4f7172165f5f62))
+* **adguard:** apply the YAML memory caps once, keep user raises ([21ef457](https://github.com/blackdark-org/travo-greenfield/commit/21ef4573d4eb5cf5176ae4d7a8472848f31480c2))
+* **adguard:** back off the loopback migration after a failed try ([0513440](https://github.com/blackdark-org/travo-greenfield/commit/0513440334cb951c4ca77c34c40e6eb85acc308d)), closes [#164](https://github.com/blackdark-org/travo-greenfield/issues/164)
+* **adguard:** cap AdGuard Home memory (GOMEMLIMIT, query log, cache) ([5d96cac](https://github.com/blackdark-org/travo-greenfield/commit/5d96cac9f032f0d7ac39e4722ecc4d41ff90c394))
+* **adguard:** report a failed migration only after a completed rollback ([c6f3d9a](https://github.com/blackdark-org/travo-greenfield/commit/c6f3d9a2cea9a49a15809e0e6e00b8110f8888b4))
+* **captive:** refuse portal targets on the router or behind it ([5dba8de](https://github.com/blackdark-org/travo-greenfield/commit/5dba8de507314aaad735d0e685559904a0bb4d54)), closes [#222](https://github.com/blackdark-org/travo-greenfield/issues/222)
+* **captive:** renew at step 0 only after a transport failure ([f8b87c2](https://github.com/blackdark-org/travo-greenfield/commit/f8b87c2b6b4bba3321e486a0de611573a9a776bf)), closes [#222](https://github.com/blackdark-org/travo-greenfield/issues/222)
+* **clients:** address review: wildcard hosts, committed LAN, reload retry, LAN-device neighbours ([2861ec6](https://github.com/blackdark-org/travo-greenfield/commit/2861ec6cd2b3766f8a7adbe94759d31b424b84f5))
+* **connectivity:** an empty 200 from the 204 endpoint is online, not a portal ([3bd48e6](https://github.com/blackdark-org/travo-greenfield/commit/3bd48e611a677f580134ced9308544dfd7c9d8ae)), closes [#129](https://github.com/blackdark-org/travo-greenfield/issues/129) [#131](https://github.com/blackdark-org/travo-greenfield/issues/131)
+* **datausage:** count days and periods in the router's timezone ([2179f16](https://github.com/blackdark-org/travo-greenfield/commit/2179f16d4952eaf2096d123db4b786263664e0cd))
+* **failover:** clear stale mangle base chains, name the failed probe check ([2ffefaa](https://github.com/blackdark-org/travo-greenfield/commit/2ffefaac106be94a05d13f16036d0bd4423f9997)), closes [#277](https://github.com/blackdark-org/travo-greenfield/issues/277)
+* **failover:** delete stale mangle base chains without flushing them ([a0d7696](https://github.com/blackdark-org/travo-greenfield/commit/a0d76965ed47f0daa2a81294244e3e1cee823e3d)), closes [#277](https://github.com/blackdark-org/travo-greenfield/issues/277)
+* **failover:** exclude Tailscale and clear mwan3 mangle leftovers ([bd94312](https://github.com/blackdark-org/travo-greenfield/commit/bd943122588ea54d1aa165bed2ae61d87654b001)), closes [#277](https://github.com/blackdark-org/travo-greenfield/issues/277)
+* **failover:** track uplinks and prove mwan3 routes by the policy ([89cf738](https://github.com/blackdark-org/travo-greenfield/commit/89cf738f0220a8e119b32f9efe70b2d64a669437)), closes [#277](https://github.com/blackdark-org/travo-greenfield/issues/277)
+* **failover:** treat a boot-enabled Tailscale as conflicting ([a4e48c8](https://github.com/blackdark-org/travo-greenfield/commit/a4e48c804b87422383f95e2396c227cf2b87e057)), closes [#277](https://github.com/blackdark-org/travo-greenfield/issues/277)
+* **firmware,factoryreset:** refuse without leaving a guard behind ([806d14c](https://github.com/blackdark-org/travo-greenfield/commit/806d14c6d7e9f2c1fca36ad58e8a79f12864e091))
+* **firmware:** release the upgrade guard once the new firmware booted ([533e106](https://github.com/blackdark-org/travo-greenfield/commit/533e106b8e5d619529df5707b0ccd7edda1ea2b0))
+* **guard:** run no injected callback under the guard lock ([415f2de](https://github.com/blackdark-org/travo-greenfield/commit/415f2de3b3c9d604ba15ee260681cd63e11999fc))
+* **guard:** scan and create guards in one exclusive step ([8b8ebfe](https://github.com/blackdark-org/travo-greenfield/commit/8b8ebfeb153236c349e0f0cb5d9e1314383292f8))
+* **lanaddress:** keep list ipaddr in its place when the address changes ([8a1203c](https://github.com/blackdark-org/travo-greenfield/commit/8a1203c59129af6eb1dc492f594fe09860ce9030))
+* **network:** DNS-name retry, validation and DHCP turn-off baseline ([017ef82](https://github.com/blackdark-org/travo-greenfield/commit/017ef822d389a8b997e72ba8b4da04a3e879a7fc))
+* **network:** read zone and forwarding booleans like fw4 parse_bool ([d9ff895](https://github.com/blackdark-org/travo-greenfield/commit/d9ff895f314205865534b79ad3940e78684a828a))
+* **network:** refuse a lan move while AdGuard runs the expert topology ([76447a4](https://github.com/blackdark-org/travo-greenfield/commit/76447a46318b216196999d6d9e0390f3cead3940))
+* **network:** unset zone policy falls back to DROP like fw4 ([79c9c55](https://github.com/blackdark-org/travo-greenfield/commit/79c9c5586dfa88ed1477b4ddb388740e9bed9b6b))
+* **pkgmgr:** serialise package operations process-wide ([feafc50](https://github.com/blackdark-org/travo-greenfield/commit/feafc5088f62301f0f859a6262689b19d868cfd3))
+* **server:** enforce the read and write timeouts of invariants §4 ([2ce45b5](https://github.com/blackdark-org/travo-greenfield/commit/2ce45b5be4c0841f787960c0be5dfaf38e7c2d14))
+* **services:** keep watchcat off after install ([3475095](https://github.com/blackdark-org/travo-greenfield/commit/3475095f1a34acb693297419457ed190e0866df0)), closes [#268](https://github.com/blackdark-org/travo-greenfield/issues/268)
+* **system:** serialize firmware uploads and exclude reboot during a flash ([d6793fe](https://github.com/blackdark-org/travo-greenfield/commit/d6793fee9103071541dfcdac2f77429c7762555f)), closes [#198](https://github.com/blackdark-org/travo-greenfield/issues/198)
+* **tailscale:** fresh probe, uncancellable restore, no firewall staging while stopped ([92d6fcc](https://github.com/blackdark-org/travo-greenfield/commit/92d6fcc82fd3178db898e97d337ec04e1d5bd539))
+* **tailscale:** session-only login, logout and settings; hide the auth URL from tokens ([43fb342](https://github.com/blackdark-org/travo-greenfield/commit/43fb342c2ed3404152d8e865bede38a4dd786557))
+* take guards atomically in interface restart, reconnect, schedule and switch ([55e8087](https://github.com/blackdark-org/travo-greenfield/commit/55e808725241ded0cbf04b7cc9bb55af9893da0d))
+* **txn:** refuse transactions during terminal and package-op guards ([814cc1b](https://github.com/blackdark-org/travo-greenfield/commit/814cc1b0c6ebac01dbab354a660890d889214412))
+* **update:** accept the button hotplug script in release packages ([ae52fea](https://github.com/blackdark-org/travo-greenfield/commit/ae52fea36b57b93ed2b2a44ec47a7234f111de33))
+* **usbtether:** finish usbmuxd setup on retry and re-read the wan zone under the lock ([97cd24e](https://github.com/blackdark-org/travo-greenfield/commit/97cd24e07494fdb22ab541d692180449121d9c48)), closes [#176](https://github.com/blackdark-org/travo-greenfield/issues/176) [#177](https://github.com/blackdark-org/travo-greenfield/issues/177)
+* **usbtether:** keep a kept guard on a failed query and re-read the wan zone on enable ([822556d](https://github.com/blackdark-org/travo-greenfield/commit/822556da37c00814c51dc93e67cf98b20447d53e))
+* **usbtether:** non-null lists in the schema and a real network layout in mock mode ([d4bb8e2](https://github.com/blackdark-org/travo-greenfield/commit/d4bb8e235ccb77864bae3930e9762822d43517b9)), closes [#178](https://github.com/blackdark-org/travo-greenfield/issues/178)
+* **web:** retry removing the Chrome profile after screenshots ([0ecc860](https://github.com/blackdark-org/travo-greenfield/commit/0ecc86050217e4055af5e23e181decc82139edbe))
+
+
+### Refactoring
+
+* **clients:** export CommittedLAN for other dhcp writers ([f0c3677](https://github.com/blackdark-org/travo-greenfield/commit/f0c367750eba5c3f0a62976a2606ff057f605706))
+* **facts:** parse hostapd stations with signal; client MACs reuse it ([b692622](https://github.com/blackdark-org/travo-greenfield/commit/b692622783bd142fa4942e41e2f49183be7d61fe))
+* **vpnkill:** export WriteSection for other firewall owners ([4b7e548](https://github.com/blackdark-org/travo-greenfield/commit/4b7e54840635f97a9379124b7be5a36c5e1f46ad))
+* **web:** API tokens page uses ConfirmDialog and toasts ([#170](https://github.com/blackdark-org/travo-greenfield/issues/170) pattern) ([3950cb3](https://github.com/blackdark-org/travo-greenfield/commit/3950cb32a91031aa2be824379feac83866433e26))
+* **web:** guarded toggles name their own failure messages ([10513eb](https://github.com/blackdark-org/travo-greenfield/commit/10513eb389e1349712de199180dffb086ceb57bd))
+* **web:** split the dashboard SSE transport and event reducer ([1c3fd9b](https://github.com/blackdark-org/travo-greenfield/commit/1c3fd9b195a47cadd5df4a4fb7f21f7af36d77a6)), closes [#93](https://github.com/blackdark-org/travo-greenfield/issues/93)
+
+
+### Documentation
+
+* **adguard:** record why expert mode cannot bind dnsmasq to loopback only ([e5827dd](https://github.com/blackdark-org/travo-greenfield/commit/e5827dd59cf703be5879eee53a21f9ec12737e58))
+* **adr:** AdGuard Home on :53 as an opt-in expert topology (0021) ([53aeca1](https://github.com/blackdark-org/travo-greenfield/commit/53aeca122c63906e1c086697875c86374d3540b7)), closes [#186](https://github.com/blackdark-org/travo-greenfield/issues/186)
+* **adr:** no native .apk yet (0015) ([84606ca](https://github.com/blackdark-org/travo-greenfield/commit/84606cadd04dec185ad8af6ec3cb6ad5c1f4d7b1)), closes [#185](https://github.com/blackdark-org/travo-greenfield/issues/185)
+* **adr:** renumber the offline bundle ADR to 0020 (0017 is taken by parallel PRs) ([946b94b](https://github.com/blackdark-org/travo-greenfield/commit/946b94b59fe694443c1c1995a10dbb1c37ed45bf))
+* **adr:** renumber the USB tethering ADR to 0019 (0017 is Tailscale) ([1db4fe5](https://github.com/blackdark-org/travo-greenfield/commit/1db4fe58931581847cfe7dedda02c4b725f3810f)), closes [#177](https://github.com/blackdark-org/travo-greenfield/issues/177)
+* **device-facts:** record the 6 h memory soak and the kernel drift ([9f31931](https://github.com/blackdark-org/travo-greenfield/commit/9f31931322c8058e583c64d403fa8f396371721f)), closes [#285](https://github.com/blackdark-org/travo-greenfield/issues/285)
+* exclusive guard acquire, txn conflict policy and package-op lock ([31ad203](https://github.com/blackdark-org/travo-greenfield/commit/31ad203aa44b89891cb45fc1401cd29891a9e23f))
+* **failover:** record the [#277](https://github.com/blackdark-org/travo-greenfield/issues/277) root cause, live failover times and decisions ([69e508f](https://github.com/blackdark-org/travo-greenfield/commit/69e508f9efafb5eb3af8bcfc03ceabfc084ed07c))
+* **invariants:** drop stale SSH key and AdGuard topology ceilings ([c29767a](https://github.com/blackdark-org/travo-greenfield/commit/c29767aa452f5839c9916970bcc9b0024c28e375))
+* **invariants:** list automated self-confirm exceptions explicitly ([4261872](https://github.com/blackdark-org/travo-greenfield/commit/4261872d94e54612246e94ef1b4a1f8f27e6cc81))
+* **invariants:** name the slide switch as a self-confirm exception ([49bc402](https://github.com/blackdark-org/travo-greenfield/commit/49bc402881d24ed25de4370a06c1a03ef7d63af8))
+* **readme:** describe USB tethering on the Network page ([3b35b56](https://github.com/blackdark-org/travo-greenfield/commit/3b35b563764efcadf36a5cbd6f4501e3116c74b9)), closes [#178](https://github.com/blackdark-org/travo-greenfield/issues/178)
+* **readme:** say how to prepare an iPhone for USB tethering ([43737a1](https://github.com/blackdark-org/travo-greenfield/commit/43737a174339340d7f79615ba381cddc6c9baaf4))
+* **spec:** a late dashboard subscriber gets the last snapshot ([e772bc7](https://github.com/blackdark-org/travo-greenfield/commit/e772bc7b36916de16401cc2fae933a2856a30437)), closes [#93](https://github.com/blackdark-org/travo-greenfield/issues/93)
+* **testing:** hardware check for the adguard migration back-off ([29fd02f](https://github.com/blackdark-org/travo-greenfield/commit/29fd02fbfd11d01db455db2b7823c4a95672118e))
+
+## 0.1.0 (2026-11-17)
+
+
+### Features
+
+* add Device port with mock and CLI adapters, guards, atomic files, lifecycle ([8a0982d](https://github.com/blackdark-org/travo-greenfield/commit/8a0982d905f291320b67c96e0b2176037bcd1107))
+* add Device port with mock and CLI adapters, guards, atomic files, lifecycle ([58565c1](https://github.com/blackdark-org/travo-greenfield/commit/58565c16120570d8778642d0d4f562331d1d8d77))
+* add DNS layer stack with fixed precedence and guarded apply ([#6](https://github.com/blackdark-org/travo-greenfield/issues/6)) ([a48383b](https://github.com/blackdark-org/travo-greenfield/commit/a48383b50ded78dfa6ac6efe624eaa989bee657e))
+* add PackageManager port with apk/opkg adapters, --mock wiring and size gate ([912990f](https://github.com/blackdark-org/travo-greenfield/commit/912990f802a67128f1fb022dfa919c73daf46ce8))
+* **adguard:** default-DNS layer, liveness probe, fail-open ([cd4f201](https://github.com/blackdark-org/travo-greenfield/commit/cd4f2011e07454d448ca9a2faa6e28dda265e259)), closes [#133](https://github.com/blackdark-org/travo-greenfield/issues/133)
+* **adguard:** status, install after first uplink, loopback migration ([28a6253](https://github.com/blackdark-org/travo-greenfield/commit/28a62532a4b244ba667e1344dd2b22d789ad2cd9)), closes [#132](https://github.com/blackdark-org/travo-greenfield/issues/132)
+* **adguard:** Travo-gated reverse proxy on :3001 ([07dfdb0](https://github.com/blackdark-org/travo-greenfield/commit/07dfdb0b7e62ae5a42f6254fab88cd2b2458f61c)), closes [#134](https://github.com/blackdark-org/travo-greenfield/issues/134)
+* **api:** add auth, first-run and transaction endpoints with default-deny ([09f4d01](https://github.com/blackdark-org/travo-greenfield/commit/09f4d0198da7638a4ffc1e05caa3882f9247dcd2))
+* **auth:** add session store, epoch file, rate limiter and password rules ([c9ad121](https://github.com/blackdark-org/travo-greenfield/commit/c9ad121722c2d30a30fb7beeec9fd440a7fab123))
+* **daemon:** serve the web UI with gzip, caching and CSP ([2a380bf](https://github.com/blackdark-org/travo-greenfield/commit/2a380bf934aba1e6677b4e09f0dc6a363bbe27aa)), closes [#18](https://github.com/blackdark-org/travo-greenfield/issues/18)
+* **dashboard:** add shared status event stream ([7c9e443](https://github.com/blackdark-org/travo-greenfield/commit/7c9e443366939ce645ebdbff04a7e5784424a060))
+* **dashboard:** Add WiFi connection link ([1e8d8d4](https://github.com/blackdark-org/travo-greenfield/commit/1e8d8d41e7d378883af83fab9a42bc421ba91daf))
+* **dashboard:** share live status subscription ([1e5f364](https://github.com/blackdark-org/travo-greenfield/commit/1e5f364103700a80049a5714ab5abdb59c374a77))
+* **dashboard:** show router resource summary ([5b51f17](https://github.com/blackdark-org/travo-greenfield/commit/5b51f174362960a3652260e1ce8b2baca8fa08d9))
+* **dashboard:** show throughput by interface ([f9c856e](https://github.com/blackdark-org/travo-greenfield/commit/f9c856e4b2d835643bfe2adaa8586c4247726edb))
+* **dashboard:** show uplink and internet status ([12a8041](https://github.com/blackdark-org/travo-greenfield/commit/12a8041cf63b64cc11e8ced4727dd46b50b79375))
+* **dev:** add mise tasks for the mock dev server and screenshots ([1531c3c](https://github.com/blackdark-org/travo-greenfield/commit/1531c3c136dab5a2b15cfd01565f0c7a6b073f1d)), closes [#17](https://github.com/blackdark-org/travo-greenfield/issues/17)
+* **device:** add Reload to the Device port and read uci via export ([57e2d91](https://github.com/blackdark-org/travo-greenfield/commit/57e2d912c3a5b71e6eb6385504925dc64183580e))
+* **device:** add root account port (verify, detect, set password) ([574b92a](https://github.com/blackdark-org/travo-greenfield/commit/574b92a6280b1223132762534f005560ce33be49))
+* **device:** parse netifd dns-server per interface ([4ce2168](https://github.com/blackdark-org/travo-greenfield/commit/4ce216841e8398a801c9f74c45999bbaf419700d)), closes [#130](https://github.com/blackdark-org/travo-greenfield/issues/130)
+* **device:** parse netifd, neighbour and hostapd payloads ([dff3679](https://github.com/blackdark-org/travo-greenfield/commit/dff3679361ed914879010de88c112f1599b609e2))
+* **device:** procd Services port with verbatim service list fixtures ([f50eb6f](https://github.com/blackdark-org/travo-greenfield/commit/f50eb6fdfdf9a8e21817880aaa4ecedf724aeddd)), closes [#132](https://github.com/blackdark-org/travo-greenfield/issues/132)
+* **device:** read WireGuard handshake evidence ([676793e](https://github.com/blackdark-org/travo-greenfield/commit/676793e494f82ac022c2228d21bc870eefec89d4))
+* **dns:** captive DNS bypass layer with 5-min auto-restore ([25a69e7](https://github.com/blackdark-org/travo-greenfield/commit/25a69e74b5593bb6b123ec4dca2cfdb5d966ebc1))
+* **dns:** guarded conditional DHCP renew on wwan for captive portals ([492561f](https://github.com/blackdark-org/travo-greenfield/commit/492561fe17b019278c44a2ef160700357de5b0ca))
+* **dns:** report captive portal login URL and show the hotel login card ([0c8211c](https://github.com/blackdark-org/travo-greenfield/commit/0c8211c42690d618dcd4ec19663e0a376616b59c))
+* **lockout:** classify callers and refuse lockout-risk changes ([2c65911](https://github.com/blackdark-org/travo-greenfield/commit/2c659117183d3e9d826413c65278c77873692583))
+* **mock:** seed the wireless UCI capture for AP settings ([9a15cf8](https://github.com/blackdark-org/travo-greenfield/commit/9a15cf82d5138fc1e2051dfbf1976d92b9d05c03))
+* **openapi:** add command that prints the generated API spec ([451541a](https://github.com/blackdark-org/travo-greenfield/commit/451541ab0bb8a03ce3d029b3a1789285dfa56424))
+* **packaging:** add the release tarball, init script, install and uninstall ([9f83cdf](https://github.com/blackdark-org/travo-greenfield/commit/9f83cdf3cd0015c7b0e446fc3f222016d3f94c55)), closes [#19](https://github.com/blackdark-org/travo-greenfield/issues/19)
+* **release:** sign the release tarball and verify it on install ([22a6492](https://github.com/blackdark-org/travo-greenfield/commit/22a6492da79463f7b7457b79b36cb538c07bc154)), closes [#21](https://github.com/blackdark-org/travo-greenfield/issues/21)
+* **runner:** run commands with stdin and add periodic lifecycle workers ([2dfdf2d](https://github.com/blackdark-org/travo-greenfield/commit/2dfdf2d275a6e229cb6d78fd0f01c2fb19937c79))
+* **system:** add confirmed router restart ([#65](https://github.com/blackdark-org/travo-greenfield/issues/65)) ([c3c8158](https://github.com/blackdark-org/travo-greenfield/commit/c3c8158b1410331dbad5879d600f411712179664))
+* **system:** apply signed updates with guarded rollback ([5b0b7d3](https://github.com/blackdark-org/travo-greenfield/commit/5b0b7d37651c1a31f95e4327167dccffceaaec24))
+* **system:** check for stable releases on demand ([b1203fd](https://github.com/blackdark-org/travo-greenfield/commit/b1203fdec71e8c4e28a83fea6cc38f920ad7005d))
+* **system:** download router configuration backups ([994912b](https://github.com/blackdark-org/travo-greenfield/commit/994912b945b439398550cd5b8d9bde9d90bfda5a))
+* **system:** show device info on the System page ([43e50a2](https://github.com/blackdark-org/travo-greenfield/commit/43e50a24d2cd68e1c552dfe1fcdcffed569d3b7d)), closes [#50](https://github.com/blackdark-org/travo-greenfield/issues/50)
+* **system:** verify and stage signed release packages ([e08bbcb](https://github.com/blackdark-org/travo-greenfield/commit/e08bbcb2969dce92f7a01bb95e3cf01ac9fd82a0))
+* **trust:** allow admin only from LAN subnets ([a989dd1](https://github.com/blackdark-org/travo-greenfield/commit/a989dd1c0725a4cadc9db41ff3cecc907f991f3f))
+* **txn:** add transactions with detached watchdog and startup recovery ([01e4f92](https://github.com/blackdark-org/travo-greenfield/commit/01e4f92c186ad14c16a579f275e4e1c1909fcedd))
+* **uciwrite:** add per-config UCI locks ([515b020](https://github.com/blackdark-org/travo-greenfield/commit/515b0205487b4a33ccad5371bc2c1986d820fe16))
+* **vpn:** apply the VPN DNS layer and verify resolution ([5f4ea62](https://github.com/blackdark-org/travo-greenfield/commit/5f4ea62eb2ec9617c6810f41cb74bc25b4aa0191)), closes [#88](https://github.com/blackdark-org/travo-greenfield/issues/88)
+* **vpn:** configure WireGuard split tunneling ([23db29f](https://github.com/blackdark-org/travo-greenfield/commit/23db29f93cd26aaa60f1e101eac07ef64aa3d45e)), closes [#90](https://github.com/blackdark-org/travo-greenfield/issues/90)
+* **vpn:** cover the guest zone with the tunnel and the kill switch ([eded4ce](https://github.com/blackdark-org/travo-greenfield/commit/eded4ce63e8ef85c67160bdfabffa0c674837d77)), closes [#89](https://github.com/blackdark-org/travo-greenfield/issues/89)
+* **vpn:** enforce the VPN kill switch ([6cfba8c](https://github.com/blackdark-org/travo-greenfield/commit/6cfba8cffc19d8c93ebb4a2d13a6261fb316af57)), closes [#89](https://github.com/blackdark-org/travo-greenfield/issues/89)
+* **vpn:** expose WireGuard tunnel status ([9e47184](https://github.com/blackdark-org/travo-greenfield/commit/9e47184903177ae21ab8120761c1eb76c945611b))
+* **vpn:** guard WireGuard tunnel changes ([d5f1a8f](https://github.com/blackdark-org/travo-greenfield/commit/d5f1a8fd31d3fffd327988f9855e480f40772966))
+* **vpn:** manage WireGuard profiles ([d415491](https://github.com/blackdark-org/travo-greenfield/commit/d4154911ccb36aecebdc5b130a7d5fc2ed86c490))
+* **web:** add login, first-run setup and session handling ([30c1c8e](https://github.com/blackdark-org/travo-greenfield/commit/30c1c8e0022353c000b580e2e21855f4ae0f2f9c)), closes [#16](https://github.com/blackdark-org/travo-greenfield/issues/16)
+* **web:** add Svelte SPA skeleton with generated API client ([dba66e2](https://github.com/blackdark-org/travo-greenfield/commit/dba66e224ef6cb8e0f2e1854b3155eba8e00b873))
+* **web:** adopt shadcn-svelte throughout the SPA ([da73de1](https://github.com/blackdark-org/travo-greenfield/commit/da73de12cb6e9ede4f753d6e9fbe5fc51ba8dd98))
+* **web:** Services page with AdGuard Home on/off and default-DNS toggle ([a2dbcba](https://github.com/blackdark-org/travo-greenfield/commit/a2dbcba56c828bb5830db5d99d28d9af2e32b3bd)), closes [#135](https://github.com/blackdark-org/travo-greenfield/issues/135)
+* **web:** show WiFi summary and scan results ([5249e3c](https://github.com/blackdark-org/travo-greenfield/commit/5249e3c512c37c6f60a38db6b03f8f886d9e59bf))
+* **web:** show WireGuard tunnel status ([c1436ce](https://github.com/blackdark-org/travo-greenfield/commit/c1436ce9a6b05accaab1b853e960e0a71c63f477))
+* **web:** toggle VPN from the dashboard ([a9584dc](https://github.com/blackdark-org/travo-greenfield/commit/a9584dc1b92de79a98b3c812fe4afb7d8774bd21)), closes [#63](https://github.com/blackdark-org/travo-greenfield/issues/63)
+* **wifi:** add guarded uplink join ([#71](https://github.com/blackdark-org/travo-greenfield/issues/71)) ([9fe4b8d](https://github.com/blackdark-org/travo-greenfield/commit/9fe4b8dc2a8532afc5d0a7869dea0a940ac03a3d))
+* **wifi:** add read-only summary and scan API ([cda78fb](https://github.com/blackdark-org/travo-greenfield/commit/cda78fb87c2303bdef819877763a36e99f671faf))
+* **wifi:** cap automatic uplink reconnect attempts ([8f61b04](https://github.com/blackdark-org/travo-greenfield/commit/8f61b04e22dbf35a29ef9bdd924f9edee3922586)), closes [#73](https://github.com/blackdark-org/travo-greenfield/issues/73)
+* **wifi:** configure a guest AP with its own subnet and zone ([e1a188e](https://github.com/blackdark-org/travo-greenfield/commit/e1a188ef1fe972a5be3ff0d2df3ab776749cd6c9)), closes [#75](https://github.com/blackdark-org/travo-greenfield/issues/75)
+* **wifi:** manage per-radio access point settings ([d442177](https://github.com/blackdark-org/travo-greenfield/commit/d4421771664dfdd132dbbbfdb7aac43d75a92409)), closes [#74](https://github.com/blackdark-org/travo-greenfield/issues/74)
+* **wifi:** manage saved uplink profiles ([81ea8b9](https://github.com/blackdark-org/travo-greenfield/commit/81ea8b9b8f89e86a62d47ba5554f19b402d64b40)), closes [#72](https://github.com/blackdark-org/travo-greenfield/issues/72)
+* **wifi:** reconcile the AP layout when the uplink needs the AP radio ([dc403f6](https://github.com/blackdark-org/travo-greenfield/commit/dc403f66236d6918103c2bb1902d1b50716eba14)), closes [#99](https://github.com/blackdark-org/travo-greenfield/issues/99)
+* **wifi:** set the uplink MAC policy ([de2f27c](https://github.com/blackdark-org/travo-greenfield/commit/de2f27c7a9f28cf418695d3042350dc7194c4264)), closes [#76](https://github.com/blackdark-org/travo-greenfield/issues/76)
+
+
+### Bug Fixes
+
+* **adguard:** finish an interrupted config write before releasing the guard ([854587b](https://github.com/blackdark-org/travo-greenfield/commit/854587b47796797c1ff109d1a94fc345a1d539d4))
+* **adguard:** seed the config when the package came without one ([76f2eb9](https://github.com/blackdark-org/travo-greenfield/commit/76f2eb9a6de22f7a41f3073a9fb2b74e44e5e008))
+* **api:** drain dashboard producers before restart ([bf36dc1](https://github.com/blackdark-org/travo-greenfield/commit/bf36dc10f29b879eaf77023640b5c992c8d02ed7))
+* **api:** refuse unexpected Host headers (DNS rebinding) ([75d9085](https://github.com/blackdark-org/travo-greenfield/commit/75d9085d835dc47e067c89f78c836428686f59ae))
+* **app:** remove the mock state dir on shutdown and drop unused session field ([0fd4c03](https://github.com/blackdark-org/travo-greenfield/commit/0fd4c03be6f14983a29fbb86326f4fc155b9a432))
+* **dashboard:** resume events after bfcache restore ([7ed9009](https://github.com/blackdark-org/travo-greenfield/commit/7ed90091ce6763f03caf705d24380915059098aa))
+* **device:** distinguish transient uci export failures ([efe7a6d](https://github.com/blackdark-org/travo-greenfield/commit/efe7a6d22f014154e1cac1897b835593a15b6f0e))
+* **device:** match complete command diagnostics ([d677972](https://github.com/blackdark-org/travo-greenfield/commit/d677972e7a2ba4feef3c6c7242e8c212680751b5))
+* **device:** reject reserved WireGuard selectors ([0a1eed5](https://github.com/blackdark-org/travo-greenfield/commit/0a1eed53ec91a456dc6d0b290757b86e1b3e4013))
+* **dnslayer:** restore base dnsmasq options in their original order ([5177e12](https://github.com/blackdark-org/travo-greenfield/commit/5177e12887dc8200fd2fb987d33af39c44bf4fac)), closes [#157](https://github.com/blackdark-org/travo-greenfield/issues/157)
+* **dns:** let Restore DNS retry an unfinished stack change ([0e885d9](https://github.com/blackdark-org/travo-greenfield/commit/0e885d9d0e7dbf3738cfab64e7b7023d319bdab0)), closes [#130](https://github.com/blackdark-org/travo-greenfield/issues/130)
+* **openapi:** build the spec with the new api.Deps ([07b20ad](https://github.com/blackdark-org/travo-greenfield/commit/07b20addfd168d9bec769e5b38b7a4cc2f8d07dc))
+* **packaging:** lowercase the hostname with explicit ranges for BusyBox tr ([3892ada](https://github.com/blackdark-org/travo-greenfield/commit/3892adaa7f8073bc67e92351c1e1cd44477c9af6)), closes [#19](https://github.com/blackdark-org/travo-greenfield/issues/19)
+* **packaging:** move LuCI for reversible port 80 installs ([8ebeefd](https://github.com/blackdark-org/travo-greenfield/commit/8ebeefd8b1f780bd1b7d79d415e25910ea076b2c))
+* **packaging:** target fresh OpenWrt installations ([a8f8f33](https://github.com/blackdark-org/travo-greenfield/commit/a8f8f338d8a60da6ed012d2571de72bcfdcfc02f))
+* **runner:** stop command descendants on cancellation ([5264217](https://github.com/blackdark-org/travo-greenfield/commit/5264217cecab2a825dc6eff482aae957597e08e6))
+* **txn:** enforce shared live apply deadline ([d7cf4e1](https://github.com/blackdark-org/travo-greenfield/commit/d7cf4e1a25eb8ab43b02766351432b50a03c9d6f))
+* **txn:** release the guard after a timeout restore nobody polls ([acf9e71](https://github.com/blackdark-org/travo-greenfield/commit/acf9e71eb0af89bc387ba193d0b80b83c7e34d0c))
+* **txn:** report a restore only after the uplink and radios are back ([bc176b1](https://github.com/blackdark-org/travo-greenfield/commit/bc176b1c8a5c9c1fe8404752dacb5284d8308976)), closes [#158](https://github.com/blackdark-org/travo-greenfield/issues/158)
+* **txn:** restore live WireGuard state during rollback ([ed843d7](https://github.com/blackdark-org/travo-greenfield/commit/ed843d7af6510ac006f461d9ebe09299a7b97400))
+* **txn:** restore the uplink default after WireGuard rollback ([343160d](https://github.com/blackdark-org/travo-greenfield/commit/343160d9ed6d908e5993f2a13c838848e40a5001))
+* **update:** accept exited processes during quiesce ([#107](https://github.com/blackdark-org/travo-greenfield/issues/107)) ([3fc68d4](https://github.com/blackdark-org/travo-greenfield/commit/3fc68d4d9230138fb30dcab1b907042f8e5d6b36))
+* **update:** wait out a stale procd listing during rollback ([fd9c856](https://github.com/blackdark-org/travo-greenfield/commit/fd9c85661461fb352b7d83b5efd2d106b0768e8b))
+* **vpn:** expire stale status on monotonic time ([ae4a370](https://github.com/blackdark-org/travo-greenfield/commit/ae4a370319b998d1756017cdac01e63ca907e3ec))
+* **vpn:** give LAN clients the tunnel by staging the VPN zone on enable ([6f53f3a](https://github.com/blackdark-org/travo-greenfield/commit/6f53f3a20c7fe2cb15743b8e875e750e93d3945b)), closes [#87](https://github.com/blackdark-org/travo-greenfield/issues/87)
+* **web:** disambiguate duplicate scan access points ([12f7076](https://github.com/blackdark-org/travo-greenfield/commit/12f70760591addb11e5c85432d44b50c048d1a48))
+* **web:** keep polling refreshes from announcing loading ([00eecde](https://github.com/blackdark-org/travo-greenfield/commit/00eecded8a01bb09b88507b32b168c8d66057690))
+* **web:** recover polling from slow and hung requests ([5b532f6](https://github.com/blackdark-org/travo-greenfield/commit/5b532f6e435a59fb7389fb979a157c8e47676038))
+* **web:** use the readable muted foreground for secondary text ([826801d](https://github.com/blackdark-org/travo-greenfield/commit/826801d98f3c14a3b70991656cebb1e9f69d3fed))
+* **wifi:** cancel scans with daemon lifecycle ([7eb9d44](https://github.com/blackdark-org/travo-greenfield/commit/7eb9d44b1e4ebae4524b0efee6297e188043b637))
+* **wifi:** do not count a guarded down tick towards reconnect ([98cdc65](https://github.com/blackdark-org/travo-greenfield/commit/98cdc652e9ac1446131ca458d333d407f08a9f68))
+* **wifi:** preserve transaction controls during polling ([3c4a8f5](https://github.com/blackdark-org/travo-greenfield/commit/3c4a8f5fa57d0df6c7002f7a1edae1cf81d67ab7))
+* **wifi:** require a fresh STA link before arming Join ([2341539](https://github.com/blackdark-org/travo-greenfield/commit/23415396f79de70de0154ef40f21c1c5e9940dfc))
+* **wifi:** skip the reconnect attempt on a tick that saw a guard ([c25579a](https://github.com/blackdark-org/travo-greenfield/commit/c25579a0b75090a1d50df79b029f90b69d2330a1))
+
+
+### Refactoring
+
+* **api:** derive VPN status schema name from Go type ([7f410ba](https://github.com/blackdark-org/travo-greenfield/commit/7f410ba6e5b52ea2cf31cee699ae64823ef11345))
+* **api:** extract join result mapping ([14ea028](https://github.com/blackdark-org/travo-greenfield/commit/14ea028677a4217bd0ab689cbff3008b4df126bc)), closes [#72](https://github.com/blackdark-org/travo-greenfield/issues/72)
+* **dashboard:** extract app event ownership ([5928436](https://github.com/blackdark-org/travo-greenfield/commit/5928436b3ae4f54bfc49e6f7bef2a39456c8eee6))
+* **dnslayer:** apply through txn.Manager.Apply ([46a26b1](https://github.com/blackdark-org/travo-greenfield/commit/46a26b13c8b0218dc3dcafa219bd5ba84d4e59ae))
+* export transaction and update guard names ([f4c597d](https://github.com/blackdark-org/travo-greenfield/commit/f4c597d234dc33183998cd5f03902d6d1c4c182d))
+* **packaging:** share OpenWrt container test helpers ([7cef0ff](https://github.com/blackdark-org/travo-greenfield/commit/7cef0ffeed3cd04afec880884a82cca6551385bc))
+* **txn:** extract the uplink marker from the WireGuard recorder ([c1c409a](https://github.com/blackdark-org/travo-greenfield/commit/c1c409ab005f908154963bce08633bdedcaf7633))
+* **web:** share the guarded VPN tunnel toggle ([57328e0](https://github.com/blackdark-org/travo-greenfield/commit/57328e0d8a6c99493bb73269c0f247f0a66f8d7f))
+* **wifi:** share join request validation ([f19b611](https://github.com/blackdark-org/travo-greenfield/commit/f19b6111e7888f6756f35348fec092d557f501b6)), closes [#72](https://github.com/blackdark-org/travo-greenfield/issues/72)
+* **wifi:** share the AP transaction flow ([2143881](https://github.com/blackdark-org/travo-greenfield/commit/2143881b1fe0b50bfe699d6b706235589d49a67a))
+
+
+### Documentation
+
+* add 0.1.0 spec, invariants, ADRs and agent setup ([6e0cb7f](https://github.com/blackdark-org/travo-greenfield/commit/6e0cb7fc0786f5a6d9813cde46914cd6fd9963f8))
+* add handoff notes for the next session ([4d0daab](https://github.com/blackdark-org/travo-greenfield/commit/4d0daab1ecc4d81eb0fed4ef44f4dfdf3d34ac29))
+* **adr:** document split UI size budgets ([76f56b3](https://github.com/blackdark-org/travo-greenfield/commit/76f56b32cc8329e0473022a396005441c4423c13))
+* **adr:** note that lockout fact parsers exist ([32b9867](https://github.com/blackdark-org/travo-greenfield/commit/32b98675a661e9ffde7c01f5b3b28aaf7e7163f5))
+* correct guard directory in glossary ([2ffb62b](https://github.com/blackdark-org/travo-greenfield/commit/2ffb62b7d1e77ad927241894461f8f69eae3e372))
+* **dashboard:** record visual and keyboard checks ([eaa821f](https://github.com/blackdark-org/travo-greenfield/commit/eaa821f32b529534b93e8669c74c0fb8e9de56d1))
+* **device:** record captive bypass and wwan renew hardware run ([a351163](https://github.com/blackdark-org/travo-greenfield/commit/a3511636ec0e5535ced00d99f6c1dcc00289ff5b))
+* move planning to GitHub issues and the project board ([083796f](https://github.com/blackdark-org/travo-greenfield/commit/083796f31e09ae044d13520cc5d506378775ffa3))
+* move the glossary to GLOSSARY.md at the root ([5bdc5fb](https://github.com/blackdark-org/travo-greenfield/commit/5bdc5fb08bc2d570422bd43387683179c3cb8e22))
+* note why old Travo can run TypeScript 7 and we cannot ([95b2dcf](https://github.com/blackdark-org/travo-greenfield/commit/95b2dcf6dc908ed625febf6161eb32f8ebfbeaaa))
+* record auth implementation and the loopback trust rule ([53424e4](https://github.com/blackdark-org/travo-greenfield/commit/53424e4ef4411381751b1f7052cfc7bd60c48b18))
+* record device facts, testing layers and spike outcomes ([f51d181](https://github.com/blackdark-org/travo-greenfield/commit/f51d181a7a59b0a9be4dc05ef5c13e368c0d6af9))
+* record web stack details, gen workflow and UI checks ([b28bc39](https://github.com/blackdark-org/travo-greenfield/commit/b28bc392c2770a9bc21914572b343789798484f9))
+* retire the slice-3 handoff and refresh handoff status ([8fe5cdb](https://github.com/blackdark-org/travo-greenfield/commit/8fe5cdbe916c9a88ac514b70cd5899431ed4268b))
+* set up agent skills config and the issue-to-merge workflow ([fd94645](https://github.com/blackdark-org/travo-greenfield/commit/fd94645319283332b4c7639a9b89a29fbae34cf3))
+* **testing:** drop the duplicate WireGuard toggle playbook entry ([70ad2d1](https://github.com/blackdark-org/travo-greenfield/commit/70ad2d123285bc54752008db535f70f5c4265c6e))
+* **testing:** record AXT1800 WireGuard rollback acceptance ([e0879c3](https://github.com/blackdark-org/travo-greenfield/commit/e0879c3f897a20ee75979cc49cb8b2be10f4bb8d))
+* **testing:** record the [#157](https://github.com/blackdark-org/travo-greenfield/issues/157), [#158](https://github.com/blackdark-org/travo-greenfield/issues/158) and [#132](https://github.com/blackdark-org/travo-greenfield/issues/132) (b) checks on the AXT1800 ([3e8365a](https://github.com/blackdark-org/travo-greenfield/commit/3e8365a4a7a037e3047e28ade9690b2eafa9964a))
+* **testing:** record the 0.1.0 hardware playbook run on the AXT1800 ([b5172d0](https://github.com/blackdark-org/travo-greenfield/commit/b5172d0e66ed1c179b331d553c3579b8d5731bb0))
+* **testing:** record the guest-zone VPN and reconnect re-test on the AXT1800 ([b16364f](https://github.com/blackdark-org/travo-greenfield/commit/b16364f52826a3ef56509d7b0c049c5202d12655))
+* **testing:** record the live phone tests on the AXT1800 ([012358b](https://github.com/blackdark-org/travo-greenfield/commit/012358ba7b7bb8480f9342907d1945e34b30e340))
+* **testing:** state the uplink state behind the first down tick ([f51d26f](https://github.com/blackdark-org/travo-greenfield/commit/f51d26f84d591dad0368cdb8d0eefa8d5b48e98c))
+* use the travo-greenfield state and guard paths ([30c05cb](https://github.com/blackdark-org/travo-greenfield/commit/30c05cb2061e7ceec3c44b36cbafc06f80cbd27b))
+* **vpn:** define tunnel status semantics ([bc97d5c](https://github.com/blackdark-org/travo-greenfield/commit/bc97d5c763ca699c9270a4072cc55e910f492811))
+* **vpn:** name tunnel status endpoint ([6795816](https://github.com/blackdark-org/travo-greenfield/commit/679581621c509b597cc0bbcbe3e9396b2dd6c10e))
+* **vpn:** pin kill switch scope to the lan zone ([0f6dfec](https://github.com/blackdark-org/travo-greenfield/commit/0f6dfec0e562bb1237692e865765fe39f6ce6dd5)), closes [#89](https://github.com/blackdark-org/travo-greenfield/issues/89)
+* **vpn:** record kill switch hardware results ([9cbafb5](https://github.com/blackdark-org/travo-greenfield/commit/9cbafb5e5dfe23afe88d4dc97c40678d436171e1)), closes [#89](https://github.com/blackdark-org/travo-greenfield/issues/89)
+* **wifi:** record Join browser acceptance ([d2a9030](https://github.com/blackdark-org/travo-greenfield/commit/d2a9030d6e09b05d0d7886ec11eba93e6074e84f))

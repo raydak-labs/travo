@@ -1,0 +1,18 @@
+=== RUN   TestHWBadUplinkDaemonDiesWatchdogRestores
+HW {"bad_sta_link":{"Present":true,"Up":true,"Carrier":false}}
+HW {"bad_sta_link_err":"\u003cnil\u003e"}
+HW {"bad_sta_default_route":false}
+HW {"uci_restored_after_s":16.173188584}
+HW {"sta_carrier_after_restore_s":7.759146587}
+HW {"sta_carrier_after_restore_ok":true}
+HW {"default_route_after_restore_s":0.509730046}
+HW {"default_route_after_restore":true}
+HW {"recover":[{"id":"019ecbea634b7eb3","configs":["wireless"],"started":"2026-11-09T16:19:07.119569633Z","summary":"hw: bad sta","window_seconds":15,"state":"rolled_back"}]}
+--- PASS: TestHWBadUplinkDaemonDiesWatchdogRestores (24.46s)
+PASS
+HomeUplink
+default via 192.168.90.2 dev phy0-sta0 proto static src 192.168.90.241 
+0
+/etc/greenfield-hw-txn:
+
+/tmp/greenfield-hw/guards:

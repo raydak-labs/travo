@@ -1,0 +1,5 @@
+PING 10.0.1.254 (10.0.1.254): 56 data bytes
+
+--- 10.0.1.254 ping statistics ---
+2 packets transmitted, 0 packets received, 100% packet loss
+exit=1

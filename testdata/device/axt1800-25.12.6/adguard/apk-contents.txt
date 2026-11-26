@@ -1,0 +1,13 @@
+adguardhome-0.107.79-r1 contains:
+etc/capabilities/adguardhome.json
+etc/config/adguardhome
+etc/init.d/adguardhome
+etc/sysctl.d/50-adguardhome.conf
+etc/uci-defaults/adguardhome
+lib/apk/packages/adguardhome.conffiles
+lib/apk/packages/adguardhome.conffiles_static
+lib/apk/packages/adguardhome.list
+lib/apk/packages/adguardhome.rusers
+lib/upgrade/keep.d/adguardhome
+usr/bin/AdGuardHome
+

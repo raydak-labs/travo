@@ -1,0 +1,13 @@
+network.wg0=interface
+network.wg0.proto='wireguard'
+network.wg0.private_key='REDACTED'
+network.wg0.addresses='100.64.41.140/32'
+network.wg0.dns='198.18.0.1' '198.18.0.2'
+network.wg0.disabled='0'
+network.wg0_peer0=wireguard_wg0
+network.wg0_peer0.public_key='KgTUh3KLijVluDvNpzDCJJfrJ7EyLzYLmdHCksG4sRg='
+network.wg0_peer0.allowed_ips='0.0.0.0/0'
+network.wg0_peer0.route_allowed_ips='1'
+network.wg0_peer0.persistent_keepalive='25'
+network.wg0_peer0.endpoint_host='203.0.113.8'
+network.wg0_peer0.endpoint_port='51820'

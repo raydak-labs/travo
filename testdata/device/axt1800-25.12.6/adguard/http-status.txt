@@ -1,0 +1,2 @@
+{"version":"0.107.79","language":"","dns_addresses":["127.0.0.1:5353","[::1]:5353","192.168.1.1:5353","[fdc7:8957:dc2d::1]:5353","[fe80::9683:c4ff:fe1f:2838%br-lan]:5353","192.168.90.241:5353","[fe80::9683:c4ff:fe1f:283a%phy0-sta0]:5353"],"dns_port":5353,"http_port":3000,"protection_disabled_duration":0,"start_time":1794237702838.0435,"protection_enabled":true,"dhcp_available":true,"running":true}
+

@@ -1,0 +1,7 @@
+config rule 'travo_block_46bae68d7d6b'
+	option name 'Travo block 46:ba:e6:8d:7d:6b'
+	option src '*'
+	option dest '*'
+	list src_mac '46:ba:e6:8d:7d:6b'
+	option target 'REJECT'
+	option proto 'all'

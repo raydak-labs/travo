@@ -1,0 +1,14 @@
+interface: wg0
+  public key: E/jjbAp2dyHKfxsM88HS13xxhtItgq8aUvwyfH/KH1c=
+  private key: (hidden)
+  listening port: 59786
+
+peer: KgTUh3KLijVluDvNpzDCJJfrJ7EyLzYLmdHCksG4sRg=
+  endpoint: 203.0.113.8:51820
+  allowed ips: 0.0.0.0/0
+  latest handshake: 15 seconds ago
+  transfer: 732 B received, 916 B sent
+  persistent keepalive: every 25 seconds
+---
+wg0	REDACTED	E/jjbAp2dyHKfxsM88HS13xxhtItgq8aUvwyfH/KH1c=	59786	off
+wg0	KgTUh3KLijVluDvNpzDCJJfrJ7EyLzYLmdHCksG4sRg=	(none)	203.0.113.8:51820	0.0.0.0/0	1794610022	732	916	25

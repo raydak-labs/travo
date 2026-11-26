@@ -1,191 +1,94 @@
-# Agent Instructions
+# travo-greenfield
 
-## Read First
+Travel-router web UI and API (Go daemon + Svelte SPA) that runs on OpenWrt next to LuCI. Clean-room rewrite of Travo.
 
-Pick by question, not by habit:
+## Verify
 
-- `AGENTS.md` keeps repo workflow and guardrails, including the documentation rules below.
-- `docs/README.md` is the **documentation map**: one table telling you which file answers which question.
-- `docs/architecture/overview.md` keeps cross-cutting invariants, safety rules, and runtime invariants that predate or span ADRs. Update it whenever new essential behavior, subsystem contract, or operational constraint is decided.
-- `docs/adr/README.md` indexes **architecture decision records** (ADRs). Before changing a subsystem, read the ADR for that area from that index (e.g. wireless → 0002, crash guards → 0003, firewall → 0004, mwan3 failover → 0005, platform/OpenAPI → 0006, auth → 0007, DNS/VPN/captive → 0001, UI language → 0012, cross-cutting invariants and device findings → 0013).
-- `docs/guides/` holds task-shaped how-tos: `development.md`, `deployment.md`, `testing.md`.
-- `docs/reference/` holds what things are: `ui-theming.md` (tokens, component contracts), `frontend-information-architecture.md` (navigation rules).
-- `docs/guides/on-device-verification.md` is the device playbook (standing checks and multi-WAN failover).
-- Open work and the shipped history are GitHub issues on `raydak-labs/travo`. Git is the history.
-- `GLOSSARY.md` at the repo root fixes the words: summary band, status tone, stale, traffic history, configured vs live radio.
-- `docs/+ Start here.md` is the **Obsidian hub** (wikilinks) for the vault rooted at `docs/`.
+`mise run check` green before every commit (Go, web, generated client, size). After API changes run `mise run gen` and commit the result. Hardware-only behaviour is gated by the playbook in `docs/testing.md`.
 
-## Documentation
+## Stack
 
-Structure is enforced by review, not by tests. Shell and install contracts are pinned by `backend/internal/contracts/`.
+Follows https://github.com/BlackDark/agent-presets/blob/main/stack/core.md and `stack/embedded-ui.md`.
+Deviations:
+- Backend Go with Huma-generated OpenAPI + hey-api client: no hand-written spec (docs/adr/0003).
+- Paraglide with `en` only (docs/adr/0004).
+- No Zod in the daemon path; Zod Mini/Valibot only if a UI boundary outside the generated client needs runtime validation (none so far, docs/adr/0031).
+- Distribution is a release tarball + install script, not a package (docs/adr/0007).
 
-### Where a fact goes
+## Map
 
-One canonical home per fact. When you learn something, put it where a reader will
-look for it, and link rather than duplicate:
+- `docs/invariants.md` MUST rules; read before touching live state, auth, DNS, WiFi. Breaking one needs an ADR.
+- `docs/device-facts.md` hardware lessons; `docs/testing.md` test layers and fixture rules.
+- `docs/web-ui.md` page rules, and how pages confirm risky changes (dialog) and report results (toasts).
+- `docs/adr/README.md` decision index; `GLOSSARY.md` terms (use them verbatim in code, tests, issues).
+- `testdata/device/<device>-<firmware>/` verbatim device captures with `PROVENANCE.md` and redaction policy; `SPIKES.md` there has hardware results.
+- `.out-of-scope/` rejected feature requests, one file per concept; `/triage` checks it.
 
-| Fact                                                                             | Home                                                                                                                            | Not                                      |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| A durable decision (hard to reverse, surprising without context, real trade-off) | a numbered ADR in `docs/adr/`                                                                                                   | a plan, a code comment, a task           |
-| An invariant or safety rule that spans subsystems                                | `docs/architecture/overview.md`, or [ADR 0013](docs/adr/0013-operational-invariants-and-device-findings.md) once an ADR owns it | the other one                            |
-| How to do something                                                              | `docs/guides/<task>.md`                                                                                                         | `docs/reference/`                        |
-| What something is (tokens, tables, contracts)                                    | `docs/reference/`                                                                                                               | a guide                                  |
-| A check that only settles on hardware                                            | `docs/guides/on-device-verification.md`                                                                                         | a guide, if the guide only runs commands |
-| A term with a specific meaning in this project                                   | `GLOSSARY.md`                                                                                                                   | a paragraph in a plan                    |
-| Backlog                                                                          | GitHub issues                                                                                                                   | a doc checklist                          |
+There is no spec file. Product intent lives in issues (PRD, then tickets); shipped behaviour lives in tests and the generated OpenAPI.
 
-Prefer a link over a second copy. A fact maintained in two places is one place
-wrong within a month.
+## Work
 
-### Writing rules
-
-- **Frontmatter on every doc**: `title`, `description`, `updated` (ISO date), `tags`.
-- **Section order inside an ADR** is fixed: Context → Decision → Why →
-  Consequences and invariants → Deliberate ceilings. An ADR without a "Why" or
-  without stated ceilings is a note, not a decision record.
-- **Keep lines under 100 characters** and prose over bullet walls. Documents are read
-  in a terminal and by agents with limited context.
-- **Do not restate code in prose.** Point at the symbol (`VpnService.restoreDefaultRouteAfterWireGuardDisable`)
-  instead of paraphrasing its body, or the doc rots on the next refactor.
-- **Cite device findings with their evidence** (what was observed, on which firmware).
-  A finding without evidence is an opinion.
-- **Update the index you touched.** `docs/README.md` and `docs/adr/README.md` are checked mechanically; `docs/+ Start here.md` must link
-  every ADR.
-- **Link with paths that survive a move**: relative markdown links or Obsidian
-  wikilinks, never a bare filename that resolves only by luck.
-
-### When you change behaviour
-
-In the same change: update the owning ADR or guide, update
-the GitHub issue, and run
-`cd backend && go test ./internal/contracts/` — the contract tests fail on scripts that
-no longer parse, a deploy-local guard that is not cleared, and a broken install one-liner.
+Work is GitHub issues, rules are `docs/`. Before any task, read `docs/agents/workflow.md`: how an issue becomes a brief, who implements, reviews and merges, and when a `needs-hardware` issue may close.
+- Implement only `ready-for-agent` issues with no open blocker; an `epic` gets `/to-tickets` first.
+- The brief is the contract. When it contradicts the repo, stop and report `blocked`: the coordinator fixes the brief.
+- A decision made while implementing lands in an ADR or `docs/invariants.md` in the same PR; the issue links it.
 
 ## Agent skills
 
 ### Issue tracker
 
-GitHub Issues on `raydak-labs/travo`, via `gh`. See `docs/agents/issue-tracker.md`.
+GitHub issues on `blackdark-org/travo-greenfield`, milestone of the next release (`gh api repos/blackdark-org/travo-greenfield/milestones --jq ".[].title"`), project board 1, native sub-issues and blocked-by. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`,
-`wontfix`). See `docs/agents/triage-labels.md`.
+Canonical role names, plus `epic`, `area/*`, `model:*`, `needs-hardware`. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context: root `GLOSSARY.md` plus `docs/adr/`. See `docs/agents/domain.md`.
+Single context: `GLOSSARY.md`, `docs/adr/`, `docs/invariants.md`, `docs/device-facts.md`. See `docs/agents/domain.md`.
 
-## Tools & Setup
+## Every change
 
-- everything should be installed via `mise`. See `.mise.toml`
-- Run `make install` once after cloning or whenever dependencies change (installs pnpm packages and downloads Go modules)
+Same PR, only what the change touches:
+- tests for the changed behaviour; fixtures are verbatim device payloads with provenance, never invented fields
+- docs that describe it (invariants, ADR when a decision changes)
+- README when a user-visible feature changes
+- screenshots after visual changes: before/after images with the changes boxed in the PR body (`docs/testing.md` "Screenshots")
 
-## Project Structure
+## Code style
 
-This is a pnpm monorepo with:
+- Data in, data out: pure functions, side effects (I/O, time, randomness) at the edges and passed in.
+- Expected failures are values (`error` in Go, `Result`/unions in TS); panic/throw for bugs only.
+- Composition over inheritance.
+- Small units: split a file past ~400 lines, a function past ~60.
+- Names explain what, comments explain why.
+- Refactors keep behaviour and land in their own commit.
+- All OpenWrt access goes through the `Device` / `PackageManager` ports; all live-state changes through the transaction module; all DNS changes through the layer stack.
 
-- `frontend/` — React + TypeScript + Vite + TailwindCSS
-- `backend/` — Go + Fiber, one package per domain under `backend/internal/`
-  (see `docs/reference/backend-packages.md`)
-- `shared/` — TypeScript API types, generated from the backend's OpenAPI document (`make generate`)
+## Stewardship
 
-## Documentation Workflow
+Leave every touched area cleaner than found.
+- Small fixes beside the change (dead code, stale doc, missing test, unclear name): own commit, same PR.
+- Whatever the change makes obsolete goes in the same PR.
+- Larger problems: report with `file:line` and a proposal; the PR stays on topic.
 
-The rules above are the source of truth. Operationally:
+## Git
 
-- `docs/README.md` is the documentation map; `docs/+ Start here.md` is its Obsidian twin. Update both when the layout changes.
-- `docs/architecture/overview.md` stays a short overview that links deeper — never a second copy of an ADR.
-- New normative cross-cutting decision → new numbered ADR + index entry + hub wikilink, in the same commit.
-- Shipped work → fold any normative part into an ADR or guide; close the issue.
-- Before finishing: `make test`, and check links by hand for anything you moved.
+- Conventional Commits. One topic per PR.
+- Merge: rebase when commits are logically separate, squash otherwise.
+- PR already merged → branch anew from `origin/main`, open a new PR.
+- `--force-with-lease` on own branches only.
 
-## Documentation retrieval (Obsidian CLI)
+## Boundaries
 
-**Default for agents:** When working with project documentation, prefer the **Obsidian CLI** if it is installed and registered, and this checkout’s vault is visible as `docs` pointing at `<repo>/docs`.
+- `sudo`, system packages, global installs: the user runs them; ask with what and why.
+- No `.github/FUNDING.yml` yet: ask, then copy https://github.com/BlackDark/agent-presets/blob/main/templates/FUNDING.yml
+- Running user processes stay up; test on other ports.
+- Never run destructive probes against a real device; GET-only first.
+- Language: code, comments, docs, commits in English; UI English via Paraglide.
 
-1. **One-time setup (humans):** Obsidian **1.12+** → **Settings → General → Command line interface** → enable and install shell shim. After PATH changes: `hash -r` (bash) or `rehash` (zsh).
+## Gotchas
 
-2. **Verify:**
-   - `command -v obsidian`
-   - `obsidian vault list` — expect `name` `docs` with `path` matching this repository’s `docs/` directory.
-
-3. **Typical commands** (pass `vault=docs` explicitly; cwd can be anywhere once the vault is registered):
-   - Search: `obsidian search query="mwan3 failover" vault=docs`
-   - Read note body to stdout: `obsidian read path=architecture/overview.md vault=docs` — paths are **vault-relative** (`adr/0002-wireless-model-and-luci-apply.md`, …). Quote paths that start with `+` or contain spaces, e.g. `obsidian read path='+ Start here.md' vault=docs`. Quote paths that start with `+` or contain spaces, e.g. `obsidian read path='+ Start here.md' vault=docs`.
-   - Backlinks: `obsidian backlinks path=adr/0001-dns-vpn-captive-portal-architecture.md vault=docs`
-   - More: `obsidian help`
-
-4. **Graph / wikilinks in the app:** Open the vault folder `docs/` in Obsidian; start at **`+ Start here.md`**.
-
-**Fallback:** No CLI, wrong vault path, headless CI, or command errors → use `Read` / `Grep` / `SemanticSearch` on `docs/` (same Markdown files). Do not block work on the Obsidian app being open.
-
-## Frontend UI & Theming
-
-- Dark mode is the `dark` class on `document.documentElement`, driven by `ThemeProvider` and an inline boot script in `frontend/index.html`. See `docs/reference/ui-theming.md` for tokens and patterns.
-- **Do not** set explicit text colors (`text-gray-900`, hex, inline `color`, etc.) for ordinary copy unless there is no reasonable alternative. Prefer inheriting from global `body` styles in `frontend/src/index.css` or using shared primitives (`CardTitle`, `CardDescription`, buttons) that already pair light/dark.
-- When you must set color, always provide **both** light and dark variants (for example `text-gray-500 dark:text-gray-400`). Charts and embedded SVGs may use the `--chart-*` CSS variables in `index.css` instead of hard-coded text fills.
-- **Exceptions**: status or semantic hues, charts, third-party widgets, badges, and contrast inside intentionally colored surfaces. Still keep dark-mode variants where users can enable dark theme.
-
-## Development
-
-- Run `pnpm install` for Node dependencies
-- Run `cd backend && go mod tidy` for Go dependencies
-- Run `make test` to run all tests
-- Run `make dev` for development servers
-- Run `make format` for formatting code
-- Run `make lint` to run lint checks
-- Run `make build` to build the projects
-
-## Testing
-
-Follow TDD: write tests first, see them fail, write minimal code to pass.
-
-- Go tests: `cd backend && go test ./...`
-- Shared tests: `cd shared && pnpm test`
-- Frontend tests: `cd frontend && pnpm test`
-
-## Real Device Validation
-
-- You have access to the OpenWRT test environment via SSH at `192.168.1.1`.
-- You may execute commands on the device and copy files to it.
-- For `scp`, use the legacy option.
-- Commands like `rg` are not available on the target system; use simpler tools like `grep`.
-- Always test important device behavior directly on the target system, either with a browser, `curl`, or SSH-level validation.
-- If useful, cross-check with real configs on the device.
-- If direct device access would reduce guesswork, ask the user so you can validate behavior before implementing blindly.
-
-## Safety-Critical System Changes
-
-Follow full rationale and examples in `docs/architecture/overview.md`. Core rules:
-
-- Any automated action that modifies live system state must use a crash guard file in `/etc/trafo/<feature>-in-progress` (ADR 0003 §2 lists every path; non-guard state stays in `/etc/travo/`).
-- Remove guard files only after the dangerous operation completes successfully.
-- A manual redeploy via `deploy-local.sh` clears guard files and is the explicit retry path.
-- Wireless changes must preserve LuCI-style rollback semantics: backend uses rpcd `uci apply` plus rollback plus `uci confirm`.
-- Scripts and SSH flows must not run `wifi` or `wifi up` as part of applying user wireless changes. They write UCI only; the user applies via LuCI "Save & Apply" or reboot.
-- Do not use `wifi reload` on ath11k/IPQ6018. Where `wifi up` already exists for bounded recovery logic, keep that exception explicit and documented.
-- If you add new zones, interfaces, or routing paths, include all required firewall changes and follow existing default `wan` patterns.
-- Any new background goroutine or scheduled task that changes live state must follow the same guard and rollback rules. No exceptions.
-
-## API Documentation Endpoint
-
-Contract:
-
-```text
-GET /api/openapi.json
-```
-
-- It is OpenAPI 3.1, generated from the handler types (ADR 0006 §4); never edit a spec by hand.
-- Add endpoints with the `get`/`post`/`put`/`del` helpers in `backend/internal/api`, not on the Fiber app.
-- After changing an API type, run `make generate` and commit `shared/openapi.json`,
-  `shared/src/generated/` and `frontend/src/api/` (never edit those by hand; CI checks they are
-  current).
-- The frontend calls the API through the generated functions in `frontend/src/api/endpoints.ts`.
-- It should remain available on the test device at `http://192.168.1.1/api/openapi.json`.
-- Protected endpoints use `POST /api/v1/auth/login` and `Authorization: Bearer <token>`.
-
-## Finish Task
-
-- Before finishing, ensure lint, tests, and build pass. Check `Makefile` for the canonical commands.
-- If tests fail, focus on fixing and rerunning them, then run the top-level `make` checks again before finishing.
+- Never call `wifi`, `wifi up/down/reload` in an apply path (ath11k crash).
+- Netifd route state lies; read the kernel table.
+- Fixtures that invent fields caused the worst shipped bugs.

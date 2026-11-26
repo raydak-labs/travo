@@ -1,0 +1,10 @@
+'iwinfo' @dc8cae01
+	"devices":{}
+	"info":{"device":"String"}
+	"scan":{"device":"String"}
+	"assoclist":{"device":"String","mac":"String"}
+	"freqlist":{"device":"String"}
+	"txpowerlist":{"device":"String"}
+	"countrylist":{"device":"String"}
+	"survey":{"device":"String"}
+	"phyname":{"section":"String"}

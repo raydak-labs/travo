@@ -1,0 +1,35 @@
+# grep -h "admin/" /usr/share/luci/menu.d/luci-app-watchcat.json /usr/share/luci/menu.d/luci-app-vnstat2.json
+	"admin/services/watchcat": {
+	"admin/status/vnstat2": {
+	"admin/status/vnstat2/graphs": {
+	"admin/status/vnstat2/config": {
+# /etc/init.d/watchcat enabled; echo $?
+0
+# /etc/init.d/vnstat enabled; echo $?
+0
+# /etc/init.d/watchcat disable; /etc/init.d/watchcat enabled; echo $?
+1
+# ubus call service list {"name":"vnstat"}
+{
+	"vnstat": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 19787,
+				"command": [
+					"/usr/sbin/vnstatd",
+					"--nodaemon",
+					"--noadd",
+					"--startempty",
+					"--noremove"
+				],
+				"term_timeout": 5,
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	}
+}

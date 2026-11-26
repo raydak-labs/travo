@@ -1,0 +1,8 @@
+network.guest_dev=device
+network.guest_dev.name='br-guest'
+network.guest_dev.type='bridge'
+network.guest_dev.bridge_empty='1'
+network.guest=interface
+network.guest.proto='static'
+network.guest.device='br-guest'
+network.guest.ipaddr='192.168.2.1/24'

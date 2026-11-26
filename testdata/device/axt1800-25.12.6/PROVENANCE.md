@@ -1,0 +1,129 @@
+Captured read-only from GL-AXT1800 (OpenWrt 25.12.6 r33311-981c978eff, qualcommax/ipq60xx) on Mon Nov  9 16:12:15 UTC 2026 via `date -u` on the router. Layout at capture: radio0 = uplink STA phy0-sta0 (SSID HomeUplink, wwan up), radio1 = AP phy1-ap0 (lan), radio0 AP disabled. Caller on Ethernet (LAN).
+
+interface-dump.json: ubus call network.interface dump
+interface-wwan-status.json: ubus call network.interface.wwan status
+interface-lan-status.json: ubus call network.interface.lan status
+interface-wan-status.json: ubus call network.interface.wan status
+device-status-all.json: ubus call network.device status
+device-status-phy1-ap0.json: ubus call network.device status '{"name":"phy1-ap0"}'
+device-status-phy0-sta0.json: ubus call network.device status '{"name":"phy0-sta0"}'
+device-status-br-lan.json: ubus call network.device status '{"name":"br-lan"}'
+wireless-status.json: ubus call network.wireless status
+hostapd-phy1-ap0-get_clients.json: ubus call hostapd.phy1-ap0 get_clients
+hostapd-list.txt: ubus -v list 'hostapd.*'
+wpa-list.txt: ubus -v list 'wpa_supplicant.*'
+iwinfo-devices.json: ubus call iwinfo devices
+iwinfo-info-phy1-ap0.json: ubus call iwinfo info '{"device":"phy1-ap0"}'
+iwinfo-info-phy0-sta0.json: ubus call iwinfo info '{"device":"phy0-sta0"}'
+iwinfo-assoclist-phy1-ap0.json: ubus call iwinfo assoclist '{"device":"phy1-ap0"}'
+ip-neigh.txt: ip -4 neigh show
+ip-neigh.json: ip -j -4 neigh show
+ip-route-main.txt: ip -4 route show table main
+ip-route-default.txt: ip -4 route show default
+ip-addr.json: ip -j -4 addr show
+uci-show-wireless.txt: uci show wireless
+uci-show-network.txt: uci show network
+uci-show-dhcp.txt: uci show dhcp
+uci-show-firewall.txt: uci show firewall
+uci-changes.txt: uci changes
+system-board.json: ubus call system board
+system-info.json: ubus call system info
+service-list-dnsmasq.json: ubus call service list '{"name":"dnsmasq"}'
+dhcp-leases.txt: cat /tmp/dhcp.leases
+resolv-auto.txt: cat /tmp/resolv.conf.d/resolv.conf.auto
+buttons.txt: for f in /sys/firmware/devicetree/base/keys/*/label; do echo "$f: $(cat $f)"; done
+ubus-list.txt: ubus list
+rpcd-acl-ls.txt: ls /usr/share/rpcd/acl.d/
+reload-config-which.txt: which reload_config wifi setsid ip jsonfilter
+
+REDACTIONS (values replaced with 'REDACTED', lines kept):
+- uci-show-wireless.txt: all wireless.*.key= lines (5 values, WiFi passphrases)
+- uci-show-network.txt: network.wg0.private_key= (WireGuard private key)
+Not redacted: network.wg0_peer0.public_key (public key, not secret). "psk"/"psk2" matches in JSON/encryption fields are type names, not secrets.
+- ubus-uci-get-dhcp.json: ubus call uci get '{"config":"dhcp"}' (after restoring /etc/config/dhcp to the backup: `list server '127.0.0.1#5353'`)
+- uci-show-dhcp-list-single.txt: uci show dhcp (same state). Shows `dhcp.cfg01411c.server='127.0.0.1#5353'`: a one-element LIST prints exactly like an option. Only `ubus call uci get` (JSON array) or `uci export` (`list` keyword) tell them apart.
+
+## Redaction policy (applies to this directory and subdirectories)
+Secrets, replaced with `REDACTED`: WiFi passphrases (`uci` `key`, and `"key"` inside `network.wireless status` JSON: wireless-status.json in both dirs), WireGuard private key.
+Location-identifying values, replaced with stable placeholders in every file (raw captures and spike logs alike): SSIDs (home uplink → `HomeUplink`, travel AP → `TravelAP`, other saved networks → `HomeNet`, `HotelA`, `HotelB`), DNS search domain → `home.lan`, WireGuard endpoint → `203.0.113.8` (RFC 5737). DHCP lease hostnames → `REDACTED-HOST`.
+Kept as captured: MAC addresses and private RFC1918 addresses. They are needed for classification tests and do not locate the user. Public keys are kept.
+Every other byte is verbatim. Placeholders were substituted after capture with exact string replacement.
+
+## guest/ (2026-11-17, 0.1.0 release playbook, #75)
+Captured while a `POST /api/v1/wifi/guest` transaction (radio1, SSID `TGPlaybookGuest`, a throwaway test key) was Pending, before it was rolled back:
+- uci-network-guest.txt: `uci show network | grep -E "^network\.(guest|travo_guest|br_guest|guest_dev)[.=]"`
+- uci-firewall-guest.txt: `uci show firewall | grep -iE "guest"`
+- uci-dhcp-guest.txt: `uci show dhcp | grep -E "^dhcp\.guest[.=]"`
+- uci-wireless-guest.txt: `uci show wireless | grep -iE "guest" | grep -v "\.key="` (the key line is omitted, not redacted)
+- interface-guest-status.json: `ubus call network.interface.guest status`
+No placeholders were needed: the SSID is a test name and the only address is the guest subnet `192.168.2.1/24`. Every byte is verbatim.
+
+## sysfs-net/ (2026-11-18, #175)
+- links.tsv: `cd /sys/class/net && for n in *; do printf "%s\t%s\t%s\t%s\t%s\n" "$n" "$(readlink $n/device)" "$(readlink $n/device/driver)" "$(readlink $n/device/subsystem)" "$(grep ^DEVTYPE= $n/uevent | cut -d= -f2)"; done`. Columns: name, device link, driver link, subsystem link, uevent `DEVTYPE`. Taken with wg0 disabled (absent) and no USB device attached. Verbatim; nothing needed redaction.
+
+## usbtether/ (2026-11-18, 25.12.6 package feed and UCI, #175)
+- apk-packages.txt: after `apk update`, `apk search -v kmod-usb-net-rndis kmod-usb-net-cdc-ncm kmod-usb-net-cdc-ether kmod-usb-net-ipheth usbmuxd`, then `apk info -R` for each tether package and `apk info -s` for them and their dependencies. None was installed. Verbatim.
+- uci-export-firewall.txt, uci-export-network.txt: `uci export firewall`, `uci export network` (router state after the 0.1.0 install: wwan uplink, guest AP, VPN profile stored, tunnel off). The wan zone is the anonymous `@zone[1]` with `list network`. Redacted: `wg0` `private_key` → `REDACTED`, peer `endpoint_host` → `203.0.113.8`.
+- usbmuxd-init.txt, usbmuxd-hotplug.txt: `/etc/init.d/usbmuxd` and `/etc/hotplug.d/usb/40-usbmuxd` from `apk fetch usbmuxd` + `apk extract` into `/tmp` (package not installed). Verbatim.
+No phone was attached: the tether link payloads (sysfs, `network.device status`, `network.interface.usbtether status`) are a hardware playbook capture step (docs/testing.md).
+
+## uci-export-system.txt (2026-11-18, 0.2.0 system settings, #190)
+- uci-export-system.txt: `uci export system` on the firstboot 25.12.6 image (hostname, zonename/timezone POSIX pair, sysntpd `timeserver ntp` with its server list). No values needed redaction; every byte is verbatim.
+
+## mwan3/ (2026-11-18, 25.12.6 package feed, #208)
+Packages fetched and extracted into `/tmp` on the router without installing them: `apk fetch mwan3 luci-app-mwan3`, `apk extract --allow-untrusted --destination <dir> <pkg>.apk`.
+- stock-config-mwan3.txt: `/etc/config/mwan3` of `mwan3-2.12.0-r3` (the conffile a fresh install writes).
+- mwan3-conffiles-init.txt: `lib/apk/packages/mwan3.conffiles`, a `---` line, then `/etc/init.d/mwan3`.
+- luci-app-mwan3-acl.json: `/usr/share/rpcd/acl.d/luci-app-mwan3.json` of `luci-app-mwan3-26.317.52279~1c75ea4`.
+Verbatim; nothing needed redaction.
+
+## logs/ (2026-11-18, OpenWrt 25.12.6, #192)
+- logs/logread.txt: `logread` (GET-only) after the 0.1.0 install, firstboot plus a day of uptime; then, in file order, at most 3 lines per (facility.level, program) were kept so every line shape appears once without the repetitive bulk (AdGuard probe errors, odhcpd RA warnings). Lines carrying a Tailscale login URL were dropped. Placeholders: the uplink SSID → `HomeUplink`, its BSSID → `REDACTED-BSSID`, the Tailscale `LogID` → `REDACTED`, a DHCPACK client hostname → `REDACTED-HOST`. Every kept line is otherwise verbatim, including the empty program in `user.notice : ...`, programs without a pid (`kernel:`, `netifd:`, `hostapd:`) and the kernel uptime brackets.
+
+## system/ (2026-11-18, OpenWrt 25.12.6, #196)
+- system/proc-mounts.txt: `cat /proc/mounts` (GET-only) on the running router: ubifs `/overlay` (`/dev/ubi0_2`, rw) under the overlayfs root. Verbatim; nothing needed redaction. Alert tests derive the degraded shapes (tmpfs overlay, read-only overlay) by replacing only that line's file system type or `rw` flag.
+- system/proc-meminfo.txt and system/system-info-meminfo.json (2026-11-20 09:31 UTC, 14 h after boot, AdGuard Home on loopback): one ssh session of `cat /proc/meminfo > a; ubus call system info > b` (GET-only, both read the same instant, files in /tmp removed afterwards). `memory.available` of `system info` (46571520 bytes) is `MemAvailable` (45480 kB) times 1024: the low-memory alert reads it through the Device port. Verbatim; nothing needed redaction.
+
+## clients/ (2026-11-18, #218, #219)
+Leases, neighbours, `network.lan` and hostapd method list, plus staged-only (reverted) block rule and host section captures. See `clients/PROVENANCE.md`.
+
+## diagnostics/ (2026-11-19, #236)
+BusyBox ping, traceroute and nslookup output with exit codes. See `diagnostics/PROVENANCE.md`.
+
+## wol/ (2026-11-19, #247)
+No Wake-on-LAN tool or package on the image. See `wol/PROVENANCE.md`.
+
+## network/ (2026-11-18, #237)
+Interface dump with the guest interface and uptime, and `uci export firewall` with anonymous and named zones. See `network/PROVENANCE.md`.
+
+## dhcp/ (2026-11-19, #239)
+`uci export dhcp` with the guest network, `network.lan`/`network.guest`, and the dnsmasq init script's `dhcp_add` range and `dhcp_domain_add` hosts-file excerpts. See `dhcp/PROVENANCE.md`.
+
+## updates/ (2026-11-18, OpenWrt 25.12.6, #193)
+- updates/versions.json: `wget -qO- https://downloads.openwrt.org/.versions.json` on the router (the release index under `release.firmware_url` of `ubus call system board`). Verbatim.
+- updates/apk-list-upgradable.txt: `apk list --upgradable` (apk-tools 3.0.5) with the package lists left in `/tmp` by earlier installs; nothing refreshed or installed. Verbatim; nothing needed redaction.
+
+## leds/ (2026-11-19, #194)
+`/sys/class/leds` listings before and after a restored `system` led section write probe, and `led.state`. See `leds/PROVENANCE.md`.
+
+## buttons/ (2026-11-19, #195)
+Devicetree key nodes (label, `linux,code`, `linux,input-type`) of the reset button and the slide switch. See `buttons/PROVENANCE.md`.
+
+## sysupgrade/ (2026-11-19, OpenWrt 25.12.6, #198)
+- sysupgrade/etc-apk-world.txt, sysupgrade/rom-etc-apk-world.txt: `cat /etc/apk/world` and `cat /rom/etc/apk/world` (GET-only) after firstboot plus the 0.1.0 install. Identical: the image was built with `adguardhome`, and Travo itself is not an apk package (ADR 0007), so no user-installed package exists. Verbatim; nothing needed redaction.
+- sysupgrade/keep.d-travo-greenfield.txt: `cat /lib/upgrade/keep.d/travo-greenfield` (GET-only) from the 0.1.0 install. Verbatim.
+- `which sysupgrade` → `/sbin/sysupgrade`; `ubus -v list system` lists `validate_firmware_image {path}` and `sysupgrade {path, force, backup, prefix, command, options}`. No image was uploaded, validated or flashed on the router.
+
+## ipv6/, ddns/ and adguard DoH captures (2026-11-19, #245)
+IPv6 defaults of the image, the `ddns-scripts` package files (installed and removed under the lock, router restored) and AGH's upstream test replies. See `ipv6/PROVENANCE.md`, `ddns/PROVENANCE.md` and `adguard/PROVENANCE.md`.
+
+## catalog/ (2026-11-19, #268)
+Package names, sizes, the built-in SQM and init script states for the services catalog; one short install/remove probe under the lock, router restored. See `catalog/PROVENANCE.md`.
+
+## mwan3/ live failover captures (2026-11-20, #277)
+Captured from the AXT1800 (25.12.6, mwan3 2.12.0-r3, iptables-nft 1.8.10) during the failover debug session; see SPIKES.md "Failover apply probe and live failover". No public addresses occur; every byte is verbatim unless noted.
+- nft-ruleset-ip-stale-base.json, nft-ruleset-ip6-stale-base.json: `nft -j list ruleset ip|ip6` with mwan3 stopped after the rolled-back apply: Tailscale's empty `filter`/`nat` tables and `mangle` base chains (OUTPUT as `type filter`).
+- mangle-stale-base.txt: `iptables -t mangle -w -S 2>&1` at the same moment (the incompatible-base-chains note, exit 0).
+- interfaces-wan-usbtether-online.txt: the `interface` lines of `mwan3 interfaces` 6 s into the failed probe (`grep interface`; the "Interface status:" header and blank line dropped).
+- mangle-probe-no-hook.txt: the same sample's `iptables -t mangle -w -S` lines matching `mwan3_(rules|policy_travo|hook)|^-A (PRE|OUT)` (grep-filtered; no hook line existed).
+- interface-wan-status-failover.json, interface-wwan-status-failover.json, interface-usbtether-status-failover.json: `ubus call network.interface.<name> status` with all three uplinks up (wan and wwan in 10.0.1.0/24).

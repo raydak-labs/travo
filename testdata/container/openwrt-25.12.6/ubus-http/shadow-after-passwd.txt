@@ -1,0 +1,2 @@
+$5$
+-rw-------    1 root     root           272 Nov  9 17:08 /etc/shadow

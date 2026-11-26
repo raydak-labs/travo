@@ -1,0 +1,1 @@
+adguardhome-0.107.79-r1 aarch64_cortex-a53 {feeds/packages/feeds/packages/net/adguardhome} (GPL-3.0-only) [installed]

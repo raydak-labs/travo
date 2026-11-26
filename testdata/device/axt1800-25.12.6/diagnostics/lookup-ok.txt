@@ -1,0 +1,10 @@
+Server:		127.0.0.1
+Address:	127.0.0.1:53
+
+Name:	localhost
+Address: 127.0.0.1
+
+Name:	localhost
+Address: ::1
+
+exit=0

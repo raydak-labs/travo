@@ -1,0 +1,8 @@
+'system' @bde8ac66
+	"board":{}
+	"info":{}
+	"reboot":{}
+	"watchdog":{"frequency":"Integer","timeout":"Integer","magicclose":"Boolean","stop":"Boolean"}
+	"signal":{"pid":"Integer","signum":"Integer"}
+	"validate_firmware_image":{"path":"String"}
+	"sysupgrade":{"path":"String","force":"Boolean","backup":"String","prefix":"String","command":"String","options":"Table"}

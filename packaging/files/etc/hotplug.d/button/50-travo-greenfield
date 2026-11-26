@@ -1,0 +1,17 @@
+#!/bin/sh
+# shellcheck shell=sh
+# Hands slide-switch events (BTN_0..BTN_9) to the travo-greenfield daemon's hook socket
+# (docs/adr/0024): the daemon runs the configured action with its own locks, guards and
+# lockout rules. No uci or wifi here. Every other button (reset, WPS, ...) is ignored and
+# keeps its stock /etc/rc.button behaviour. hotplug-call sources this file in a subshell.
+case "$BUTTON" in
+BTN_[0-9]) ;;
+*) exit 0 ;;
+esac
+case "$ACTION" in
+pressed | released) ;;
+*) exit 0 ;;
+esac
+# Lower case with dashes: BTN_0 pressed is the hook action button-btn-0-pressed.
+# Detached: procd runs hotplug scripts in order and a VPN action may take up to 90 s.
+(travo-greenfield --hook "button-btn-${BUTTON#BTN_}-$ACTION" 2>&1 | logger -t travo-greenfield-hook) &

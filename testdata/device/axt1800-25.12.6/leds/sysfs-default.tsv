@@ -1,0 +1,3 @@
+blue:run	1	1	[none] timer heartbeat default-on netdev mmc0 phy0rx phy0tx phy0assoc phy0radio phy1rx phy1tx phy1assoc phy1radio
+mmc0::	0	255	none timer heartbeat default-on netdev [mmc0] phy0rx phy0tx phy0assoc phy0radio phy1rx phy1tx phy1assoc phy1radio
+white:system	0	1	[none] timer heartbeat default-on netdev mmc0 phy0rx phy0tx phy0assoc phy0radio phy1rx phy1tx phy1assoc phy1radio

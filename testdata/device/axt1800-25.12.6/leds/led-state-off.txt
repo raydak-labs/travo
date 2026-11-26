@@ -1,0 +1,2 @@
+blue:run none 1
+white:system none 0

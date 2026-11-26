@@ -1,0 +1,8 @@
+Server:		127.0.0.1
+Address:	127.0.0.1:53
+
+** server can't find does-not-exist.invalid: NXDOMAIN
+
+** server can't find does-not-exist.invalid: NXDOMAIN
+
+exit=1

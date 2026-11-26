@@ -1,0 +1,7 @@
+HTTP/1.1 200 OK
+Accept-Ranges: bytes
+Content-Length: 1666
+Content-Type: text/html; charset=utf-8
+Vary: Accept-Encoding
+Date: Mon, 09 Nov 2026 16:14:31 GMT
+

@@ -1,0 +1,10 @@
+25.49 79.17
+{"err":"\u003cnil\u003e","recover":[{"id":"c50af1f8ffc4eefb","configs":["wireless"],"started":"2026-11-09T16:23:55.416503431Z","summary":"hw: reboot","window_seconds":15,"state":"rolled_back"}],"uptime":"13.27"}
+TravelAP
+=== RUN   TestHWRebootVerify
+HW {"boot_result":"{\"err\":\"\\u003cnil\\u003e\",\"recover\":[{\"id\":\"c50af1f8ffc4eefb\",\"configs\":[\"wireless\"],\"started\":\"2026-11-09T16:23:55.416503431Z\",\"summary\":\"hw: reboot\",\"window_seconds\":15,\"state\":\"rolled_back\"}],\"uptime\":\"13.27\"}"}
+HW {"uci_ssid_restored":true}
+HW {"orig_ssid_live_s":0.151765041}
+HW {"orig_ssid_live_ok":true}
+--- PASS: TestHWRebootVerify (0.17s)
+PASS

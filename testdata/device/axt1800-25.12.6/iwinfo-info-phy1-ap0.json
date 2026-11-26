@@ -1,0 +1,51 @@
+{
+	"phy": "phy1",
+	"ssid": "TravelAP",
+	"bssid": "94:83:C4:1F:28:39",
+	"country": "US",
+	"mode": "Master",
+	"channel": 1,
+	"center_chan1": 1,
+	"frequency": 2412,
+	"frequency_offset": 0,
+	"txpower": 25,
+	"txpower_offset": 0,
+	"quality_max": 70,
+	"noise": -99,
+	"encryption": {
+		"enabled": true,
+		"wpa": [
+			2
+		],
+		"authentication": [
+			"psk"
+		],
+		"ciphers": [
+			"ccmp"
+		]
+	},
+	"htmodes": [
+		"HT20",
+		"HT40",
+		"HE20",
+		"HE40"
+	],
+	"hwmodes": [
+		"b",
+		"g",
+		"n",
+		"ax"
+	],
+	"hwmodes_text": "ax/b/g/n",
+	"hwmode": "n",
+	"htmode": "HT20",
+	"hardware": {
+		"id": [
+			0,
+			0,
+			0,
+			0
+		],
+		"name": "Qualcomm Atheros IPQ6018"
+	}
+}

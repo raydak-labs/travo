@@ -1,0 +1,63 @@
+adguardhome-0.107.79-r1 description:
+Free and open source, powerful network-wide ads and trackers blocking DNS server.
+
+adguardhome-0.107.79-r1 webpage:
+https://github.com/AdguardTeam/AdGuardHome
+
+adguardhome-0.107.79-r1 installed size:
+32 MiB
+
+adguardhome-0.107.79-r1 depends on:
+ca-bundle
+libc
+
+adguardhome-0.107.79-r1 provides:
+adguardhome-any
+
+adguardhome-0.107.79-r1 is required by:
+
+adguardhome-0.107.79-r1 contains:
+etc/capabilities/adguardhome.json
+etc/config/adguardhome
+etc/init.d/adguardhome
+etc/sysctl.d/50-adguardhome.conf
+etc/uci-defaults/adguardhome
+lib/apk/packages/adguardhome.conffiles
+lib/apk/packages/adguardhome.conffiles_static
+lib/apk/packages/adguardhome.list
+lib/apk/packages/adguardhome.rusers
+lib/upgrade/keep.d/adguardhome
+usr/bin/AdGuardHome
+
+adguardhome-0.107.79-r1 triggers:
+
+adguardhome-0.107.79-r1 has auto-install rule:
+
+adguardhome-0.107.79-r1 affects auto-installation of:
+
+adguardhome-0.107.79-r1 replaces:
+
+adguardhome-0.107.79-r1 license:
+GPL-3.0-only
+
+adguardhome-0.107.80-r1 description:
+Free and open source, powerful network-wide ads and trackers blocking DNS server.
+
+adguardhome-0.107.80-r1 webpage:
+https://github.com/AdguardTeam/AdGuardHome
+
+adguardhome-0.107.80-r1 installed size:
+32 MiB
+
+adguardhome-0.107.80-r1 depends on:
+ca-bundle
+libc
+
+adguardhome-0.107.80-r1 provides:
+adguardhome-any
+
+adguardhome-0.107.80-r1 has auto-install rule:
+
+adguardhome-0.107.80-r1 license:
+GPL-3.0-only
+

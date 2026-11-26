@@ -1,0 +1,17 @@
+{
+	"kernel": "6.12.112",
+	"hostname": "OpenWrt",
+	"system": "ARMv8 Processor rev 4",
+	"model": "GL.iNet GL-AXT1800",
+	"board_name": "glinet,gl-axt1800",
+	"rootfs_type": "squashfs",
+	"release": {
+		"distribution": "OpenWrt",
+		"version": "25.12.6",
+		"firmware_url": "https://downloads.openwrt.org/",
+		"revision": "r33311-981c978eff",
+		"target": "qualcommax/ipq60xx",
+		"description": "OpenWrt 25.12.6 r33311-981c978eff",
+		"builddate": "1792273538"
+	}
+}
