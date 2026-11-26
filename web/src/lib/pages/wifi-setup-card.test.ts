@@ -51,4 +51,13 @@ describe('wifi setup card', () => {
     loader.data = [{ ...factory[0], security: 'protected' }] as ApConfig[];
     expect(render(WiFiSetupCard, { props: { apply: vi.fn() } }).body).not.toContain('Set up WiFi');
   });
+
+  it('offers a retry when the access points cannot be read', () => {
+    loader.data = undefined;
+    loader.status = { state: 'error', message: 'WiFi is unavailable' };
+    const body = render(WiFiSetupCard, { props: { apply: vi.fn() } }).body;
+    expect(body).toContain('WiFi is unavailable');
+    expect(body).toContain('Retry');
+    loader.status = { state: 'ready' };
+  });
 });

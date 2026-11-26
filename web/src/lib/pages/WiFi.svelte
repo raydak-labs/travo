@@ -273,9 +273,15 @@ async function saveProfile(body: JoinWiFiData['body']): Promise<string | undefin
   }
 }
 
-// Every opening scans afresh: the list is only useful while it is current.
+// Every opening scans afresh: the list is only useful while it is current. The element that
+// opened the picker (the Connect to WiFi button) takes the focus back when the join dialog closes.
+let connectTrigger: HTMLElement | null = null;
 $effect(() => {
-  if (connectOpen) untrack(() => void scan());
+  if (!connectOpen) return;
+  untrack(() => {
+    if (document.activeElement instanceof HTMLElement) connectTrigger = document.activeElement;
+    void scan();
+  });
 });
 
 async function scan() {
@@ -373,7 +379,7 @@ async function scan() {
   <div class="min-h-0 overflow-y-auto">
     <LoadState status={scanStatus} retry={scan} stale={scanData !== undefined}>
       {#if scanData}
-        <WiFiScanList result={scanData} join={(network) => { connectOpen = false; joinTrigger = null; selected = network; }} {busy} />
+        <WiFiScanList result={scanData} join={(network) => { connectOpen = false; joinTrigger = connectTrigger; selected = network; }} {busy} />
       {:else}
         <EmptyState icon={Radar} title={m.wifi_scanning()} />
       {/if}

@@ -253,9 +253,42 @@ stage_wifi() {
     [ "$(uci -q get "wireless.$iface.mode")" = ap ] || continue
     uci -q get "wireless.$iface.network" | grep -qw lan || continue
     radio=$(uci -q get "wireless.$iface.device")
+    # An AP and a STA on one radio crash ath11k (device-facts §3): that AP stays off.
+    radio_has_sta "$radio" && { echo "install.sh: $radio carries an uplink; its access point stays off" >&2; continue; }
     printf 'set wireless.%s.ssid=%s\nset wireless.%s.encryption=sae-mixed\nset wireless.%s.key=%s\nset wireless.%s.disabled=0\nset wireless.%s.disabled=0\n' \
       "$iface" "$(uci_quote "$wifi_name")" "$iface" "$iface" "$(uci_quote "$wifi_key")" "$iface" "$radio"
   done | uci batch || die "could not stage the WiFi settings"
+}
+
+radio_has_sta() {
+  for sta in $(uci -q show wireless | sed -n "s/^wireless\.\([^.=]*\)=wifi-iface$/\1/p"); do
+    [ "$(uci -q get "wireless.$sta.mode")" = sta ] && [ "$(uci -q get "wireless.$sta.device")" = "$1" ] &&
+      [ "$(uci -q get "wireless.$sta.disabled")" != 1 ] && return 0
+  done
+  return 1
+}
+
+# a.b.c.d -> integer, for range comparisons. Shell arithmetic: BusyBox awk caps %d at 2^31-1.
+ip_int() {
+  # shellcheck disable=SC2046 # the split on dots is the point
+  set -- $(printf '%s' "$1" | tr . ' ')
+  echo $(((($1 * 256 + $2) * 256 + $3) * 256 + $4))
+}
+
+# Whether two CIDRs share any address: their networks under the shorter prefix are equal.
+cidr_overlap() {
+  a=$(ip_int "${1%/*}") b=$(ip_int "${2%/*}") p=${1#*/} q=${2#*/}
+  [ "$q" -lt "$p" ] && p=$q
+  shift_by=$((32 - p))
+  [ $((a >> shift_by)) -eq $((b >> shift_by)) ]
+}
+
+# An address outside br-lan (an uplink) that overlaps the target LAN.
+uplink_overlaps() {
+  for cidr in $(ip -4 -o addr show | awk '$2 != "br-lan" && $2 != "lo" { print $4 }'); do
+    cidr_overlap "$cidr" "$1" && return 0
+  done
+  return 1
 }
 
 read_wifi_key() {
@@ -263,9 +296,9 @@ read_wifi_key() {
   [ -t 0 ] || die "--wifi needs a terminal to ask for the password, or TRAVO_WIFI_PASSWORD"
   stty -echo
   printf 'WiFi password for %s (8 to 63 characters): ' "$wifi_name" >&2
-  read -r wifi_key || wifi_key=
+  IFS= read -r wifi_key || wifi_key=
   printf '\nRepeat it: ' >&2
-  read -r again || again=
+  IFS= read -r again || again=
   stty echo
   printf '\n' >&2
   [ "$wifi_key" = "$again" ] || die "the two passwords differ"
@@ -278,8 +311,8 @@ first_run() {
   [ "$first_install" = 1 ] || return 0
   new_lan=
   if [ "$keep_lan" = 0 ] && [ "$(uci -q get network.lan.ipaddr)" = "$FACTORY_LAN" ]; then
-    if ip -4 -o addr show | grep -v ' br-lan ' | grep -q " inet ${lan_target%.*}\."; then
-      echo "install.sh: an uplink already uses ${lan_target%.*}.0/24; the LAN stays $FACTORY_LAN (pass --lan)" >&2
+    if uplink_overlaps "$lan_target"; then
+      echo "install.sh: an uplink already uses addresses in $lan_target; the LAN stays $FACTORY_LAN (pass --lan)" >&2
     else
       new_lan=$lan_target
       printf 'del_list network.lan.ipaddr=%s\nadd_list network.lan.ipaddr=%s\n' "$FACTORY_LAN" "$new_lan" |

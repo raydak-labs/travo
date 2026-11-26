@@ -5,6 +5,7 @@ import Label from '$lib/components/ui/label/label.svelte';
 import type { TxnBody } from '../api/gen';
 import { fetchAccessPoints, setupAccessPoints } from '../api/wifi';
 import { m } from '../paraglide/messages.js';
+import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import Section from '../ui/Section.svelte';
 import { wifiNotSetUp } from '../wifi';
@@ -29,7 +30,11 @@ function save(event: SubmitEvent) {
 }
 </script>
 
-{#if aps.data && wifiNotSetUp(aps.data)}
+{#if aps.status.state === 'error' && !aps.data}
+  <Section title={m.wifi_setup_title()}>
+    <LoadState status={aps.status} retry={aps.retry}>{null}</LoadState>
+  </Section>
+{:else if aps.data && wifiNotSetUp(aps.data)}
   <Section title={m.wifi_setup_title()} description={m.wifi_setup_description()}>
     <form class="grid gap-4 sm:max-w-md" onsubmit={save}>
       <Label class="grid gap-1">
