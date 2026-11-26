@@ -6,6 +6,10 @@ Travel-router web UI and API (Go daemon + Svelte SPA) that runs on OpenWrt next 
 
 `mise run check` green before every commit (Go, web, generated client, size). After API changes run `mise run gen` and commit the result. Hardware-only behaviour is gated by the playbook in `docs/testing.md`.
 
+## Local environment
+
+Local environment variables (such as router host/IP, router password, and other hardware-test credentials) may be defined in `mise.local.toml` (gitignored). Check for `mise.local.toml` and run commands through `mise` when local router credentials or environment variables are needed. Never commit `mise.local.toml` or print/log secret values from it.
+
 ## Stack
 
 Follows https://github.com/BlackDark/agent-presets/blob/main/stack/core.md and `stack/embedded-ui.md`.
