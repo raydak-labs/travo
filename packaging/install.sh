@@ -232,7 +232,7 @@ uci_quote() {
   printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
 }
 
-# One RFC 1123 hostname label: 1-63 ASCII letters, digits or '-', not starting or ending with '-'.
+# RFC 1123 label (1-63 chars).
 valid_hostname() {
   [ -n "$1" ] && [ "${#1}" -le 63 ] || return 1
   case "$1" in
@@ -316,10 +316,8 @@ read_wifi_key() {
   [ "$wifi_key" = "$again" ] || die "the two passwords differ"
 }
 
-# After a healthy install: the factory LAN, hostname and WiFi get Travo's defaults. UCI is
-# committed first; when LAN or WiFi changed, the network reload runs detached after this script
-# ends, since it drops an SSH session on the LAN. Travo restarts afterwards so its HTTPS
-# certificate and host allowlist match the new address and hostname.
+# Apply Travo defaults over factory LAN, hostname and WiFi. LAN/WiFi reloads run detached
+# so SSH isn't dropped mid-script; Travo restarts after to refresh its TLS cert and host_allow.
 first_run() {
   [ "$first_install" = 1 ] || return 0
   new_lan=

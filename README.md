@@ -47,7 +47,7 @@ The installer checks the release signature with the router's `usign` before it c
 | `--port N` | Serve Travo on `http://<router>:N` and leave LuCI on port 80 |
 | `--wifi` | Turn on the router's WiFi: asks for a password, the network is called **Travo** on every band (WPA2/WPA3). `--wifi-name NAME` picks another name; `TRAVO_WIFI_PASSWORD` skips the question in scripts |
 | `--lan CIDR` / `--keep-lan` | The router's address. A first install moves OpenWrt's `192.168.1.1/24`, which hotel networks often use too, to `192.168.50.1/24` |
-| `--hostname NAME` / `--keep-hostname` | The router's hostname. A first install changes OpenWrt's factory `OpenWrt` to `travo` and leaves custom hostnames untouched |
+| `--hostname NAME` / `--keep-hostname` | First-install hostname (default `travo`, replaces factory `OpenWrt` only) |
 | `--adguard-bundle <file>` | Install AdGuard Home offline from the release's `adguardhome-*.apk` |
 | `--rotate-key` | Accept a new signing key once, when the release notes announce one |
 | `--insecure` | Install an unsigned build you made yourself |
