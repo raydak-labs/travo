@@ -5,7 +5,12 @@
 #        | --port N (alternate port, keeps LuCI unchanged)
 #        | --force (skip the OS and architecture checks only)
 #        | --insecure (install without a signature check) | --rotate-key (accept a new signing key)
-#        | --adguard-bundle FILE (offline AdGuard Home package from the same release, docs/adr/0020).
+#        | --adguard-bundle FILE (offline AdGuard Home package from the same release, docs/adr/0020)
+#        | --lan CIDR (router address on a first install, default 192.168.50.1/24) | --keep-lan
+#        | --wifi (ask for the WiFi password) | --wifi-name NAME (default Travo).
+# First install on a factory router (docs/adr/0034): the LAN moves off OpenWrt's 192.168.1.1/24,
+# which hotel and home networks often use too, and with --wifi or TRAVO_WIFI_PASSWORD the WiFi
+# comes up as one WPA2/WPA3 network on every band. Both only replace OpenWrt's factory values.
 # Before installing it verifies $here/checksums.txt.sig over checksums.txt with usign (docs/adr/0007).
 # Test hooks: TRAVO_TEST_STOP_AFTER_SWAP=1 exits after moving LuCI.
 # TRAVO_TEST_HOLD_80=1 starts a listener that blocks travo from taking port 80.
@@ -25,7 +30,7 @@ die() {
 }
 
 usage() {
-  echo "usage: install.sh [--force] [--insecure] [--rotate-key] [--port N] [--adguard-bundle FILE] | --uninstall [--purge]" >&2
+  echo "usage: install.sh [--force] [--insecure] [--rotate-key] [--port N] [--adguard-bundle FILE] [--lan CIDR | --keep-lan] [--wifi] [--wifi-name NAME] | --uninstall [--purge]" >&2
   exit 2
 }
 
@@ -211,6 +216,94 @@ install() {
   # the keep-list carried its guard across the flash. Cleared by name, never by glob.
   rm -f /etc/travo-guards/firmware-upgrade-in-progress
   install_ports "$version"
+  first_run
+}
+
+FACTORY_LAN=192.168.1.1/24
+DEFAULT_LAN=192.168.50.1/24
+DEFAULT_SSID=Travo
+
+# Quotes a value for `uci batch`. The value travels through printf (a builtin), never argv.
+uci_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+# ipv4/prefix with every octet 0-255 and a prefix of 8-30.
+valid_cidr() {
+  printf '%s' "$1" | grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}/([89]|[12][0-9]|30)$' || return 1
+  for octet in $(printf '%s' "${1%/*}" | tr . ' '); do [ "$octet" -le 255 ] || return 1; done
+}
+
+# The router's own WiFi is untouched since firstboot: every AP bridged into lan off and open.
+wifi_factory() {
+  found=0
+  for iface in $(uci -q show wireless | sed -n "s/^wireless\.\([^.=]*\)=wifi-iface$/\1/p"); do
+    [ "$(uci -q get "wireless.$iface.mode")" = ap ] || continue
+    uci -q get "wireless.$iface.network" | grep -qw lan || continue
+    found=1
+    [ "$(uci -q get "wireless.$iface.disabled")" = 1 ] || return 1
+    case "$(uci -q get "wireless.$iface.encryption")" in ""|none) ;; *) return 1 ;; esac
+  done
+  [ "$found" = 1 ]
+}
+
+# Stages the factory APs as one network on every band (the same plan as POST /api/v1/wifi/setup).
+stage_wifi() {
+  for iface in $(uci -q show wireless | sed -n "s/^wireless\.\([^.=]*\)=wifi-iface$/\1/p"); do
+    [ "$(uci -q get "wireless.$iface.mode")" = ap ] || continue
+    uci -q get "wireless.$iface.network" | grep -qw lan || continue
+    radio=$(uci -q get "wireless.$iface.device")
+    printf 'set wireless.%s.ssid=%s\nset wireless.%s.encryption=sae-mixed\nset wireless.%s.key=%s\nset wireless.%s.disabled=0\nset wireless.%s.disabled=0\n' \
+      "$iface" "$(uci_quote "$wifi_name")" "$iface" "$iface" "$(uci_quote "$wifi_key")" "$iface" "$radio"
+  done | uci batch || die "could not stage the WiFi settings"
+}
+
+read_wifi_key() {
+  [ -n "${TRAVO_WIFI_PASSWORD:-}" ] && { wifi_key=$TRAVO_WIFI_PASSWORD; return; }
+  [ -t 0 ] || die "--wifi needs a terminal to ask for the password, or TRAVO_WIFI_PASSWORD"
+  stty -echo
+  printf 'WiFi password for %s (8 to 63 characters): ' "$wifi_name" >&2
+  read -r wifi_key || wifi_key=
+  printf '\nRepeat it: ' >&2
+  read -r again || again=
+  stty echo
+  printf '\n' >&2
+  [ "$wifi_key" = "$again" ] || die "the two passwords differ"
+}
+
+# After a healthy install: the factory LAN and WiFi get Travo's defaults. UCI is committed first;
+# the network reload runs detached after this script ends, since it drops an SSH session on the
+# LAN. Travo restarts afterwards so its HTTPS certificate names the new address.
+first_run() {
+  [ "$first_install" = 1 ] || return 0
+  new_lan=
+  if [ "$keep_lan" = 0 ] && [ "$(uci -q get network.lan.ipaddr)" = "$FACTORY_LAN" ]; then
+    if ip -4 -o addr show | grep -v ' br-lan ' | grep -q " inet ${lan_target%.*}\."; then
+      echo "install.sh: an uplink already uses ${lan_target%.*}.0/24; the LAN stays $FACTORY_LAN (pass --lan)" >&2
+    else
+      new_lan=$lan_target
+      printf 'del_list network.lan.ipaddr=%s\nadd_list network.lan.ipaddr=%s\n' "$FACTORY_LAN" "$new_lan" |
+        uci batch || die "could not stage the LAN address"
+    fi
+  fi
+  wifi_on=0
+  if [ -n "$wifi_key" ]; then
+    if wifi_factory; then
+      stage_wifi
+      wifi_on=1
+    else
+      echo "install.sh: the WiFi is not as OpenWrt ships it (or has no access point); it stays as it is" >&2
+    fi
+  fi
+  [ -n "$new_lan" ] || [ "$wifi_on" = 1 ] || return 0
+  # Commit only what changed: a router without radios has no wireless config to commit.
+  [ -z "$new_lan" ] || uci commit network || die "could not save the LAN address"
+  [ "$wifi_on" = 0 ] || uci commit wireless || die "could not save the WiFi settings"
+  [ -z "$new_lan" ] || echo "The router's address becomes ${new_lan%/*}: open http://${new_lan%/*}/ once your device has a new address (unplug and replug the cable, or rejoin the WiFi)."
+  [ "$wifi_on" = 0 ] || echo "WiFi: $wifi_name on every band (WPA2/WPA3)."
+  echo "Applying the network settings now; this SSH session may drop."
+  # 9>&-: the detached job must not keep the installer's lock.
+  (sleep 2; reload_config; sleep 15; /etc/init.d/$NAME restart) </dev/null >/dev/null 2>&1 9>&- &
 }
 
 uninstall() {
@@ -259,9 +352,12 @@ uninstall() {
   echo "$NAME removed"
 }
 
-force=0 purge=0 insecure=0 rotate=0 new_key=0 mode=install
+force=0 purge=0 insecure=0 rotate=0 new_key=0 mode=install keep_lan=0 ask_wifi=0
 alternate_port=
 adguard_bundle=
+lan_target=$DEFAULT_LAN
+wifi_name=$DEFAULT_SSID
+wifi_key=
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --uninstall) mode=uninstall ;;
@@ -282,12 +378,24 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -gt 0 ] && [ -n "$1" ] || usage
       adguard_bundle=$1
       ;;
+    --lan)
+      shift
+      { [ "$#" -gt 0 ] && valid_cidr "$1"; } || usage
+      lan_target=$1
+      ;;
+    --keep-lan) keep_lan=1 ;;
+    --wifi) ask_wifi=1 ;;
+    --wifi-name)
+      shift
+      [ "$#" -gt 0 ] && [ -n "$1" ] && [ "${#1}" -le 32 ] || usage
+      wifi_name=$1
+      ;;
     *) usage ;;
   esac
   shift
 done
 [ "$purge" = 0 ] || [ "$mode" = uninstall ] || usage
-[ "$mode" = install ] || { [ "$insecure" = 0 ] && [ "$rotate" = 0 ] && [ -z "$alternate_port" ] && [ -z "$adguard_bundle" ]; } || usage
+[ "$mode" = install ] || { [ "$insecure" = 0 ] && [ "$rotate" = 0 ] && [ -z "$alternate_port" ] && [ -z "$adguard_bundle" ] && [ "$ask_wifi" = 0 ]; } || usage
 
 [ "$(id -u)" = 0 ] || die "must run as root"
 mkdir -p /var/lock
@@ -298,4 +406,10 @@ if [ -e "$update_guard" ] || [ -L "$update_guard" ]; then
   die "update recovery required: run /usr/bin/travo --recover-update (or the saved recovery executable)"
 fi
 here=$(cd "$(dirname "$0")" && pwd)
+# Ask before installing anything, so a typo cannot leave a half-configured router.
+if [ "$mode" = install ] && { [ "$ask_wifi" = 1 ] || [ -n "${TRAVO_WIFI_PASSWORD:-}" ]; }; then
+  read_wifi_key
+  case "$wifi_key" in *[!\ -~]*) die "the WiFi password must be printable ASCII" ;; esac
+  [ "${#wifi_key}" -ge 8 ] && [ "${#wifi_key}" -le 63 ] || die "the WiFi password needs 8 to 63 characters"
+fi
 "$mode"
