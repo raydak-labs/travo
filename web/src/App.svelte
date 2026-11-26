@@ -39,6 +39,7 @@ import { theme } from './lib/theme.svelte';
 import AlertBanner from './lib/ui/AlertBanner.svelte';
 import LoadState from './lib/ui/LoadState.svelte';
 import type { LoadStatus } from './lib/ui/loader.svelte';
+import TimezoneMismatchBanner from './lib/ui/TimezoneMismatchBanner.svelte';
 
 let drawerOpen = $state(false);
 let navChunk = $state<LoadStatus>({ state: 'loading' });
@@ -335,6 +336,7 @@ $effect(() => {
       <div class="mx-auto max-w-6xl">
         {#if authenticated}
           <AlertBanner list={dashboardEvents.alerts.data} />
+          <TimezoneMismatchBanner generation={session.generation} />
         {/if}
         {#key shown}
           {#if session.state === 'unknown'}
