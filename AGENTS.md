@@ -8,7 +8,7 @@ Travel-router web UI and API (Go daemon + Svelte SPA) that runs on OpenWrt next 
 
 ## Local environment
 
-Local environment variables (such as router host/IP, router password, and other hardware-test credentials) may be defined in `mise.local.toml` (gitignored). Check for `mise.local.toml` and run commands through `mise` when local router credentials or environment variables are needed. Never commit `mise.local.toml` or print/log secret values from it.
+Local env vars (e.g. router IP, password) live in gitignored `mise.local.toml`. Check for it and run commands via `mise`; never commit it or log its secrets.
 
 ## Stack
 
