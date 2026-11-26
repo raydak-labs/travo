@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
-	"github.com/blackdark-org/travo-greenfield/internal/usbtether"
+	"github.com/raydak-labs/travo/internal/txn"
+	"github.com/raydak-labs/travo/internal/usbtether"
 )
 
 type usbTetherFake struct {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/wol"
+	"github.com/raydak-labs/travo/internal/wol"
 )
 
 // WakeOnLAN broadcasts a magic packet on the LAN bridges (internal/wol).

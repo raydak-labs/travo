@@ -82,7 +82,7 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           gh release upload "$TAG" \
-            "dist/travo-greenfield-${TAG#v}-aarch64.tar.gz" \
+            "dist/travo-${TAG#v}-aarch64.tar.gz" \
             dist/checksums.txt dist/checksums.txt.sig \
             "$ADGUARD_BUNDLE" \
             --clobber

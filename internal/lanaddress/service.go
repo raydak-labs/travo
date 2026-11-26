@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/adguard"
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/adguard"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/facts"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // Window is the confirm window of a lan change (ADR 0028): the caller reconnects to get a

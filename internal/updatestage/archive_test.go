@@ -88,11 +88,11 @@ func TestArchiveSignedAdditions(t *testing.T) {
 		name string
 		ok   bool
 	}{
-		{"root/etc/hotplug.d/iface/60-travo-greenfield", true},
-		{"root/usr/share/travo-greenfield/data.json", true},
+		{"root/etc/hotplug.d/iface/60-travo", true},
+		{"root/usr/share/travo/data.json", true},
 		{webPrefix + "app.js", true},
 		{webPrefix + "assets/app.js", false},
-		{"root/sbin/travo-greenfield", false},
+		{"root/sbin/travo", false},
 		{"root/etc", false},
 		{"root/etc/../sbin/x", false},
 		{"extra.sh", false},

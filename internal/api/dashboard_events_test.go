@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
-	"github.com/blackdark-org/travo-greenfield/internal/throughput"
-	"github.com/blackdark-org/travo-greenfield/internal/uplinkview"
+	"github.com/raydak-labs/travo/internal/connectivity"
+	"github.com/raydak-labs/travo/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/throughput"
+	"github.com/raydak-labs/travo/internal/uplinkview"
 )
 
 func TestDashboardEventServiceSharesProducersAndStops(t *testing.T) {

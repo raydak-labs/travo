@@ -5,12 +5,12 @@ import (
 	"log/slog"
 	"path/filepath"
 
-	"github.com/blackdark-org/travo-greenfield/internal/api"
-	"github.com/blackdark-org/travo-greenfield/internal/app"
-	"github.com/blackdark-org/travo-greenfield/internal/crontab"
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/hook"
-	"github.com/blackdark-org/travo-greenfield/internal/wifischedule"
+	"github.com/raydak-labs/travo/internal/api"
+	"github.com/raydak-labs/travo/internal/app"
+	"github.com/raydak-labs/travo/internal/crontab"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/hook"
+	"github.com/raydak-labs/travo/internal/wifischedule"
 )
 
 // cronService builds the one crontab writer (ADR 0024): call it once and share the result,

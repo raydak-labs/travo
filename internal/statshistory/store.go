@@ -9,7 +9,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
+	"github.com/raydak-labs/travo/internal/atomicfile"
 )
 
 const fileVersion = 1

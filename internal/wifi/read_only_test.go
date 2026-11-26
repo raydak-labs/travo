@@ -24,10 +24,10 @@ func TestReadOnlyPathsHaveNoWriteDependencies(t *testing.T) {
 					t.Fatal(err)
 				}
 				switch importPath {
-				case "github.com/blackdark-org/travo-greenfield/internal/txn",
-					"github.com/blackdark-org/travo-greenfield/internal/uciwrite":
+				case "github.com/raydak-labs/travo/internal/txn",
+					"github.com/raydak-labs/travo/internal/uciwrite":
 					t.Errorf("read-only package imports writer %s", importPath)
-				case "github.com/blackdark-org/travo-greenfield/internal/device":
+				case "github.com/raydak-labs/travo/internal/device":
 					name := "device"
 					if spec.Name != nil {
 						name = spec.Name.Name
@@ -70,7 +70,7 @@ func TestJoinUsesDevicePorts(t *testing.T) {
 		}
 		for _, spec := range f.Imports {
 			switch spec.Path.Value {
-			case `"os/exec"`, `"syscall"`, `"github.com/blackdark-org/travo-greenfield/internal/device/cli"`:
+			case `"os/exec"`, `"syscall"`, `"github.com/raydak-labs/travo/internal/device/cli"`:
 				t.Errorf("%s accesses OpenWrt outside the Device ports (%s)", path, spec.Path.Value)
 			}
 		}

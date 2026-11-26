@@ -5,8 +5,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/mock"
 )
 
 // guestZone is the zone section internal/wifi planGuest writes (invariants §10).

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // ParseShow parses `uci show <config>` output. Fixture use only: `uci show` cannot tell a

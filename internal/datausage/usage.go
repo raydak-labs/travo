@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/statshistory"
+	"github.com/raydak-labs/travo/internal/statshistory"
 )
 
 // Period is a range of days in the router's timezone, end exclusive, with the traffic per

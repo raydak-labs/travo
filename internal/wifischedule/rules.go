@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/crontab"
+	"github.com/raydak-labs/travo/internal/crontab"
 )
 
 const maxRules = 16

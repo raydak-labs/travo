@@ -7,7 +7,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/vpnprofiles"
+	"github.com/raydak-labs/travo/internal/vpnprofiles"
 )
 
 const vpnImportOperation = "postVPNProfile"

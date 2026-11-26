@@ -8,8 +8,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/portfwd"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/portfwd"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // PortForwards is the firewall redirects from wan to lan hosts (internal/portfwd).

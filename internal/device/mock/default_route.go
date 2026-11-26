@@ -4,7 +4,7 @@ import (
 	"context"
 	_ "embed"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 //go:embed testdata/device-status-phy0-sta0.json

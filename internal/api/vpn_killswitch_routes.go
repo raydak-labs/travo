@@ -7,8 +7,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
-	"github.com/blackdark-org/travo-greenfield/internal/vpnkill"
+	"github.com/raydak-labs/travo/internal/txn"
+	"github.com/raydak-labs/travo/internal/vpnkill"
 )
 
 // VPNKillSwitch reads and changes the firewall kill switch (internal/vpnkill).

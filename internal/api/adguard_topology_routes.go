@@ -8,10 +8,10 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/adguard"
-	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/adguard"
+	"github.com/raydak-labs/travo/internal/dnslayer"
+	"github.com/raydak-labs/travo/internal/guard"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // AdGuardTopology is the expert switch of ADR 0021 (adguard.Service.SetTopology).

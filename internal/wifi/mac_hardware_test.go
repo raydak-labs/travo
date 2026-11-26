@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
-	"github.com/blackdark-org/travo-greenfield/internal/uciwrite"
+	"github.com/raydak-labs/travo/internal/device/cli"
+	"github.com/raydak-labs/travo/internal/guard"
+	"github.com/raydak-labs/travo/internal/txn"
+	"github.com/raydak-labs/travo/internal/uciwrite"
 )
 
 type macHWClock struct{}
@@ -24,8 +24,8 @@ func TestHWUplinkMACRandomThenRollsBack(t *testing.T) {
 	d := cli.New()
 	m := &txn.Manager{
 		Device: d, Locks: &uciwrite.Locks{},
-		Guards:    guard.Dir{Path: "/tmp/greenfield-hw/guards", Now: time.Now},
-		Dir:       "/etc/greenfield-hw-txn",
+		Guards:    guard.Dir{Path: "/tmp/travo-hw/guards", Now: time.Now},
+		Dir:       "/etc/travo-hw-txn",
 		ConfigDir: "/etc/config", Reload: []string{"reload_config"}, UCI: "uci",
 		Spawner: txn.ShellSpawner{Shell: "/bin/sh", RunTimeout: 120 * time.Second},
 		Clock:   macHWClock{},

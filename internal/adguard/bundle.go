@@ -21,7 +21,7 @@ var (
 )
 
 // BundlePath is where install.sh puts a verified bundle: RAM, root-only, gone after reboot.
-const BundlePath = "/tmp/travo-greenfield-bundle/adguardhome.apk"
+const BundlePath = "/tmp/travo-bundle/adguardhome.apk"
 
 // Bundle is the local package an offline first install may use.
 type Bundle struct {

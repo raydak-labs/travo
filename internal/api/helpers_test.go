@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/auth"
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
-	"github.com/blackdark-org/travo-greenfield/internal/trust"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/raydak-labs/travo/internal/auth"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/trust"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 const (

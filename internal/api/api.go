@@ -12,15 +12,15 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 
-	"github.com/blackdark-org/travo-greenfield/internal/auth"
-	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/reboot"
-	"github.com/blackdark-org/travo-greenfield/internal/throughput"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
-	"github.com/blackdark-org/travo-greenfield/internal/vpnprofiles"
-	"github.com/blackdark-org/travo-greenfield/internal/vpnstatus"
-	"github.com/blackdark-org/travo-greenfield/internal/wifi"
+	"github.com/raydak-labs/travo/internal/auth"
+	"github.com/raydak-labs/travo/internal/connectivity"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/reboot"
+	"github.com/raydak-labs/travo/internal/throughput"
+	"github.com/raydak-labs/travo/internal/txn"
+	"github.com/raydak-labs/travo/internal/vpnprofiles"
+	"github.com/raydak-labs/travo/internal/vpnstatus"
+	"github.com/raydak-labs/travo/internal/wifi"
 )
 
 // Txns is the slice of txn.Manager the API needs.
@@ -240,7 +240,7 @@ func registerSessionOnly[I, O any](s *server, op huma.Operation, a huma.API, h f
 func New(d Deps) (http.Handler, huma.API) {
 	s := &server{Deps: d, sessions: d.Sessions, clock: d.Clock, trusted: d.Trusted}
 	mux := http.NewServeMux()
-	cfg := huma.DefaultConfig("travo-greenfield", d.Version)
+	cfg := huma.DefaultConfig("travo", d.Version)
 	cfg.OpenAPIPath = "/api/openapi"
 	cfg.DocsPath = ""
 	cfg.SchemasPath = ""
@@ -333,51 +333,51 @@ func schemaNamer(t reflect.Type, hint string) string {
 		t = t.Elem()
 	}
 	switch t.PkgPath() {
-	case "github.com/blackdark-org/travo-greenfield/internal/wifi":
+	case "github.com/raydak-labs/travo/internal/wifi":
 		if t.Name() == "Summary" {
 			return "WiFi" + name
 		}
-	case "github.com/blackdark-org/travo-greenfield/internal/wifiprofiles":
+	case "github.com/raydak-labs/travo/internal/wifiprofiles":
 		return "WiFiProfile" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/wifireconnect":
+	case "github.com/raydak-labs/travo/internal/wifireconnect":
 		return "WiFiReconnect" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/usbtether":
+	case "github.com/raydak-labs/travo/internal/usbtether":
 		return "USBTether" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/wifischedule":
+	case "github.com/raydak-labs/travo/internal/wifischedule":
 		return "WiFiSchedule" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/statshistory":
+	case "github.com/raydak-labs/travo/internal/statshistory":
 		return "StatsHistory" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/datausage":
+	case "github.com/raydak-labs/travo/internal/datausage":
 		return "DataUsage" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/tailscale":
+	case "github.com/raydak-labs/travo/internal/tailscale":
 		return "Tailscale" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/failover":
+	case "github.com/raydak-labs/travo/internal/failover":
 		return "Failover" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/uplinkview":
+	case "github.com/raydak-labs/travo/internal/uplinkview":
 		return "Dashboard" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/wansettings":
+	case "github.com/raydak-labs/travo/internal/wansettings":
 		return "WAN" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/ipv6settings":
+	case "github.com/raydak-labs/travo/internal/ipv6settings":
 		return "IPv6" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/ddns":
+	case "github.com/raydak-labs/travo/internal/ddns":
 		return "DDNS" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/catalog":
+	case "github.com/raydak-labs/travo/internal/catalog":
 		return "Catalog" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/portfwd":
+	case "github.com/raydak-labs/travo/internal/portfwd":
 		return "Port" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/lanaddress":
+	case "github.com/raydak-labs/travo/internal/lanaddress":
 		return "LAN" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/leds":
+	case "github.com/raydak-labs/travo/internal/leds":
 		return "LED" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/firmware":
+	case "github.com/raydak-labs/travo/internal/firmware":
 		return "Firmware" + name
-	case "github.com/blackdark-org/travo-greenfield/internal/buttons":
+	case "github.com/raydak-labs/travo/internal/buttons":
 		if name == "Button" {
 			return "HardwareButton"
 		}
 		return "Button" + name
 	}
-	if t.PkgPath() == "github.com/blackdark-org/travo-greenfield/internal/adguard" && t.Name() == "Status" {
+	if t.PkgPath() == "github.com/raydak-labs/travo/internal/adguard" && t.Name() == "Status" {
 		return "AdGuard" + name
 	}
 	return name

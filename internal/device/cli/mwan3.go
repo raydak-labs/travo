@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 func (d *Device) MWAN3Interfaces(ctx context.Context) (string, error) {

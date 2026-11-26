@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/catalog"
+	"github.com/raydak-labs/travo/internal/catalog"
 )
 
 type fakeCatalog struct {

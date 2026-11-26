@@ -10,9 +10,9 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/apitokens"
-	"github.com/blackdark-org/travo-greenfield/internal/auth"
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/raydak-labs/travo/internal/apitokens"
+	"github.com/raydak-labs/travo/internal/auth"
 )
 
 const (

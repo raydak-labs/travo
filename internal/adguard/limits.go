@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // Memory caps for a 418 MB router whose kernel and WiFi leave ~80 MB available

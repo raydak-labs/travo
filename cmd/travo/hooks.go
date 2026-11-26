@@ -7,16 +7,16 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/blackdark-org/travo-greenfield/internal/app"
-	"github.com/blackdark-org/travo-greenfield/internal/hook"
-	"github.com/blackdark-org/travo-greenfield/internal/lifecycle"
+	"github.com/raydak-labs/travo/internal/app"
+	"github.com/raydak-labs/travo/internal/hook"
+	"github.com/raydak-labs/travo/internal/lifecycle"
 )
 
 // runHook is the client side of `--hook <action>`: cron jobs and button scripts call it
 // (ADR 0024). Exit status 1 on any failure; the message goes to stderr for logger.
 func runHook(socket, action string) int {
 	if err := hook.Call(socket, action, hook.ClientTimeout); err != nil {
-		fmt.Fprintln(os.Stderr, "travo-greenfield hook:", err)
+		fmt.Fprintln(os.Stderr, "travo hook:", err)
 		return 1
 	}
 	return 0

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
-	"github.com/blackdark-org/travo-greenfield/internal/wifi"
+	"github.com/raydak-labs/travo/internal/txn"
+	"github.com/raydak-labs/travo/internal/wifi"
 )
 
 type fakeMAC struct {

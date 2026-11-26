@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"slices"
 
-	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
+	"github.com/raydak-labs/travo/internal/dnslayer"
 )
 
 // QuadHundred is tailscaled's in-process MagicDNS resolver; with --accept-dns=false it still

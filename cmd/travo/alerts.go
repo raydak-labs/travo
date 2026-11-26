@@ -5,14 +5,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/adguard"
-	"github.com/blackdark-org/travo-greenfield/internal/alerts"
-	"github.com/blackdark-org/travo-greenfield/internal/api"
-	"github.com/blackdark-org/travo-greenfield/internal/app"
-	"github.com/blackdark-org/travo-greenfield/internal/datausage"
-	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
-	"github.com/blackdark-org/travo-greenfield/internal/firmware"
-	"github.com/blackdark-org/travo-greenfield/internal/wifireconnect"
+	"github.com/raydak-labs/travo/internal/adguard"
+	"github.com/raydak-labs/travo/internal/alerts"
+	"github.com/raydak-labs/travo/internal/api"
+	"github.com/raydak-labs/travo/internal/app"
+	"github.com/raydak-labs/travo/internal/datausage"
+	"github.com/raydak-labs/travo/internal/device/facts"
+	"github.com/raydak-labs/travo/internal/firmware"
+	"github.com/raydak-labs/travo/internal/wifireconnect"
 )
 
 // newAlerts wires the alert sources. Mock mode has no flash or mount table to read.

@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 var wireGuardPeerSection = regexp.MustCompile(`^wg0_peer[0-9]+$`)

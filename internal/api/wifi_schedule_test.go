@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/lockout"
-	"github.com/blackdark-org/travo-greenfield/internal/wifischedule"
+	"github.com/raydak-labs/travo/internal/lockout"
+	"github.com/raydak-labs/travo/internal/wifischedule"
 )
 
 type fakeSchedule struct {

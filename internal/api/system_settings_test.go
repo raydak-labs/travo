@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/syssettings"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/syssettings"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 type fakeSettings struct {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/wifi"
+	"github.com/raydak-labs/travo/internal/wifi"
 )
 
 type wifiOutput struct{ Body wifi.Summary }

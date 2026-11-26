@@ -4,7 +4,7 @@ import (
 	"context"
 	"slices"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // RenewLease records the renew like netifd would accept it; the lease itself is unchanged.

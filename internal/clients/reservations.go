@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // HostPrefix names the dhcp host sections Travo creates: travo_host_<mac without colons>.

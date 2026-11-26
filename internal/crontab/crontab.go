@@ -16,7 +16,7 @@ import (
 // HookCommand is the command a scheduled job runs for a daemon hook action. Its output goes
 // to syslog: crond would otherwise drop a failure silently.
 func HookCommand(action string) string {
-	return "/usr/bin/travo-greenfield --hook " + action + " 2>&1 | logger -t travo-greenfield-hook"
+	return "/usr/bin/travo --hook " + action + " 2>&1 | logger -t travo-hook"
 }
 
 var (
@@ -25,8 +25,8 @@ var (
 	ErrInvalid = errors.New("crontab: invalid line or owner")
 )
 
-func begin(owner string) string { return "# travo-greenfield:" + owner + " begin" }
-func end(owner string) string   { return "# travo-greenfield:" + owner + " end" }
+func begin(owner string) string { return "# travo:" + owner + " begin" }
+func end(owner string) string   { return "# travo:" + owner + " end" }
 
 // Lines returns the owner's job lines, in order; nil when it has no block.
 func Lines(content, owner string) []string {

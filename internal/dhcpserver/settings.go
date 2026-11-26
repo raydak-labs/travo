@@ -11,7 +11,7 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // LANSection is the dhcp section serving the lan interface.

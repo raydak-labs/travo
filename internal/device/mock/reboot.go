@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // SetBootID sets the value returned by BootID.

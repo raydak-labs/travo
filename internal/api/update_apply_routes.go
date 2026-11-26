@@ -10,7 +10,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 
-	"github.com/blackdark-org/travo-greenfield/internal/updateapply"
+	"github.com/raydak-labs/travo/internal/updateapply"
 )
 
 type UpdateApplier interface {

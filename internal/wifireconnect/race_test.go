@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
+	"github.com/raydak-labs/travo/internal/guard"
 )
 
 // An attempt racing another guarded operation: exactly one of them proceeds. A failing

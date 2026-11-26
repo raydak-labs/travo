@@ -9,10 +9,10 @@ import (
 	"slices"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/atomicfile"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/guard"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // TopologyGuard covers a topology switch from before its transaction until the outcome is

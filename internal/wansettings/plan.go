@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // write is one staged change to network.wan. Values never carry the PPPoE password.

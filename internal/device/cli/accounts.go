@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/blackdark-org/travo-greenfield/internal/auth/rootpw"
+	"github.com/raydak-labs/travo/internal/auth/rootpw"
 )
 
 const shadowPath = "/etc/shadow"

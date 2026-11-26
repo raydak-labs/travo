@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 func TestNamesEmptyOnTheCapture(t *testing.T) {

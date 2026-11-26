@@ -5,9 +5,9 @@ import (
 	"errors"
 	"regexp"
 
-	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
+	"github.com/raydak-labs/travo/internal/atomicfile"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/facts"
 )
 
 func (m *Manager) recordWireGuardBaseline(ctx context.Context, id string) error {

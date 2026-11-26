@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/blackdark-org/travo-greenfield/internal/statshistory"
+	"github.com/raydak-labs/travo/internal/statshistory"
 )
 
 // Limits of the budget settings.

@@ -3,7 +3,7 @@ package cli
 import (
 	"context"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // ReconnectUplink runs `ifup wwan`, the recovery measured on the AXT1800 (device-facts §2).

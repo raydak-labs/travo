@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/apitokens"
-	"github.com/blackdark-org/travo-greenfield/internal/factoryreset"
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
+	"github.com/raydak-labs/travo/internal/apitokens"
+	"github.com/raydak-labs/travo/internal/factoryreset"
+	"github.com/raydak-labs/travo/internal/guard"
 )
 
 func resetEnv(t *testing.T) (*env, guard.Dir) {

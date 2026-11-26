@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/datausage"
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
-	"github.com/blackdark-org/travo-greenfield/internal/wifireconnect"
+	"github.com/raydak-labs/travo/internal/datausage"
+	"github.com/raydak-labs/travo/internal/guard"
+	"github.com/raydak-labs/travo/internal/wifireconnect"
 )
 
 // Severity orders alerts; the shell shows a banner for danger.

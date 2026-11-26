@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/facts"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // PPPoEDevice is the kernel link netifd's ppp proto creates for network.wan unless

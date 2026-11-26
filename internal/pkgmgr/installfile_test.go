@@ -12,7 +12,7 @@ func TestInstallFileSkipsOnlyApkSignatureCheckAndRefusesRelativePaths(t *testing
 		args = n + " " + strings.Join(a, " ")
 		return "", 0, nil
 	}
-	const file = "/tmp/travo-greenfield-bundle/adguardhome.apk"
+	const file = "/tmp/travo-bundle/adguardhome.apk"
 	if err := (&APK{Run: r}).InstallFile(context.Background(), file); err != nil || args != "apk add --allow-untrusted "+file {
 		t.Fatalf("%q %v", args, err)
 	}

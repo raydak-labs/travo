@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 func TestRealUCIWirelessKey(t *testing.T) {

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/guard"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // A scheduled toggle racing another guarded operation: never both. The fake begin takes

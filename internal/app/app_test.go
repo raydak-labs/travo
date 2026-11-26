@@ -44,7 +44,7 @@ func TestCloseRemovesMockStateDir(t *testing.T) {
 }
 
 func TestRebootFileAndMockBootRotation(t *testing.T) {
-	if got := RealPaths().RebootFile(); got != "/etc/travo-greenfield/reboot.json" {
+	if got := RealPaths().RebootFile(); got != "/etc/travo/reboot.json" {
 		t.Fatalf("reboot file = %q", got)
 	}
 	d, err := New(Options{Mock: true})

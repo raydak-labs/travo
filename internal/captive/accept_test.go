@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
+	"github.com/raydak-labs/travo/internal/connectivity"
 )
 
 const simTerms = `<form method="post" action="/accept"><input type="hidden" name="token" value="sim-1">%s

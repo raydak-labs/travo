@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/apitokens"
-	"github.com/blackdark-org/travo-greenfield/internal/sshkeys"
+	"github.com/raydak-labs/travo/internal/apitokens"
+	"github.com/raydak-labs/travo/internal/sshkeys"
 )
 
 const testEd25519 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKiO5ZRy/vDVzgKRHcpeswVz7ybMJPfsbY4JBskk4YXL test-ed25519"

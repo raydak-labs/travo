@@ -11,7 +11,7 @@ Implementation (`internal/dnslayer`):
 - A change or `Resume` is refused while dhcp has foreign staged changes (`uci changes`): the stack never commits or reverts someone else's edits. A daemon crash mid-stage looks the same; `uci revert dhcp` or a reboot (staging lives in /tmp) clears it. Residual: a writer staging between the check and apply; the transaction module's single staging area closes that.
 - `Status` is read-only and reports `pending` (guard held) and `corrupt` (unreadable record).
 - Commit goes through an `Applier` (the transaction module); the stack never commits itself.
-- The daemon builds one `dnslayer.Service` (record `/etc/travo-greenfield/dns-layers.json`, applier `txn.Manager.Apply`, `AfterApply` = the shared connectivity probe's `Invalidate`); every layer user receives that instance.
+- The daemon builds one `dnslayer.Service` (record `/etc/travo/dns-layers.json`, applier `txn.Manager.Apply`, `AfterApply` = the shared connectivity probe's `Invalidate`); every layer user receives that instance.
 
 ## Captive layer (#130)
 

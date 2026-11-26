@@ -136,13 +136,13 @@ func TestAssemble(t *testing.T) {
 	if f := byName["port80.sh"]; f.Mode != 0o644 || string(f.Body) != "helper\n" {
 		t.Errorf("port80.sh entry %+v", f)
 	}
-	if f := byName["root/usr/bin/travo-greenfield"]; f.Mode != 0o755 || string(f.Body) != "ELF" {
+	if f := byName["root/usr/bin/travo"]; f.Mode != 0o755 || string(f.Body) != "ELF" {
 		t.Errorf("binary entry %+v", f)
 	}
 	if string(byName["VERSION"].Body) != "1.2.3\n" {
 		t.Errorf("VERSION %q", byName["VERSION"].Body)
 	}
-	wantManifest := "/etc/init.d/svc\n/usr/bin/travo-greenfield\n/www/travo-greenfield/index.html\n"
+	wantManifest := "/etc/init.d/svc\n/usr/bin/travo\n/www/travo/index.html\n"
 	if got := string(byName["manifest.txt"].Body); got != wantManifest {
 		t.Errorf("manifest %q, want %q", got, wantManifest)
 	}
@@ -152,12 +152,12 @@ func TestAssemble(t *testing.T) {
 		sum(wantManifest) + "  ./manifest.txt\n" +
 		sum("helper\n") + "  ./port80.sh\n" +
 		sum("rc\n") + "  ./root/etc/init.d/svc\n" +
-		sum("ELF") + "  ./root/usr/bin/travo-greenfield\n" +
-		sum("<html>") + "  ./root/www/travo-greenfield/index.html\n"
+		sum("ELF") + "  ./root/usr/bin/travo\n" +
+		sum("<html>") + "  ./root/www/travo/index.html\n"
 	if got := string(byName["checksums.txt"].Body); got != wantSums {
 		t.Errorf("checksums\n%s\nwant\n%s", got, wantSums)
 	}
-	if _, ok := byName["root/etc/travo-greenfield/manifest.txt"]; ok {
+	if _, ok := byName["root/etc/travo/manifest.txt"]; ok {
 		t.Error("manifest copy must be made by install.sh, not packed")
 	}
 }

@@ -9,9 +9,9 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/ifrestart"
-	"github.com/blackdark-org/travo-greenfield/internal/lockout"
-	"github.com/blackdark-org/travo-greenfield/internal/wifi"
+	"github.com/raydak-labs/travo/internal/ifrestart"
+	"github.com/raydak-labs/travo/internal/lockout"
+	"github.com/raydak-labs/travo/internal/wifi"
 )
 
 // InterfaceRestarter restarts one uplink interface (internal/ifrestart).

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // File reads and atomically replaces root's crontab. An absent file reads as "".

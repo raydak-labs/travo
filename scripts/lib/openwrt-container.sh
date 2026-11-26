@@ -15,7 +15,7 @@ cleanup() { docker rm -f "$NAME" >/dev/null 2>&1 || true; }
 # diagnose <label> <started epoch>: why a wait gave up, so a CI failure explains itself.
 diagnose() {
   echo "$1: gave up after $(($(date +%s) - $2))s" >&2
-  dx 'echo "-- ps"; ps w; echo "-- logread"; logread | tail -n 40; echo "-- travo-greenfield"; /etc/init.d/travo-greenfield status' >&2 2>&1 || true
+  dx 'echo "-- ps"; ps w; echo "-- logread"; logread | tail -n 40; echo "-- travo"; /etc/init.d/travo status' >&2 2>&1 || true
 }
 
 # wait_boot: until procd has run every /etc/rc.d script. In the container S98sysntpd blocks

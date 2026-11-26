@@ -7,7 +7,7 @@ import (
 	"net/netip"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/lockout"
+	"github.com/raydak-labs/travo/internal/lockout"
 )
 
 // The captured layout (STA on radio0, AP on radio1) never drops an AP: nothing to check,

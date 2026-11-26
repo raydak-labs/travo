@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 var wireGuardInterface = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,14}$`)

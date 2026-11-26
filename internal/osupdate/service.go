@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
-	"github.com/blackdark-org/travo-greenfield/internal/pkgmgr"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/facts"
+	"github.com/raydak-labs/travo/internal/pkgmgr"
 )
 
 var (

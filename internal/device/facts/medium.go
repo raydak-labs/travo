@@ -1,6 +1,6 @@
 package facts
 
-import "github.com/blackdark-org/travo-greenfield/internal/device"
+import "github.com/raydak-labs/travo/internal/device"
 
 // Medium is the physical medium of a netdev, from sysfs, never from its name (device-facts §12).
 type Medium string

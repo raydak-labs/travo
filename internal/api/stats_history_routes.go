@@ -8,7 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/statshistory"
+	"github.com/raydak-labs/travo/internal/statshistory"
 )
 
 // StatsHistory is the persisted traffic, clients and uptime history (docs/adr/0026).

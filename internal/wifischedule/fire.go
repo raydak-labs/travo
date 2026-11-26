@@ -8,10 +8,10 @@ import (
 	"slices"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/hook"
-	"github.com/blackdark-org/travo-greenfield/internal/lockout"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
-	"github.com/blackdark-org/travo-greenfield/internal/wifi"
+	"github.com/raydak-labs/travo/internal/hook"
+	"github.com/raydak-labs/travo/internal/lockout"
+	"github.com/raydak-labs/travo/internal/txn"
+	"github.com/raydak-labs/travo/internal/wifi"
 )
 
 // Outcome of one scheduled toggle; stable codes for the UI.

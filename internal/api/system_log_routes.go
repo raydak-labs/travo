@@ -7,7 +7,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/systemlog"
+	"github.com/raydak-labs/travo/internal/systemlog"
 )
 
 // SystemLog answers log queries from `logread` (internal/systemlog).

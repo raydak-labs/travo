@@ -16,8 +16,8 @@ the time zone is a POSIX string in `/etc/TZ` that Go's `time` cannot load (devic
 
 - Clock: BusyBox crond, through `internal/crontab` (owner `wifi-schedule`). Each enabled
   rule renders two lines, `M H * * <days>` for its off and on times, each running
-  `travo-greenfield --hook wifi-schedule-<id>-<off|on>` (ADR 0024). Days apply to both times.
-- Rules live in `/etc/travo-greenfield/wifi-schedule.json` (ADR 0009: atomic, 0600,
+  `travo --hook wifi-schedule-<id>-<off|on>` (ADR 0024). Days apply to both times.
+- Rules live in `/etc/travo/wifi-schedule.json` (ADR 0009: atomic, 0600,
   unreadable fails closed and is never overwritten). This is a deliberate exception to
   "the block is the source of truth" in 0024: a cron line cannot carry the AP section (UCI
   names are not valid hook action names) or the lockout acknowledgement. The block is

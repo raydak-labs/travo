@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // Probe timing: the IPv4 uplink must stay as it was while netifd reloads the DHCPv6 clients.

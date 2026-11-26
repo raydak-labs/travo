@@ -7,7 +7,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/wifireconnect"
+	"github.com/raydak-labs/travo/internal/wifireconnect"
 )
 
 // WiFiReconnectReader reads the capped auto-reconnect counter (internal/wifireconnect).

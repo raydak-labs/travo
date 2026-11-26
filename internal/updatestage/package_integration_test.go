@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
+	"github.com/raydak-labs/travo/internal/device/cli"
 )
 
 // The booted package suite supplies the real mkpkg output and a throwaway

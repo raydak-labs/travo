@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/adguard"
+	"github.com/raydak-labs/travo/internal/adguard"
 )
 
 type fakeDoH struct {

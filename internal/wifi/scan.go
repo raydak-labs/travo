@@ -6,7 +6,7 @@ import (
 	"errors"
 	"slices"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
+	"github.com/raydak-labs/travo/internal/device/facts"
 )
 
 type ScanResult struct {

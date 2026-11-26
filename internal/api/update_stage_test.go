@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/updatestage"
+	"github.com/raydak-labs/travo/internal/updatestage"
 )
 
 type fakeStager struct {

@@ -4,8 +4,8 @@ import (
 	"net/netip"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
-	"github.com/blackdark-org/travo-greenfield/internal/vpnstatus"
+	"github.com/raydak-labs/travo/internal/dnslayer"
+	"github.com/raydak-labs/travo/internal/vpnstatus"
 )
 
 func TestDecide(t *testing.T) {

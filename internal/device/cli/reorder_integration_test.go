@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // Real uci: a staged reorder moves the section in `uci export` order, which is the order

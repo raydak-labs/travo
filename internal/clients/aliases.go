@@ -10,7 +10,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
+	"github.com/raydak-labs/travo/internal/atomicfile"
 )
 
 // MaxAlias bounds an alias in runes.

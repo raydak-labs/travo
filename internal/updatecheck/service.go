@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
+	"github.com/raydak-labs/travo/internal/atomicfile"
 )
 
 type Result struct {

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/lanaddress"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/lanaddress"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 type fakeLAN struct {

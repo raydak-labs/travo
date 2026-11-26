@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/mock"
 )
 
 func TestConnectivityMediumOfActiveInterface(t *testing.T) {

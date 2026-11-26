@@ -6,10 +6,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
-	"github.com/blackdark-org/travo-greenfield/internal/pkgmgr"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/cli"
+	"github.com/raydak-labs/travo/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/pkgmgr"
 )
 
 const captures = "../../testdata/device/axt1800-25.12.6/"

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/auth"
-	"github.com/blackdark-org/travo-greenfield/internal/throughput"
+	"github.com/raydak-labs/travo/internal/auth"
+	"github.com/raydak-labs/travo/internal/throughput"
 )
 
 type recordedWrite struct {

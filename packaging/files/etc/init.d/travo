@@ -1,6 +1,6 @@
 #!/bin/sh /etc/rc.common
 # shellcheck shell=sh
-# Starts the travo-greenfield daemon under procd. Settings: /etc/config/travo-greenfield, section main.
+# Starts the travo daemon under procd. Settings: /etc/config/travo, section main.
 # shellcheck disable=SC2034 # rc.common reads these variables
 START=99
 # shellcheck disable=SC2034
@@ -12,17 +12,17 @@ start_service() {
 	# shellcheck disable=SC3043 # ash supports local; rc.common scripts use it
 	local enabled listen listen_tls static_dir host_allow release_source
 	# shellcheck disable=SC1091 # rc.common provides config_load, not present on the dev machine
-	config_load travo-greenfield
+	config_load travo
 	config_get enabled main enabled 1
 	[ "$enabled" = 0 ] && return 0
 	config_get listen main listen '0.0.0.0:8090'
 	config_get listen_tls main listen_tls ''
-	config_get static_dir main static_dir '/www/travo-greenfield'
+	config_get static_dir main static_dir '/www/travo'
 	config_get host_allow main host_allow ''
 	config_get release_source main release_source ''
 
 	procd_open_instance
-	procd_set_param command /usr/bin/travo-greenfield --listen "$listen" --static-dir "$static_dir"
+	procd_set_param command /usr/bin/travo --listen "$listen" --static-dir "$static_dir"
 	[ -n "$listen_tls" ] && [ "$listen_tls" != off ] && procd_append_param command --listen-tls "$listen_tls"
 	[ -n "$host_allow" ] && procd_append_param command --host-allow "$host_allow"
 	[ -n "$release_source" ] && procd_append_param command --release-source "$release_source"

@@ -24,7 +24,7 @@ func TestRequiredCoversPackagingFiles(t *testing.T) {
 	}
 	for _, name := range required {
 		rest, ok := strings.CutPrefix(name, "root/")
-		if !ok || rest == "usr/bin/travo-greenfield" || strings.HasPrefix(name, webPrefix) {
+		if !ok || rest == "usr/bin/travo" || strings.HasPrefix(name, webPrefix) {
 			continue
 		}
 		if _, err := os.Stat("../../packaging/files/" + rest); err != nil {

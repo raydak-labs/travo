@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // nftEmpty is `nft -j list ruleset` of a family without tables

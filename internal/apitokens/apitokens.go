@@ -19,7 +19,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
+	"github.com/raydak-labs/travo/internal/atomicfile"
 )
 
 // Scope limits what a token may do. read = safe methods only; admin = every protected

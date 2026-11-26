@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
-	"github.com/blackdark-org/travo-greenfield/internal/wol"
+	"github.com/raydak-labs/travo/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/wol"
 )
 
 func wolEnv(t *testing.T, w WakeOnLAN) (*env, string, string) {

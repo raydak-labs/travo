@@ -8,10 +8,10 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/lockout"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
-	"github.com/blackdark-org/travo-greenfield/internal/vpnkill"
-	"github.com/blackdark-org/travo-greenfield/internal/wifi"
+	"github.com/raydak-labs/travo/internal/lockout"
+	"github.com/raydak-labs/travo/internal/txn"
+	"github.com/raydak-labs/travo/internal/vpnkill"
+	"github.com/raydak-labs/travo/internal/wifi"
 )
 
 type wifiGuestOutput struct{ Body wifi.GuestConfig }

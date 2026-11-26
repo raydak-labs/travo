@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
+	"github.com/raydak-labs/travo/internal/dnslayer"
 )
 
 func running(suffix string, enabled bool) Status {

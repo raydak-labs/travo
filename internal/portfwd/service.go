@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/clients"
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/clients"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // ErrUnavailable: the firewall config cannot be read.

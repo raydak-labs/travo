@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
+	"github.com/raydak-labs/travo/internal/atomicfile"
 )
 
 // Migrate moves an installed AGH to the loopback topology and the memory caps (Limits) as a

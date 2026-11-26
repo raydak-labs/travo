@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
+	"github.com/raydak-labs/travo/internal/connectivity"
 )
 
 // Walker bounds (invariants §12, ADR 0023).

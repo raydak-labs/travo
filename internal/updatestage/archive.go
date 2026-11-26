@@ -21,14 +21,14 @@ const (
 	expandedLimit = 24 << 20
 	memberLimit   = 13 << 20
 	maxMembers    = 256
-	webPrefix     = "root/www/travo-greenfield/"
+	webPrefix     = "root/www/travo/"
 )
 
 var required = []string{
 	"VERSION", "checksums.txt", "install.sh", "manifest.txt", "minisign.pub", "port80.sh",
-	"root/etc/hotplug.d/button/50-travo-greenfield", "root/etc/init.d/travo-greenfield",
-	"root/etc/uci-defaults/90-travo-greenfield",
-	"root/lib/upgrade/keep.d/travo-greenfield", "root/usr/bin/travo-greenfield",
+	"root/etc/hotplug.d/button/50-travo", "root/etc/init.d/travo",
+	"root/etc/uci-defaults/90-travo",
+	"root/lib/upgrade/keep.d/travo", "root/usr/bin/travo",
 	webPrefix + "index.html",
 }
 

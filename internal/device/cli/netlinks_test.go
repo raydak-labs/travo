@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // sysfsFromCapture rebuilds /sys/class/net from the verbatim readlink capture: the device

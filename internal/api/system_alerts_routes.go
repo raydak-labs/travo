@@ -6,7 +6,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/alerts"
+	"github.com/raydak-labs/travo/internal/alerts"
 )
 
 // Alerts derives the operator alerts on read (internal/alerts).

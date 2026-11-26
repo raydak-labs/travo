@@ -4,7 +4,7 @@ Status: accepted (#287); extends the release staging rules of [0007](0007-distri
 
 ## Context
 
-Self-update runs the INSTALLED release's stager on the NEW tarball. Up to 0.2.0 the stager accepted only a fixed member list, so 0.2.0 adding `root/etc/hotplug.d/button/50-travo-greenfield` (#195) made 0.1.0 refuse the whole archive ("Could not verify release package"). CI only staged builds of the same commit, so it never saw the break.
+Self-update runs the INSTALLED release's stager on the NEW tarball. Up to 0.2.0 the stager accepted only a fixed member list, so 0.2.0 adding `root/etc/hotplug.d/button/50-travo` (#195) made 0.1.0 refuse the whole archive ("Could not verify release package"). CI only staged builds of the same commit, so it never saw the break.
 
 Shipping a 0.2.x without the new file cannot help 0.1.0: the 0.2.0 stager lists that file as required, so the same tarball would then break 0.2.0 → 0.2.x. Release asset names are fixed per version, so one release cannot serve both.
 

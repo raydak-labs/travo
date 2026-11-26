@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
-	"github.com/blackdark-org/travo-greenfield/internal/statshistory"
+	"github.com/raydak-labs/travo/internal/atomicfile"
+	"github.com/raydak-labs/travo/internal/statshistory"
 )
 
 // View is the Network page's data usage card.
@@ -36,7 +36,7 @@ type History interface {
 // Service reads the history and owns the budget file.
 type Service struct {
 	History History
-	Path    string           // budget file, e.g. /etc/travo-greenfield/data-budget.json
+	Path    string           // budget file, e.g. /etc/travo/data-budget.json
 	Now     func() time.Time // router wall clock
 
 	mu        sync.Mutex

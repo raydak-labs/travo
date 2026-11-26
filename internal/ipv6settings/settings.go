@@ -6,7 +6,7 @@ import (
 	"errors"
 	"slices"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // Section names. wan6 is the image's DHCPv6 client on the cable uplink (testdata

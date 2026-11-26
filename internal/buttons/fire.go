@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"net/netip"
 
-	"github.com/blackdark-org/travo-greenfield/internal/lockout"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
-	"github.com/blackdark-org/travo-greenfield/internal/wifi"
+	"github.com/raydak-labs/travo/internal/lockout"
+	"github.com/raydak-labs/travo/internal/txn"
+	"github.com/raydak-labs/travo/internal/wifi"
 )
 
 // Outcome of one slide; stable codes for the UI and the hook log line.

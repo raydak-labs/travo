@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/runner"
+	"github.com/raydak-labs/travo/internal/runner"
 )
 
 const secret = "S3cr3t-pw!-unique"

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net/netip"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/facts"
 )
 
 // ErrSameSubnet: two chosen uplinks sit in one IPv4 subnet (Ethernet and WiFi to the same

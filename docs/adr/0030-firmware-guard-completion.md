@@ -9,7 +9,7 @@ the firmware-upgrade line of §5. Factory reset is unchanged.
 
 The firmware upgrade (#198) writes `firmware-upgrade-in-progress` before it schedules
 `sysupgrade` and never removes it, so an interrupted flash stays visible. With "keep
-settings" the keep-list carries `/etc/travo-greenfield-guards/` across the flash, so after a
+settings" the keep-list carries `/etc/travo-guards/` across the flash, so after a
 flash that worked the guard is still there. Every feature that refuses during a terminal
 operation (uplink reconnect, WiFi schedule, slide switch, interface restart, reboot from the
 UI, factory reset, the next upgrade) then stayed off until the operator ran `install.sh`.

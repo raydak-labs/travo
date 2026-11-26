@@ -8,10 +8,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
-// Topology modes (ADR 0021), persisted in UCI travo-greenfield.main.adguard_topology.
+// Topology modes (ADR 0021), persisted in UCI travo.main.adguard_topology.
 const (
 	TopologyDefault = "default"
 	TopologyExpert  = "expert"
@@ -20,7 +20,7 @@ const (
 // TopologyConfig/Section/Option name where the mode lives; it is committed in the same
 // transaction as dhcp, so a watchdog restore puts the mode back with dnsmasq's port.
 const (
-	TopologyConfig  = "travo-greenfield"
+	TopologyConfig  = "travo"
 	TopologySection = "main"
 	TopologyOption  = "adguard_topology"
 )
@@ -48,7 +48,7 @@ type ExpertPlan struct {
 	Edits []UCIEdit // dhcp and the mode
 }
 
-// PlanExpert is pure: dhcp, network and travo-greenfield sections in, the expert plan out.
+// PlanExpert is pure: dhcp, network and travo sections in, the expert plan out.
 // dnsmasq moves to DnsmasqPort and stops being the advertised DNS, so every served pool
 // gets DHCP option 6 with its own address, and odhcpd stops announcing the lan's IPv6
 // address as resolver (nothing answers DNS on it in expert mode).

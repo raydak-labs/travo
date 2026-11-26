@@ -12,12 +12,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 const (
-	config = "travo-greenfield"
-	// SectionPrefix marks the button sections in /etc/config/travo-greenfield.
+	config = "travo"
+	// SectionPrefix marks the button sections in /etc/config/travo.
 	SectionPrefix = "button_"
 	sectionType   = "button"
 

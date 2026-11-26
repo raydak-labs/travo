@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
-	"github.com/blackdark-org/travo-greenfield/internal/vpnprofiles"
-	"github.com/blackdark-org/travo-greenfield/internal/vpntunnel"
+	"github.com/raydak-labs/travo/internal/txn"
+	"github.com/raydak-labs/travo/internal/vpnprofiles"
+	"github.com/raydak-labs/travo/internal/vpntunnel"
 )
 
 type splitFake struct {

@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
+	"github.com/raydak-labs/travo/internal/device/cli"
+	"github.com/raydak-labs/travo/internal/guard"
 )
 
 func realService(version string, stage Stage) *Service {
-	return New(guard.Dir{Path: "/etc/travo-greenfield-guards", Now: time.Now}, cli.New(), stage, version)
+	return New(guard.Dir{Path: "/etc/travo-guards", Now: time.Now}, cli.New(), stage, version)
 }
 
 func TestMain(m *testing.M) {

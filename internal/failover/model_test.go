@@ -8,9 +8,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/cli"
+	"github.com/raydak-labs/travo/internal/device/mock"
 )
 
 // stockRouter loads the mwan3 package's own /etc/config/mwan3 (25.12.6 feed, verbatim);

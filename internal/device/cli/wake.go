@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // wakeTimeout bounds one send; a local UDP write does not block in practice.

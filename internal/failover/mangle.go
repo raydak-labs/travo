@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // mwan3Prefix names every chain mwan3 creates in mangle (mwan3_hook, mwan3_rules,

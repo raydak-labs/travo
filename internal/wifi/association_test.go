@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // showUCI only reads; any write reaches the nil embedded interface and panics.

@@ -7,7 +7,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/netview"
+	"github.com/raydak-labs/travo/internal/netview"
 )
 
 // NetworkView is the read-only interface and firewall zone view (internal/netview).

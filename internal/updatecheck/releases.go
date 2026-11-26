@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const DefaultSource = "blackdark-org/travo-greenfield"
+const DefaultSource = "raydak-labs/travo"
 const maxResponse = 4 << 20
 
 var segment = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
@@ -46,7 +46,7 @@ func (r release) eligibleVersion() string {
 	for _, asset := range r.Assets {
 		counts[asset.Name]++
 	}
-	for _, name := range []string{"travo-greenfield-" + v + "-aarch64.tar.gz", "checksums.txt", "checksums.txt.sig"} {
+	for _, name := range []string{"travo-" + v + "-aarch64.tar.gz", "checksums.txt", "checksums.txt.sig"} {
 		if counts[name] != 1 {
 			return ""
 		}
@@ -80,7 +80,7 @@ func latest(ctx context.Context, transport http.RoundTripper, source string) (st
 		return "", "unavailable"
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "travo-greenfield")
+	req.Header.Set("User-Agent", "travo")
 	res, err := client.Do(req)
 	if err != nil {
 		return "", "unavailable"

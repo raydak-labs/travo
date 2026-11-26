@@ -8,7 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/osupdate"
+	"github.com/raydak-labs/travo/internal/osupdate"
 )
 
 // OpenWrtUpdates reports newer OpenWrt releases and upgradable packages (internal/osupdate).

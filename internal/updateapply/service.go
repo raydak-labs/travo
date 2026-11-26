@@ -19,9 +19,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
-	"github.com/blackdark-org/travo-greenfield/internal/updatestage"
+	"github.com/raydak-labs/travo/internal/atomicfile"
+	"github.com/raydak-labs/travo/internal/guard"
+	"github.com/raydak-labs/travo/internal/updatestage"
 )
 
 // GuardName is the crash guard held while an update is active or needs recovery.

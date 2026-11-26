@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/facts"
 )
 
 // Read calls `ubus system board` and `ubus system info` and parses both. Any failure is

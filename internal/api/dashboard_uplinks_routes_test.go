@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
-	"github.com/blackdark-org/travo-greenfield/internal/uplinkview"
+	"github.com/raydak-labs/travo/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/uplinkview"
 )
 
 type fakeUplinks struct {

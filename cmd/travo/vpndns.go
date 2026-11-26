@@ -5,12 +5,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 
-	"github.com/blackdark-org/travo-greenfield/internal/app"
-	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
-	"github.com/blackdark-org/travo-greenfield/internal/vpndns"
-	"github.com/blackdark-org/travo-greenfield/internal/vpnprofiles"
-	"github.com/blackdark-org/travo-greenfield/internal/vpntunnel"
+	"github.com/raydak-labs/travo/internal/app"
+	"github.com/raydak-labs/travo/internal/dnslayer"
+	"github.com/raydak-labs/travo/internal/txn"
+	"github.com/raydak-labs/travo/internal/vpndns"
+	"github.com/raydak-labs/travo/internal/vpnprofiles"
+	"github.com/raydak-labs/travo/internal/vpntunnel"
 )
 
 // newVPNDNS wires the `vpn` DNS layer reconciler to the shared layer stack.

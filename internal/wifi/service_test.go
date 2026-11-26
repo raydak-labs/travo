@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 const fixtureRoot = "../../testdata/device/axt1800-25.12.6"

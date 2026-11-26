@@ -3,7 +3,7 @@ package txn
 import (
 	"context"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // Settled is a config read and whether a transaction overlapped it. Sections of an

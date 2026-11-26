@@ -7,8 +7,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/blackdark-org/travo-greenfield/internal/api"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/api"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // specVersion keeps the committed spec stable; the real build version is not part of the contract.

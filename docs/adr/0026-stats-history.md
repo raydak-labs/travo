@@ -9,7 +9,7 @@ retention rule existed (#40).
 
 - Store: a RAM ring in the daemon (`internal/statshistory`), one point per 10 min bucket,
   retention 7 days (at most 1008 points, about 150 KB of JSON). No KV store: the ring is
-  one compact JSON file, `/etc/travo-greenfield/stats-history.json` (mode 0600, atomic
+  one compact JSON file, `/etc/travo/stats-history.json` (mode 0600, atomic
   replacement).
 - Flash: never per sample. The ring is flushed at most once per 6 h when it changed and
   once on graceful shutdown (SIGTERM from procd, which also covers a reboot). Worst case

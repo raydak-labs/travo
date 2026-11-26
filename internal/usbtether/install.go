@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"slices"
 
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
-	"github.com/blackdark-org/travo-greenfield/internal/pkgmgr"
+	"github.com/raydak-labs/travo/internal/guard"
+	"github.com/raydak-labs/travo/internal/pkgmgr"
 )
 
 // InstallGuard covers a driver install (kernel modules, init scripts: invariants §13). It is

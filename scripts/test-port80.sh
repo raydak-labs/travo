@@ -16,7 +16,7 @@ tmp=$(mktemp -d)
 trap 'cleanup; rm -rf "$tmp"' EXIT
 mise run package
 mkdir "$tmp/pkg"
-tar -xzf "dist/travo-greenfield-$VERSION-aarch64.tar.gz" -C "$tmp/pkg"
+tar -xzf "dist/travo-$VERSION-aarch64.tar.gz" -C "$tmp/pkg"
 docker run -d --name "$NAME" --platform "$PLATFORM" "$IMAGE" /sbin/init >/dev/null
 wait_boot
 dx 'mkdir -p /tmp/tg'
@@ -70,14 +70,14 @@ listeners >"$tmp/swapped"
 for address in 0.0.0.0:8080 :::8080 0.0.0.0:8443 :::8443; do
   grep -qxF "$address" "$tmp/swapped" || fail "listener $address missing"
 done
-dx '[ ! -e /etc/travo-greenfield-guards/port-swap ] && [ ! -e /etc/travo-greenfield-guards/port-swap.uhttpd ]'
-dx 'sysupgrade -l 2>/dev/null' | grep -qxF /etc/travo-greenfield/uhttpd.orig || fail "uhttpd.orig would not survive sysupgrade"
+dx '[ ! -e /etc/travo-guards/port-swap ] && [ ! -e /etc/travo-guards/port-swap.uhttpd ]'
+dx 'sysupgrade -l 2>/dev/null' | grep -qxF /etc/travo/uhttpd.orig || fail "uhttpd.orig would not survive sysupgrade"
 
 step "2: reinstall without replacing the original snapshot"
-dx 'cp /etc/travo-greenfield/uhttpd.orig /tmp/original.before'
+dx 'cp /etc/travo/uhttpd.orig /tmp/original.before'
 install
 wait_health "after reinstall" 80
-dx 'cmp /tmp/original.before /etc/travo-greenfield/uhttpd.orig'
+dx 'cmp /tmp/original.before /etc/travo/uhttpd.orig'
 
 step "3: uninstall handles staged writes and failed restoration before restoring original listeners"
 dx 'uci set uhttpd.main.home=/tmp'
@@ -99,7 +99,7 @@ chmod +x /tmp/failing-uci/uci'
 # shellcheck disable=SC2016 # PATH is the container's
 expect_refusal 'PATH=/tmp/failing-uci:$PATH sh /tmp/tg/install.sh --uninstall' 'left LuCI on the moved ports'
 dx 'cat /etc/config/uhttpd' | cmp - "$tmp/moved.config" || fail "uninstall rollback differs from its snapshot"
-dx '[ -L /etc/rc.d/S99travo-greenfield ] && [ ! -e /etc/travo-greenfield-guards/port-swap ]'
+dx '[ -L /etc/rc.d/S99travo ] && [ ! -e /etc/travo-guards/port-swap ]'
 wait_health "after uninstall rollback" 8090
 expect_luci 8080
 uninstall
@@ -114,11 +114,11 @@ dx 'uci export uhttpd' >"$tmp/before.export"
 start_holder 0.0.0.0:8080
 expect_refusal 'sh /tmp/tg/install.sh --insecure' 'port 8080 is in use'
 expect_unchanged_uhttpd
-dx '[ ! -e /etc/travo-greenfield-guards/port-swap ]'
+dx '[ ! -e /etc/travo-guards/port-swap ]'
 stop_holder
 purge
 
-step "5: roll back when greenfield cannot take :80"
+step "5: roll back when travo cannot take :80"
 dx 'cat /etc/config/uhttpd' >"$tmp/before.config"
 expect_refusal 'TRAVO_TEST_HOLD_80=1 sh /tmp/tg/install.sh --insecure' 'uhttpd restored'
 dx 'cat /etc/config/uhttpd' | cmp - "$tmp/before.config" || fail "rollback differs from the snapshot"
@@ -127,7 +127,7 @@ expect_luci 80
 listeners >"$tmp/rolled-back"
 grep -qxF '0.0.0.0:80' "$tmp/rolled-back"
 grep -qxF ':::80' "$tmp/rolled-back"
-dx '[ ! -e /etc/travo-greenfield-guards/port-swap ]'
+dx '[ ! -e /etc/travo-guards/port-swap ]'
 purge
 
 step "6: refuse when uhttpd has staged changes"
@@ -139,7 +139,7 @@ purge
 
 step "7: recover an interrupted swap on the next install"
 expect_refusal 'TRAVO_TEST_STOP_AFTER_SWAP=1 sh /tmp/tg/install.sh --insecure' 'WARNING: --insecure'
-dx '[ -f /etc/travo-greenfield-guards/port-swap ]'
+dx '[ -f /etc/travo-guards/port-swap ]'
 out=$(install)
 echo "$out" | grep -qF 'restored uhttpd from an interrupted install'
 wait_health "after interrupted swap retry" 80
@@ -156,10 +156,10 @@ step "9: refuse an unlisted helper and a conflicting port 80 listener"
 dx 'cp /tmp/tg/checksums.txt /tmp/checksums.before; sed -i "/port80\.sh$/d" /tmp/tg/checksums.txt'
 expect_refusal 'sh /tmp/tg/install.sh --insecure' 'port80.sh checksum missing or invalid'
 dx 'mv /tmp/checksums.before /tmp/tg/checksums.txt'
-dx '[ ! -e /usr/bin/travo-greenfield ] &&
-    [ ! -e /etc/init.d/travo-greenfield ] &&
-    [ ! -e /etc/rc.d/S99travo-greenfield ] &&
-    [ ! -e /etc/config/travo-greenfield ]'
+dx '[ ! -e /usr/bin/travo ] &&
+    [ ! -e /etc/init.d/travo ] &&
+    [ ! -e /etc/rc.d/S99travo ] &&
+    [ ! -e /etc/config/travo ]'
 
 # Move LuCI aside so the standalone process is the only port 80 listener.
 dx 'cp /etc/config/uhttpd /tmp/uhttpd.before
@@ -186,10 +186,10 @@ install
 uninstall
 expect_luci 80
 # shellcheck disable=SC2016 # substitution runs in the container
-dx '[ "$(uci -q get travo-greenfield.main.listen)" = 0.0.0.0:8090 ]'
+dx '[ "$(uci -q get travo.main.listen)" = 0.0.0.0:8090 ]'
 install
 wait_health "after reinstall with retained settings" 80
 expect_luci 8080
-dx '[ -L /etc/rc.d/S99travo-greenfield ]'
+dx '[ -L /etc/rc.d/S99travo ]'
 purge
 step "port 80 tests passed"

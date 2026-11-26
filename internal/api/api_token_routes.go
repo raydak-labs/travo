@@ -7,7 +7,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/apitokens"
+	"github.com/raydak-labs/travo/internal/apitokens"
 )
 
 // APITokens is the automation token store (internal/apitokens).

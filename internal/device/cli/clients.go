@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // LeaseFile is dnsmasq's lease file (`dhcp.@dnsmasq[0].leasefile` on the AXT1800).

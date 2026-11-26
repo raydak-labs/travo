@@ -17,10 +17,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
-	"github.com/blackdark-org/travo-greenfield/internal/uciwrite"
+	"github.com/raydak-labs/travo/internal/atomicfile"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/guard"
+	"github.com/raydak-labs/travo/internal/uciwrite"
 )
 
 //go:embed watchdog.sh
@@ -80,7 +80,7 @@ type Manager struct {
 	Device device.Device
 	Locks  *uciwrite.Locks
 	Guards guard.Dir
-	// Dir holds snapshots on flash (e.g. /etc/travo-greenfield/txn): a reboot mid-window
+	// Dir holds snapshots on flash (e.g. /etc/travo/txn): a reboot mid-window
 	// (ath11k crashes can cause one) must still restore. Writes are rare, per transaction.
 	Dir       string
 	ConfigDir string   // /etc/config

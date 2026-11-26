@@ -10,15 +10,15 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
-	"github.com/blackdark-org/travo-greenfield/internal/pkgmgr"
-	"github.com/blackdark-org/travo-greenfield/internal/runner"
-	"github.com/blackdark-org/travo-greenfield/internal/tailscale"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
-	"github.com/blackdark-org/travo-greenfield/internal/uciwrite"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/cli"
+	"github.com/raydak-labs/travo/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/guard"
+	"github.com/raydak-labs/travo/internal/pkgmgr"
+	"github.com/raydak-labs/travo/internal/runner"
+	"github.com/raydak-labs/travo/internal/tailscale"
+	"github.com/raydak-labs/travo/internal/txn"
+	"github.com/raydak-labs/travo/internal/uciwrite"
 )
 
 // Paths are the daemon's on-disk locations. Guards never live in the state dir (invariants §1).
@@ -30,7 +30,7 @@ type Paths struct {
 
 // RealPaths are the router locations.
 func RealPaths() Paths {
-	return Paths{State: "/etc/travo-greenfield", Guards: "/etc/travo-greenfield-guards", Txn: "/etc/travo-greenfield/txn"}
+	return Paths{State: "/etc/travo", Guards: "/etc/travo-guards", Txn: "/etc/travo/txn"}
 }
 
 // EpochFile is where the session epoch is persisted.
@@ -118,7 +118,7 @@ func New(o Options) (Deps, error) {
 		if o.FirstRun {
 			dev.SetPassword("")
 		}
-		tmp, err := os.MkdirTemp("", "travo-greenfield-mock-")
+		tmp, err := os.MkdirTemp("", "travo-mock-")
 		if err != nil {
 			return Deps{}, err
 		}

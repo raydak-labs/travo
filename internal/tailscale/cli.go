@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/runner"
+	"github.com/raydak-labs/travo/internal/runner"
 )
 
 // Timeout tiers for the tailscale CLI (invariants §1: every shell-out has one).

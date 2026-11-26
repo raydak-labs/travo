@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/ifrestart"
-	"github.com/blackdark-org/travo-greenfield/internal/lockout"
+	"github.com/raydak-labs/travo/internal/ifrestart"
+	"github.com/raydak-labs/travo/internal/lockout"
 )
 
 type fakeRestarter struct {

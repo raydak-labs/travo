@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/datausage"
-	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
-	"github.com/blackdark-org/travo-greenfield/internal/wifireconnect"
+	"github.com/raydak-labs/travo/internal/datausage"
+	"github.com/raydak-labs/travo/internal/device/facts"
+	"github.com/raydak-labs/travo/internal/guard"
+	"github.com/raydak-labs/travo/internal/wifireconnect"
 )
 
 const mountsCapture = "../../testdata/device/axt1800-25.12.6/system/proc-mounts.txt"

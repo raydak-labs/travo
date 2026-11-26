@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 func TestMWAN3ReadersRunReadOnlyCommands(t *testing.T) {

@@ -3,7 +3,7 @@ package mock
 import (
 	"context"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // ReconnectUplink counts the request; the mock has no radio to re-associate.

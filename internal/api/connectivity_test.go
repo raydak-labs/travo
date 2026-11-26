@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
+	"github.com/raydak-labs/travo/internal/connectivity"
 )
 
 type connectivitySnapshot connectivity.Status

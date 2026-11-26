@@ -14,7 +14,7 @@ func (d *Device) VerifyRelease(ctx context.Context, manifest, signature, key str
 
 // UpdateSettings uses the same defaults as the packaged procd init script.
 func (d *Device) UpdateSettings(ctx context.Context) (listen, staticDir string, err error) {
-	sections, err := d.Show(ctx, "travo-greenfield")
+	sections, err := d.Show(ctx, "travo")
 	if err != nil {
 		return "", "", err
 	}
@@ -31,7 +31,7 @@ func (d *Device) UpdateSettings(ctx context.Context) (listen, staticDir string, 
 			listen = "0.0.0.0:8090"
 		}
 		if staticDir == "" {
-			staticDir = "/www/travo-greenfield"
+			staticDir = "/www/travo"
 		}
 		return listen, staticDir, nil
 	}
@@ -39,7 +39,7 @@ func (d *Device) UpdateSettings(ctx context.Context) (listen, staticDir string, 
 }
 
 func (d *Device) StopUpdateService(ctx context.Context) error {
-	_, err := d.run(ctx, 15*time.Second, "/etc/init.d/travo-greenfield", "stop")
+	_, err := d.run(ctx, 15*time.Second, "/etc/init.d/travo", "stop")
 	if err == nil {
 		return nil
 	}
@@ -52,12 +52,12 @@ func (d *Device) StopUpdateService(ctx context.Context) error {
 }
 
 func (d *Device) StartUpdateService(ctx context.Context) error {
-	_, err := d.run(ctx, 15*time.Second, "/etc/init.d/travo-greenfield", "restart")
+	_, err := d.run(ctx, 15*time.Second, "/etc/init.d/travo", "restart")
 	return err
 }
 
 func (d *Device) UpdatePID(ctx context.Context) (int, error) {
-	raw, err := d.Call(ctx, "service", "list", map[string]string{"name": "travo-greenfield"})
+	raw, err := d.Call(ctx, "service", "list", map[string]string{"name": "travo"})
 	if err != nil {
 		return 0, err
 	}
@@ -70,7 +70,7 @@ func (d *Device) UpdatePID(ctx context.Context) (int, error) {
 	if err := json.Unmarshal(raw, &services); err != nil {
 		return 0, err
 	}
-	instances := services["travo-greenfield"].Instances
+	instances := services["travo"].Instances
 	if len(instances) > 1 {
 		return 0, errors.New("ambiguous Travo procd instance")
 	}

@@ -6,10 +6,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
-	"github.com/blackdark-org/travo-greenfield/internal/vpnkill"
-	"github.com/blackdark-org/travo-greenfield/internal/vpnprofiles"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/txn"
+	"github.com/raydak-labs/travo/internal/vpnkill"
+	"github.com/raydak-labs/travo/internal/vpnprofiles"
 )
 
 const iface = "wg0"

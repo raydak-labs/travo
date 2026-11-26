@@ -22,7 +22,7 @@ Verified facts: package 0.107.79-r1, config `/etc/adguardhome/adguardhome.yaml` 
 
 - **Adopt before the first pop.** Old Travo wrote `server 127.0.0.1#5353` + `noresolv=1` as the dnsmasq base, so popping the `adguard` layer over that base changed nothing. `dnslayer.Adopt` records an exact live match as the active `adguard` layer over a base without `server`/`noresolv` (dnsmasq then reads its resolv file); it writes no DNS option and refuses when a record already exists.
 - **Probe**: a raw UDP query for `travo-<random>.example.com` to `127.0.0.1:5353`, 5 s timeout, every 15 s. NOERROR/NXDOMAIN pass; SERVFAIL, REFUSED and timeouts fail. Ticks are skipped without a kernel default route and while the `captive` layer is active (the portal hides the Internet; captive wins anyway).
-- **Fail-open**: 3 consecutive failures pop the layer and persist `fail_open_since` in `/etc/travo-greenfield/adguard-dns.json`. Re-enable: the user's `POST /api/v1/adguard/dns {"enabled":true}` (needs a passing probe) or 10 minutes of continuously passing probes. A user "off" persists there too and is never undone by the probe.
+- **Fail-open**: 3 consecutive failures pop the layer and persist `fail_open_since` in `/etc/travo/adguard-dns.json`. Re-enable: the user's `POST /api/v1/adguard/dns {"enabled":true}` (needs a passing probe) or 10 minutes of continuously passing probes. A user "off" persists there too and is never undone by the probe.
 - **Default on**: without a user "off", the first passing probe after install pushes the layer (DNS stays at base until then). Turning AGH off pops the layer before `stop`.
 
 ## Implementation notes (#134)

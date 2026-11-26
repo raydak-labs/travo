@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/ipv6settings"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/ipv6settings"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 type fakeIPv6 struct {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/factoryreset"
+	"github.com/raydak-labs/travo/internal/factoryreset"
 )
 
 // FactoryResetter wipes the router (internal/factoryreset).

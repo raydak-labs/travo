@@ -7,10 +7,10 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/captive"
-	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
-	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
+	"github.com/raydak-labs/travo/internal/captive"
+	"github.com/raydak-labs/travo/internal/connectivity"
+	"github.com/raydak-labs/travo/internal/dnslayer"
+	"github.com/raydak-labs/travo/internal/guard"
 )
 
 // CaptiveAssist is the captive portal DNS bypass (internal/captive).

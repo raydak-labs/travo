@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
-	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
+	"github.com/raydak-labs/travo/internal/atomicfile"
+	"github.com/raydak-labs/travo/internal/dnslayer"
 )
 
 // DNSLayer is "default DNS" on: dnsmasq forwards everything to AGH (ADR 0006).

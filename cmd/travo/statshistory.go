@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/app"
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/lifecycle"
-	"github.com/blackdark-org/travo-greenfield/internal/statshistory"
-	"github.com/blackdark-org/travo-greenfield/internal/syssettings"
-	"github.com/blackdark-org/travo-greenfield/internal/version"
+	"github.com/raydak-labs/travo/internal/app"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/lifecycle"
+	"github.com/raydak-labs/travo/internal/statshistory"
+	"github.com/raydak-labs/travo/internal/syssettings"
+	"github.com/raydak-labs/travo/internal/version"
 )
 
 // startStatsHistory loads the history file and starts the sampler; its last act on

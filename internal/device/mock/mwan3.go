@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // MWAN3Interfaces mimics `mwan3 interfaces` on the committed config: an enabled interface

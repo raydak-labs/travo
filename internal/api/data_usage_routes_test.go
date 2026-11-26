@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/datausage"
+	"github.com/raydak-labs/travo/internal/datausage"
 )
 
 type fakeDataUsage struct {

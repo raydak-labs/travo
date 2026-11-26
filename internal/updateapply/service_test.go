@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
+	"github.com/raydak-labs/travo/internal/guard"
 )
 
 func fixtureService(t *testing.T) *Service {

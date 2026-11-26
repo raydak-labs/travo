@@ -38,7 +38,7 @@ Measured on the AXT1800 (OpenWrt 25.12.6, 2026-11-17, `SPIKES.md`):
   attempt itself runs under the `wifi-reconnect-in-progress` guard. A failed
   `ifup` keeps that guard, so the feature stays off until a redeploy clears it.
 - At most 5 attempts. The counter is persisted in
-  `/etc/travo-greenfield/wifi-reconnect.json` (`{attempts, last_attempt}`, no
+  `/etc/travo/wifi-reconnect.json` (`{attempts, last_attempt}`, no
   credentials) BEFORE each attempt, so restarts, redeploys and a crash mid-attempt
   never reset it. Only an IPv4 address on `wwan` clears it. A torn file fails
   closed: the worker stays idle and the API answers 503.
