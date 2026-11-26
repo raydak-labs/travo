@@ -31,7 +31,8 @@ describe('alerts', () => {
 
   it('links each alert to its owning page', () => {
     expect(alertRoute(alert({ code: 'adguard_fail_open' }))).toBe('services');
-    expect(alertRoute(alert({ code: 'uplink_reconnect_exhausted' }))).toBe('wifi');
+    expect(alertRoute(alert({ code: 'uplink_reconnect_exhausted' }))).toBe('internet');
+    expect(alertRoute(alert({ code: 'stale_guard', subject: 'wifi-reconnect-in-progress' }))).toBe('internet');
     expect(alertRoute(alert({ code: 'wifi_not_set_up' }))).toBe('wifi');
     expect(alertRoute(alert({ code: 'persistence_degraded' }))).toBe('system');
     expect(alertRoute(alert({ code: 'data_budget_exceeded' }))).toBe('internet');
