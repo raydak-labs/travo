@@ -9,13 +9,15 @@
 # Before installing it verifies $here/checksums.txt.sig over checksums.txt with usign (docs/adr/0007).
 # Test hooks: TRAVO_TEST_STOP_AFTER_SWAP=1 exits after moving LuCI.
 # TRAVO_TEST_HOLD_80=1 starts a listener that blocks greenfield from taking port 80.
-# Touches only the paths in manifest.txt and the ones named in uninstall() (invariants §15).
+# Touches only the paths in manifest.txt, the ones named in uninstall() and stale files in the
+# UI directory it owns (invariants §15).
 set -eu
 
 NAME=travo-greenfield
 STATE_DIR=/etc/travo-greenfield
 MIN_FREE_KIB=20480
 PORT_SWAP_GUARD=/etc/travo-greenfield-guards/port-swap
+UI_DIR=/www/travo-greenfield
 
 die() {
   echo "install.sh: $*" >&2
@@ -139,6 +141,17 @@ stage_adguard_bundle() {
   echo "AdGuard Home bundle staged; it installs on first start without an uplink"
 }
 
+# The UI directory belongs to Travo alone. Asset names carry a content hash, so every release
+# ships new names; drop the files this release does not list. Without this a reinstall leaves the
+# old assets behind and the self-updater refuses (installed manifest does not match, ADR 0007).
+prune_ui() {
+  [ -d "$UI_DIR" ] || return 0
+  for f in "$UI_DIR"/* "$UI_DIR"/.[!.]*; do
+    [ -f "$f" ] && [ ! -L "$f" ] || continue
+    grep -qxF "$f" manifest.txt || rm -f "$f"
+  done
+}
+
 install() {
   [ "$force" = 1 ] || { check_os; check_arch; }
   check_space
@@ -169,6 +182,7 @@ install() {
   [ -e /etc/init.d/$NAME ] || first_install=1
 
   cp -a root/. / || die "copying files to / failed"
+  prune_ui
   # OpenWrt runs uci-defaults only at boot; run it now. It deletes itself on success.
   defaults=/etc/uci-defaults/90-$NAME
   if [ -e "$defaults" ]; then

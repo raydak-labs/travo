@@ -208,6 +208,7 @@ dnsmasq is the single DNS authority for upstream choice; in expert mode AGH owns
 
 - Single self-contained binary per arch, stripped, no runtime deps. Budget ~12.8 MB stripped; measure the delta before adding a dependency. Keep ≥20 MB flash headroom.
 - Cron log level 9 (keep an operator's own setting) so per-minute job starts don't flood the error log.
+- `install.sh` leaves `/www/travo-greenfield` holding exactly the UI files its manifest lists: asset names change every release, and leftovers make the self-updater refuse (its owned-files check, ADR 0007). It removes nothing outside that directory.
 - Install requires an explicit `--password` or the first-run screen; the installer verifies the service answers on its configured port before reporting success, and refuses to move LuCI otherwise.
 - Contract tests: scripts parse, guard paths under `/etc/travo-greenfield-guards/`, every route in the spec, auth covers every route (walk the live route table), strict PUT coverage, spec field names match models, no feature writes UCI outside the transaction module.
 - Record a decision with evidence (firmware version + captured payload) for every device finding.
