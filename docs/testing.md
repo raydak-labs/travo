@@ -200,7 +200,13 @@ Record each check as pass or fail in SPIKES.md ("Captive portal joint session") 
 
 ## Web
 
-`pnpm -C web check`: Biome, svelte-check, Vitest (pure logic and server-rendered components), build, UI size budget. Visual and keyboard behaviour (theme, drawer, focus) is checked in headless Chrome at 390 px and 1280 px before a UI PR; attach screenshots to the PR.
+`pnpm -C web check`: Biome, svelte-check, Vitest (pure logic and server-rendered components), build, UI size budget. Visual and keyboard behaviour (theme, drawer, focus) is checked in headless Chrome at 390 px and 1280 px before a UI PR.
+
+**Screenshots.** A PR that changes what the UI shows carries before/after images in its body:
+
+1. `mise run screenshots:compare` builds the screenshots of `origin/main` in a temporary worktree and of the branch, and writes every changed shot to `web/screenshots-diff/` as one image: Before on the left, After on the right, each changed region boxed in red; new pages appear as New, `index.md` lists changed, new, removed and unchanged shots. Pass a base and a name filter to widen it: `mise run screenshots:compare -- origin/main -390-light` (default `-1280-light`). The pixel diff runs in headless Chrome (`web/scripts/screenshot-diff.mjs`); a change below the noise threshold is not a change.
+2. Open the PR, then `mise run screenshots:publish -- <PR number>` pushes the images to the orphan branch `pr-assets` (folder `pr-<n>/`, never merged) and prints the Markdown; paste it under a "Screenshots" heading in the PR body. Re-run both after later visual commits.
+3. The reviewer reads the boxed regions against the PR description: every box is an intended change, and every intended change has a box.
 
 `mise run screenshots` writes PNGs for UI PRs to `web/screenshots/`, including the shared overlays (`system-reboot-dialog`, `wifi-ap-disable-dialog`, `wifi-pending-toast`, `vpn-error-toast`; responses stubbed in the page, see `web/scripts/screenshots-overlays.mjs`); `web/scripts/cdp.mjs` is the shared headless-Chrome helper for browser checks. Dialog and toast keyboard flows: build, then `scripts/with-mock.sh -- node web/scripts/e2e-components.mjs`.
 

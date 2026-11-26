@@ -1,6 +1,6 @@
 // Writes PNG screenshots of the UI at mobile and desktop widths in light and dark scheme.
 // Expects the daemon and `vite preview` already running (see `mise run screenshots`).
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { launchChrome } from './cdp.mjs';
 import { shootOverlays } from './screenshots-overlays.mjs';
@@ -169,6 +169,9 @@ async function shootHistory(chrome) {
 }
 
 async function main() {
+  // Start empty: a page that no longer exists must not leave an old shot behind (the
+  // before/after comparison would report it as changed instead of removed).
+  rmSync(OUT_DIR, { recursive: true, force: true });
   mkdirSync(OUT_DIR, { recursive: true });
   const chrome = await launchChrome();
   try {

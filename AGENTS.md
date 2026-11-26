@@ -53,7 +53,7 @@ Same PR, only what the change touches:
 - tests for the changed behaviour; fixtures are verbatim device payloads with provenance, never invented fields
 - docs that describe it (invariants, ADR when a decision changes)
 - README when a user-visible feature changes
-- screenshots after visual changes
+- screenshots after visual changes: before/after images with the changes boxed in the PR body (`docs/testing.md` "Screenshots")
 
 ## Code style
 

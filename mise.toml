@@ -152,6 +152,15 @@ description = "Build, serve the UI against the mock daemon, write web/screenshot
 depends = ["web:install"]
 run = "pnpm -C web build && scripts/with-mock.sh -- node web/scripts/screenshots.mjs"
 
+[tasks."screenshots:compare"]
+description = "Before/after screenshots against BASE (default origin/main): web/screenshots-diff/"
+depends = ["web:install"]
+run = "scripts/screenshots-compare.sh"
+
+[tasks."screenshots:publish"]
+description = "Publish web/screenshots-diff to the pr-assets branch for PR N and print the Markdown"
+run = "scripts/screenshots-publish.sh"
+
 [tasks."e2e:csp"]
 description = "Build, let the mock daemon serve web/dist, fail on CSP violations or script errors in headless Chrome"
 depends = ["web:install"]
