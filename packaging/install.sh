@@ -146,8 +146,8 @@ stage_adguard_bundle() {
 # old assets behind and the self-updater refuses (installed manifest does not match, ADR 0007).
 prune_ui() {
   [ -d "$UI_DIR" ] || return 0
-  for f in "$UI_DIR"/* "$UI_DIR"/.[!.]*; do
-    [ -f "$f" ] && [ ! -L "$f" ] || continue
+  # Direct children only: the UI is a flat directory (the updater refuses subdirectories).
+  find "$UI_DIR" -mindepth 1 -maxdepth 1 -type f | while IFS= read -r f; do
     grep -qxF "$f" manifest.txt || rm -f "$f"
   done
 }

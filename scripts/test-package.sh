@@ -181,9 +181,9 @@ dx 'ls -ld /tmp/travo-greenfield-bundle' | grep -q '^drwx------' || fail "bundle
 echo "ok: bundle pin enforced by install.sh"
 
 step "reinstall drops UI files the release does not list, keeps the rest"
-dx 'touch /www/travo-greenfield/old-AbCd1234.js /www/luci-stale-check'
+dx 'touch /www/travo-greenfield/old-AbCd1234.js /www/travo-greenfield/..old.js /www/luci-stale-check'
 dx 'sh /tmp/tg/install.sh'
-dx '[ ! -e /www/travo-greenfield/old-AbCd1234.js ]' || fail "stale UI asset survived a reinstall"
+dx '[ ! -e /www/travo-greenfield/old-AbCd1234.js ] && [ ! -e /www/travo-greenfield/..old.js ]' || fail "stale UI asset survived a reinstall"
 dx '[ -e /www/luci-stale-check ]' || fail "a file outside the UI directory was removed"
 dx 'rm -f /www/luci-stale-check'
 on_disk=$(dx 'ls /www/travo-greenfield | wc -l')
