@@ -158,7 +158,7 @@ depends = ["web:install"]
 run = "scripts/screenshots-compare.sh"
 
 [tasks."screenshots:publish"]
-description = "Publish web/screenshots-diff to the pr-assets branch for PR N and print the Markdown"
+description = "Attach web/screenshots-diff to PR N (gh pr edit --attach) under its Screenshots heading"
 run = "scripts/screenshots-publish.sh"
 
 [tasks."e2e:csp"]
