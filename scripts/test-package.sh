@@ -94,16 +94,21 @@ docker exec -e TRAVO_STAGE_PACKAGE_FIXTURE=/tmp/stage-fixture -e TRAVO_STAGE_PAC
 step "the previous release's stager accepts this package"
 prev=$(git ls-remote --tags origin 'v*' | sed -n 's|.*refs/tags/\(v[0-9][0-9.]*\)$|\1|p' | sort -V | tail -n 1)
 [ -n "$prev" ] || fail "no previous release tag on origin"
-git rev-parse -q --verify "refs/tags/$prev" >/dev/null || git fetch -q --depth=1 origin tag "$prev"
-mkdir "$tmp/prev"
-git archive "$prev" | tar -x -C "$tmp/prev"
-(cd "$tmp/prev" && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go test -tags integration -c -o "$tmp/stage-prev.test" ./internal/updatestage)
-docker cp "$tmp/stage-prev.test" "$NAME:/tmp/stage-prev.test"
-docker exec -e TRAVO_STAGE_PACKAGE_FIXTURE=/tmp/stage-fixture -e TRAVO_STAGE_PACKAGE_VERSION="$VERSION" \
-  "$NAME" /tmp/stage-prev.test -test.run '^TestRealReleasePackage$' -test.v ||
-  fail "$prev cannot stage this package: self-update from $prev would break"
-dx 'rm /tmp/stage-prev.test'
-echo "ok: $prev stages it"
+# Tags before v0.11.0 are the old Travo code, which never self-updates into this one.
+if [ "$(printf '%s\n' "$prev" v0.11.0 | sort -V | head -n 1)" != v0.11.0 ]; then
+  echo "skip: $prev predates the rewrite (v0.11.0)"
+else
+  git rev-parse -q --verify "refs/tags/$prev" >/dev/null || git fetch -q --depth=1 origin tag "$prev"
+  mkdir "$tmp/prev"
+  git archive "$prev" | tar -x -C "$tmp/prev"
+  (cd "$tmp/prev" && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go test -tags integration -c -o "$tmp/stage-prev.test" ./internal/updatestage)
+  docker cp "$tmp/stage-prev.test" "$NAME:/tmp/stage-prev.test"
+  docker exec -e TRAVO_STAGE_PACKAGE_FIXTURE=/tmp/stage-fixture -e TRAVO_STAGE_PACKAGE_VERSION="$VERSION" \
+    "$NAME" /tmp/stage-prev.test -test.run '^TestRealReleasePackage$' -test.v ||
+    fail "$prev cannot stage this package: self-update from $prev would break"
+  dx 'rm /tmp/stage-prev.test'
+  echo "ok: $prev stages it"
+fi
 dx 'rm -r /tmp/stage-fixture /tmp/stage.test'
 
 step "refusals before the real install"
