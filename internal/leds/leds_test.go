@@ -69,7 +69,7 @@ func TestOffSectionMatchesCapture(t *testing.T) {
 		t.Fatalf("got %+v", secs)
 	}
 	for _, s := range secs {
-		want := OffSection(s.Options["sysfs"])
+		want := OffSection(s.Options["sysfs"], false)
 		if s.Name != want.Name || s.Type != want.Type || !sameOptions(s, want) || len(s.Options) != len(want.Options) {
 			t.Errorf("captured %+v, Travo writes %+v", s, want)
 		}
@@ -82,19 +82,19 @@ func TestOffSectionMatchesCapture(t *testing.T) {
 func TestPlansTouchOnlyTravoSections(t *testing.T) {
 	sysfs := sysfsCapture(t, "sysfs-default.tsv")
 	foreign := device.Section{Name: "led_wan", Type: "led", Options: map[string]string{"sysfs": "blue:run", "trigger": "netdev"}}
-	stale := OffSection("gone:led")
-	current := OffSection("blue:run")
+	stale := OffSection("gone:led", false)
+	current := OffSection("blue:run", false)
 	current.Options["delayon"] = "1" // an operator's extra option is kept
 	secs := []device.Section{foreign, stale, current}
-	p := PlanOff(secs, sysfs)
+	p := PlanOff(secs, sysfs, false)
 	if len(p.Write) != 1 || p.Write[0].Name != "travo_led_white_system" || !slices.Equal(p.Delete, []string{stale.Name}) {
 		t.Fatalf("off plan %+v", p)
 	}
-	d := PlanDefault(secs)
+	d := PlanDefault(secs, false)
 	if len(d.Write) != 0 || !slices.Equal(d.Delete, []string{stale.Name, current.Name}) {
 		t.Fatalf("default plan %+v", d)
 	}
-	if !PlanDefault([]device.Section{foreign}).Empty() {
+	if !PlanDefault([]device.Section{foreign}, false).Empty() {
 		t.Fatal("no Travo section: nothing to do")
 	}
 }
@@ -210,5 +210,70 @@ func TestHookActions(t *testing.T) {
 	}
 	if st, _ := s.Get(ctx); st.Off {
 		t.Fatal("leds-on did not return the LEDs to default")
+	}
+}
+
+func held(st Status) map[string]bool {
+	out := map[string]bool{}
+	for _, e := range st.LEDs {
+		out[e.Name] = e.HeldOff
+	}
+	return out
+}
+
+func TestSetLEDHoldsOneLEDAndReleasesIt(t *testing.T) {
+	ctx := context.Background()
+	s, dev := newService(t)
+	st, err := s.SetLED(ctx, "blue:run", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h := held(st); !h["blue:run"] || h["white:system"] || st.Off {
+		t.Fatalf("one off: %+v", st)
+	}
+	if _, err := s.SetLED(ctx, "blue:run", true); err != nil || len(dev.ServiceActions) != 1 {
+		t.Fatalf("unchanged must not restart: %v %v", err, dev.ServiceActions)
+	}
+	st, err = s.SetLED(ctx, "blue:run", false)
+	if err != nil || held(st)["blue:run"] {
+		t.Fatalf("back on: %+v %v", st, err)
+	}
+	if _, err := s.SetLED(ctx, "mmc0::", true); !errors.Is(err, ErrUnknownLED) {
+		t.Fatalf("storage LED must stay with the kernel: %v", err)
+	}
+}
+
+func TestNightKeepsTheUsersChoice(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newService(t)
+	a := s.Actions()
+	if _, err := s.SetLED(ctx, "blue:run", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := a[ActionOff](ctx); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ := s.Get(ctx); !st.Off {
+		t.Fatalf("night did not hold every LED off: %+v", st)
+	}
+	if err := a[ActionOn](ctx); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := s.Get(ctx)
+	if h := held(st); !h["blue:run"] || h["white:system"] {
+		t.Fatalf("morning must restore only what night switched off: %+v", st)
+	}
+	// Switching an LED off during the night drops its night mark: the morning keeps it off.
+	if err := a[ActionOff](ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetLED(ctx, "white:system", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := a[ActionOn](ctx); err != nil {
+		t.Fatal(err)
+	}
+	if h := held(func() Status { st, _ := s.Get(ctx); return st }()); !h["white:system"] || !h["blue:run"] {
+		t.Fatalf("a choice made at night was lost: %+v", h)
 	}
 }

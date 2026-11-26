@@ -955,6 +955,10 @@ export type LanView = {
 
 export type LedEntry = {
     /**
+     * A Travo led section holds this LED off
+     */
+    held_off: boolean;
+    /**
      * Kernel LED name (/sys/class/leds)
      */
     name: string;
@@ -983,10 +987,21 @@ export type LedSchedule = {
 export type LedStatus = {
     leds: Array<LedEntry>;
     /**
-     * Travo holds the LEDs off (its led sections are committed)
+     * Travo holds every controllable LED off
      */
     off: boolean;
     schedule: LedSchedule;
+};
+
+export type LedInputBody = {
+    /**
+     * Kernel LED name from GET /system/leds
+     */
+    name: string;
+    /**
+     * true holds this LED off; false returns it to the firmware default
+     */
+    off: boolean;
 };
 
 export type LedsOffInputBody = {
@@ -1520,6 +1535,13 @@ export type TailscalePrefs = {
     exit_node: string;
     ssh: boolean;
     want_running: boolean;
+};
+
+export type TailscaleRunningInputBody = {
+    /**
+     * true starts tailscaled and starts it at boot; false stops it (not a logout)
+     */
+    enabled: boolean;
 };
 
 export type TailscaleSettings = {
@@ -4759,6 +4781,47 @@ export type SetLedsResponses = {
 
 export type SetLedsResponse = SetLedsResponses[keyof SetLedsResponses];
 
+export type SetLedData = {
+    body: LedInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/system/leds/led';
+};
+
+export type SetLedErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetLedError = SetLedErrors[keyof SetLedErrors];
+
+export type SetLedResponses = {
+    /**
+     * OK
+     */
+    200: LedStatus;
+};
+
+export type SetLedResponse = SetLedResponses[keyof SetLedResponses];
+
 export type SetLedScheduleData = {
     body: LedSchedule;
     path?: never;
@@ -5510,6 +5573,47 @@ export type LogoutTailscaleResponses = {
 };
 
 export type LogoutTailscaleResponse = LogoutTailscaleResponses[keyof LogoutTailscaleResponses];
+
+export type SetTailscaleRunningData = {
+    body: TailscaleRunningInputBody;
+    path?: never;
+    query?: never;
+    url: '/api/v1/tailscale/running';
+};
+
+export type SetTailscaleRunningErrors = {
+    /**
+     * Bad Request
+     */
+    400: ApiError;
+    /**
+     * Conflict
+     */
+    409: ApiError;
+    /**
+     * Unprocessable Entity
+     */
+    422: ApiError;
+    /**
+     * Internal Server Error
+     */
+    500: ApiError;
+    /**
+     * Service Unavailable
+     */
+    503: ApiError;
+};
+
+export type SetTailscaleRunningError = SetTailscaleRunningErrors[keyof SetTailscaleRunningErrors];
+
+export type SetTailscaleRunningResponses = {
+    /**
+     * OK
+     */
+    200: TailscaleStatus;
+};
+
+export type SetTailscaleRunningResponse = SetTailscaleRunningResponses[keyof SetTailscaleRunningResponses];
 
 export type SetTailscaleSettingsData = {
     body: TailscaleSettings;

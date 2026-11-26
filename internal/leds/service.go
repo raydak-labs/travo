@@ -44,12 +44,49 @@ func (s *Service) Get(ctx context.Context) (Status, error) {
 	if err != nil {
 		return Status{}, fmt.Errorf("leds: crontab: %w", err)
 	}
-	return Status{LEDs: Entries(sysfs), Off: len(Owned(secs)) > 0, Schedule: ParseSchedule(lines)}, nil
+	entries := Entries(sysfs)
+	held := map[string]bool{}
+	for _, sec := range Owned(secs) {
+		held[sec.Name] = true
+	}
+	all := len(entries) > 0
+	for i := range entries {
+		entries[i].HeldOff = held[SectionName(entries[i].Name)]
+		all = all && entries[i].HeldOff
+	}
+	return Status{LEDs: entries, Off: all, Schedule: ParseSchedule(lines)}, nil
 }
 
-// SetOff holds every controllable LED off (true) or returns them to their default state
+// SetOff holds every controllable LED off (true) or returns them all to their default state
 // (false). An unchanged config writes nothing and does not restart the LEDs.
 func (s *Service) SetOff(ctx context.Context, off bool) (Status, error) {
+	return s.change(ctx, func(secs []device.Section, sysfs []device.LED) (Plan, error) {
+		if off {
+			return PlanOff(secs, sysfs, false), nil
+		}
+		return PlanDefault(secs, false), nil
+	})
+}
+
+// SetLED holds one LED off or returns it to its default state.
+func (s *Service) SetLED(ctx context.Context, name string, off bool) (Status, error) {
+	return s.change(ctx, func(secs []device.Section, sysfs []device.LED) (Plan, error) {
+		return PlanLED(secs, sysfs, name, off)
+	})
+}
+
+// night is the schedule's off (true) and on (false): it adds and removes only its own sections.
+func (s *Service) night(ctx context.Context, off bool) error {
+	_, err := s.change(ctx, func(secs []device.Section, sysfs []device.LED) (Plan, error) {
+		if off {
+			return PlanOff(secs, sysfs, true), nil
+		}
+		return PlanDefault(secs, true), nil
+	})
+	return err
+}
+
+func (s *Service) change(ctx context.Context, plan func([]device.Section, []device.LED) (Plan, error)) (Status, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	sysfs, err := s.Sysfs.LEDs(ctx)
@@ -60,12 +97,12 @@ func (s *Service) SetOff(ctx context.Context, off bool) (Status, error) {
 	if err != nil {
 		return Status{}, fmt.Errorf("leds: uci: %w", err)
 	}
-	plan := PlanDefault(secs)
-	if off {
-		plan = PlanOff(secs, sysfs)
+	p, err := plan(secs, sysfs)
+	if err != nil {
+		return Status{}, err
 	}
-	if !plan.Empty() {
-		if err := s.Apply.Apply(ctx, []string{config}, func(lctx context.Context) error { return stage(lctx, s.UCI, plan) }); err != nil {
+	if !p.Empty() {
+		if err := s.Apply.Apply(ctx, []string{config}, func(lctx context.Context) error { return stage(lctx, s.UCI, p) }); err != nil {
 			return Status{}, err
 		}
 		// The led script replays /var/run/led.state (each LED's state before its section
@@ -92,8 +129,8 @@ func (s *Service) SetSchedule(ctx context.Context, sch Schedule) (Status, error)
 // Actions are the hook actions the schedule's jobs call.
 func (s *Service) Actions() map[string]func(context.Context) error {
 	return map[string]func(context.Context) error{
-		ActionOff: func(ctx context.Context) error { _, err := s.SetOff(ctx, true); return err },
-		ActionOn:  func(ctx context.Context) error { _, err := s.SetOff(ctx, false); return err },
+		ActionOff: func(ctx context.Context) error { return s.night(ctx, true) },
+		ActionOn:  func(ctx context.Context) error { return s.night(ctx, false) },
 	}
 }
 
@@ -106,8 +143,10 @@ func stage(ctx context.Context, u device.UCI, p Plan) error {
 		if err := u.SetType(ctx, config, sec.Name, sec.Type); err != nil {
 			return err
 		}
-		for _, k := range []string{"name", "sysfs", "trigger", "default"} {
-			errs = append(errs, u.Set(ctx, config, sec.Name, k, sec.Options[k]))
+		for _, k := range []string{"name", "sysfs", "trigger", "default", NightOption} {
+			if v, ok := sec.Options[k]; ok {
+				errs = append(errs, u.Set(ctx, config, sec.Name, k, v))
+			}
 		}
 	}
 	return errors.Join(errs...)

@@ -22,6 +22,14 @@ func (f *fakeLEDs) SetOff(_ context.Context, off bool) (leds.Status, error) {
 	return f.st, f.setErr
 }
 
+func (f *fakeLEDs) SetLED(_ context.Context, name string, off bool) (leds.Status, error) {
+	if name != "blue:run" {
+		return leds.Status{}, leds.ErrUnknownLED
+	}
+	f.st.LEDs[0].HeldOff = off
+	return f.st, f.setErr
+}
+
 func (f *fakeLEDs) SetSchedule(_ context.Context, s leds.Schedule) (leds.Status, error) {
 	if _, err := s.Lines(); err != nil {
 		return leds.Status{}, err
@@ -42,6 +50,14 @@ func TestLEDRoutes(t *testing.T) {
 	rec = e.do(req{method: "PUT", path: "/api/v1/system/leds", body: `{"off":true}`, cookie: cookie, csrf: csrf})
 	if rec.Code != http.StatusOK || !f.st.Off {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	rec = e.do(req{method: "PUT", path: "/api/v1/system/leds/led", body: `{"name":"blue:run","off":true}`, cookie: cookie, csrf: csrf})
+	if rec.Code != http.StatusOK || !f.st.LEDs[0].HeldOff || !strings.Contains(rec.Body.String(), `"held_off":true`) {
+		t.Fatalf("one LED: %d %s", rec.Code, rec.Body)
+	}
+	rec = e.do(req{method: "PUT", path: "/api/v1/system/leds/led", body: `{"name":"mmc0::","off":true}`, cookie: cookie, csrf: csrf})
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "led_unknown") {
+		t.Fatalf("unknown LED: %d %s", rec.Code, rec.Body)
 	}
 	rec = e.do(req{method: "PUT", path: "/api/v1/system/leds/schedule", body: `{"enabled":true,"off_at":"07:00","on_at":"07:00"}`, cookie: cookie, csrf: csrf})
 	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "led_schedule_invalid") {
