@@ -33,5 +33,5 @@ Add a third radio-selection step in Join after `pickRadio` and `reconcileRadio`:
 
 - While the uplink STA holds the displaced radio, that band's AP (5 GHz or 2.4 GHz) stays off; clients use the twin on the other band.
 - When a dual-band upstream is joined from a WiFi client, the client's radio is spared so the operator's session stays connected through the confirm window.
-- Automatically re-enabling a displaced AP when the uplink is later removed or switched to another radio is out of scope and left for a follow-up.
+- Automatically re-enabling a displaced AP when the uplink is later removed or switched to another radio is out of scope, and so far only possible through LuCI: no Travo path disables the uplink STA ([#299](https://github.com/raydak-labs/travo/issues/299)).
 - Hardware behaviour (confirm and rollback on a dual-AP AXT1800) is verified via the playbook step in [testing.md](../testing.md).
