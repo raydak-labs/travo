@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/reboot"
+	"github.com/raydak-labs/travo/internal/reboot"
 )
 
 const rebootRequestPath = "/api/v1/system/reboot"

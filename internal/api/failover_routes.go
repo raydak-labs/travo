@@ -7,8 +7,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/failover"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/failover"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // Failover reads and changes multi-WAN failover (internal/failover).

@@ -84,7 +84,7 @@ func (s *Service) prepare(ctx context.Context, dir, version string) error {
 		return err
 	}
 	archive := filepath.Join(dir, "release.tar.gz")
-	if err := download(ctx, s.client, base+"travo-greenfield-"+version+"-aarch64.tar.gz", archive, archiveLimit); err != nil {
+	if err := download(ctx, s.client, base+"travo-"+version+"-aarch64.tar.gz", archive, archiveLimit); err != nil {
 		return err
 	}
 	if err := extract(ctx, archive, filepath.Join(dir, "payload"), signed, version); err != nil {

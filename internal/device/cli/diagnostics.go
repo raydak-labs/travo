@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/runner"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/runner"
 )
 
 // Timeout tiers per tool: ping sends 4 probes with a 2 s wait; traceroute is at most

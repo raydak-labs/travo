@@ -61,7 +61,7 @@ func Build(w io.Writer, files []File, mtime time.Time) error {
 }
 
 // Inputs are the already-read sources of one release. Web and Files names are relative to
-// /www/travo-greenfield and / on the router.
+// /www/travo and / on the router.
 type Inputs struct {
 	Version string
 	Binary  []byte
@@ -74,8 +74,8 @@ type Inputs struct {
 }
 
 const (
-	binaryTarget = "/usr/bin/travo-greenfield"
-	webTarget    = "/www/travo-greenfield/"
+	binaryTarget = "/usr/bin/travo"
+	webTarget    = "/www/travo/"
 )
 
 // Assemble lays the sources out as the tarball (docs: issue #19 contract) and adds

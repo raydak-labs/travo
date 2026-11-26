@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/alerts"
+	"github.com/raydak-labs/travo/internal/alerts"
 )
 
 type fakeAlerts struct{ err error }

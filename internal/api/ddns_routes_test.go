@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/ddns"
-	"github.com/blackdark-org/travo-greenfield/internal/pkgmgr"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/ddns"
+	"github.com/raydak-labs/travo/internal/pkgmgr"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 type fakeDDNS struct {

@@ -4,7 +4,7 @@ import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig(({ mode }) => {
-  // Daemon for local dev: `travo-greenfield --mock` (default :8081); override with DAEMON_URL.
+  // Daemon for local dev: `travo --mock` (default :8081); override with DAEMON_URL.
   const target = loadEnv(mode, '.', '').DAEMON_URL || 'http://127.0.0.1:8081';
   const proxy = { '/api': target };
   return {

@@ -8,8 +8,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/system"
-	"github.com/blackdark-org/travo-greenfield/internal/version"
+	"github.com/raydak-labs/travo/internal/system"
+	"github.com/raydak-labs/travo/internal/version"
 )
 
 type memoryBody struct {
@@ -18,7 +18,7 @@ type memoryBody struct {
 }
 
 type appBody struct {
-	Version   string `json:"version" doc:"travo-greenfield build version"`
+	Version   string `json:"version" doc:"travo build version"`
 	BuildTime string `json:"build_time" doc:"Build time, RFC 3339; empty for unstamped builds"`
 }
 

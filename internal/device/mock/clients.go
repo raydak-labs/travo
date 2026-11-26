@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 //go:embed testdata/dhcp-leases.txt

@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/app"
-	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
-	"github.com/blackdark-org/travo-greenfield/internal/vpndns"
-	"github.com/blackdark-org/travo-greenfield/internal/vpnstatus"
-	"github.com/blackdark-org/travo-greenfield/internal/vpntunnel"
+	"github.com/raydak-labs/travo/internal/app"
+	"github.com/raydak-labs/travo/internal/dnslayer"
+	"github.com/raydak-labs/travo/internal/vpndns"
+	"github.com/raydak-labs/travo/internal/vpnstatus"
+	"github.com/raydak-labs/travo/internal/vpntunnel"
 )
 
 type connectedTunnel struct{}

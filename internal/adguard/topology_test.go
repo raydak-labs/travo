@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
-	"github.com/blackdark-org/travo-greenfield/internal/pkgmgr"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/guard"
+	"github.com/raydak-labs/travo/internal/pkgmgr"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // fakeTxns keeps a passing switch staged (pending): commit = confirm, revert = the

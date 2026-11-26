@@ -10,8 +10,8 @@ import (
 	"net/netip"
 	"slices"
 
-	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
-	"github.com/blackdark-org/travo-greenfield/internal/vpnstatus"
+	"github.com/raydak-labs/travo/internal/dnslayer"
+	"github.com/raydak-labs/travo/internal/vpnstatus"
 )
 
 // Action is what the reconciler does to the `vpn` layer.

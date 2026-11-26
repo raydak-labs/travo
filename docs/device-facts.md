@@ -93,7 +93,7 @@ Design: [ADR 0018](adr/0018-mwan3-failover.md); rules: [invariants.md](invariant
 
 ## 10. Sysupgrade and upgrades
 
-- [HW] The keep-list must include `/etc/rc.d/S99travo-greenfield` (boot link) as well as the init script, binary and UCI enable. A missing link after 25.12.3 to 25.12.6 left the service inactive.
+- [HW] The keep-list must include `/etc/rc.d/S99travo` (boot link) as well as the init script, binary and UCI enable. A missing link after 25.12.3 to 25.12.6 left the service inactive.
 - After an upgrade the old binary may keep running: verify the running exe path; restart, not start.
 - Package manager: 25.x = apk, older = opkg; detect at runtime. Package lists live in `/tmp` and vanish on reboot; `apk list --upgradable` reads only those (empty until `apk update`).
 - [HW, GET-only] `/sbin/sysupgrade` exists; `ubus -v list system` offers `validate_firmware_image {path}` (fwtool signature, board match and `platform_check_image`, read-only) and `sysupgrade`. User-installed packages = `/etc/apk/world` minus `/rom/etc/apk/world`. The sysupgrade image's own package list is not readable without unpacking squashfs. `/tmp` is a 204 MiB tmpfs with ~149 MB RAM available. Never flash the shared test router.

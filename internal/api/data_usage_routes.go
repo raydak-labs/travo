@@ -7,7 +7,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/datausage"
+	"github.com/raydak-labs/travo/internal/datausage"
 )
 
 // DataUsage is usage per uplink, the monthly budget and the uptime log (internal/datausage).

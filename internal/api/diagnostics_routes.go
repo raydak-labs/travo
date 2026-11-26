@@ -8,7 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/diagnostics"
+	"github.com/raydak-labs/travo/internal/diagnostics"
 )
 
 // Diagnostics runs one ping, traceroute or DNS lookup from the router (internal/diagnostics).

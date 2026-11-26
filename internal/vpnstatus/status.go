@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 const Interface = "wg0"

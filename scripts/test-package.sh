@@ -32,7 +32,7 @@ build_pkg() {
 step "build the tarball"
 tmp=$(mktemp -d)
 trap 'cleanup; rm -rf "$tmp"' EXIT
-tarball=dist/travo-greenfield-$VERSION-aarch64.tar.gz
+tarball=dist/travo-$VERSION-aarch64.tar.gz
 minisign -G -W -p "$tmp/k1.pub" -s "$tmp/k1.key" >/dev/null
 minisign -G -W -p "$tmp/k2.pub" -s "$tmp/k2.key" >/dev/null
 # A stand-in offline AdGuard bundle: only its hash matters to install.sh (docs/adr/0020).
@@ -55,8 +55,8 @@ mkdir -p "$tmp/pkg-extra/root/etc/rc.d"
 printf '#!/bin/sh\n' >"$tmp/pkg-extra/root/etc/rc.d/S00evil"
 # validly signed, but the listed binary replaced by a symlink to an identical copy outside root/
 cp -R "$tmp/pkg" "$tmp/pkg-link"
-mv "$tmp/pkg-link/root/usr/bin/travo-greenfield" "$tmp/pkg-link/binary-copy"
-ln -s /tmp/tg-link/binary-copy "$tmp/pkg-link/root/usr/bin/travo-greenfield"
+mv "$tmp/pkg-link/root/usr/bin/travo" "$tmp/pkg-link/binary-copy"
+ln -s /tmp/tg-link/binary-copy "$tmp/pkg-link/root/usr/bin/travo"
 
 step "tarball entries equal root/ plus the manifest"
 (cd "$tmp/pkg" && find root -type f | sed 's|^root||' | LC_ALL=C sort) >"$tmp/on-disk.txt"
@@ -117,29 +117,29 @@ out=$(docker exec -u 65534 "$NAME" sh -c 'sh /tmp/tg/install.sh 2>&1; echo rc=$?
 echo "$out" | grep -qx 'rc=1' || fail "non-root install not refused with exit 1: $out"
 echo "$out" | grep -q 'root' || fail "non-root refusal has no reason: $out"
 echo "ok: non-root refused: $(echo "$out" | head -n 1)"
-dx '[ ! -e /usr/bin/travo-greenfield ]' || fail "a refused install left files behind"
+dx '[ ! -e /usr/bin/travo ]' || fail "a refused install left files behind"
 
 # Signature cases 1 and 2 (3 is the install below). Each runs install.sh and prints rc=<exit code>.
 step "signature: no .sig refuses"
 out=$(dx 'sh /tmp/tg-nosig/install.sh 2>&1; echo rc=$?')
 echo "$out" | grep -qx 'rc=1' || fail "install without .sig not refused with exit 1: $out"
 echo "$out" | grep -q -e '--insecure' || fail "refusal does not mention --insecure: $out"
-dx '[ ! -e /usr/bin/travo-greenfield ]' || fail "a refused install left files behind"
+dx '[ ! -e /usr/bin/travo ]' || fail "a refused install left files behind"
 echo "ok: refused: $(echo "$out" | head -n 1)"
 
 step "signature: --insecure installs without writing the key"
 dx 'sh /tmp/tg-nosig/install.sh --insecure'
-dx '[ -x /usr/bin/travo-greenfield ]' || fail "--insecure install did not install"
-dx '[ ! -e /etc/travo-greenfield/minisign.pub ]' || fail "--insecure install wrote the trusted key"
+dx '[ -x /usr/bin/travo ]' || fail "--insecure install did not install"
+dx '[ ! -e /etc/travo/minisign.pub ]' || fail "--insecure install wrote the trusted key"
 dx 'sh /tmp/tg-nosig/install.sh --uninstall --purge'
-dx '[ ! -e /usr/bin/travo-greenfield ] && [ ! -e /etc/travo-greenfield ]' || fail "uninstall/purge left files"
+dx '[ ! -e /usr/bin/travo ] && [ ! -e /etc/travo ]' || fail "uninstall/purge left files"
 echo "ok: --insecure installed, no key written"
 
 step "install"
 listeners >"$tmp/listeners-before.txt"
 dx 'sh /tmp/tg/install.sh'
 wait_health "after install" 80
-dx 'cat /etc/travo-greenfield/minisign.pub' | cmp - "$tmp/k1.pub" || fail "signed install did not store the tarball key"
+dx 'cat /etc/travo/minisign.pub' | cmp - "$tmp/k1.pub" || fail "signed install did not store the tarball key"
 echo "ok: signed install stored the key"
 listeners >"$tmp/listeners-after.txt"
 while IFS= read -r l; do
@@ -149,24 +149,24 @@ done <"$tmp/listeners-before.txt"
 grep -q ':80$' "$tmp/listeners-after.txt" || fail "nothing listens on :80"
 grep -q ':8080$' "$tmp/listeners-after.txt" || fail "nothing listens on :8080"
 echo "ok: LuCI moved and the other pre-install listeners are still present"
-[ "$(dx 'uci -q get travo-greenfield.main.listen_tls')" = :443 ] || fail "install did not enable HTTPS on :443"
+[ "$(dx 'uci -q get travo.main.listen_tls')" = :443 ] || fail "install did not enable HTTPS on :443"
 attempts=0
 until dx 'wget --no-check-certificate -T 2 -qO- https://127.0.0.1/api/health' 2>/dev/null | grep -q '"status"'; do
   attempts=$((attempts + 1))
   [ "$attempts" -lt 15 ] || fail "no HTTPS health answer on :443"
   sleep 1
 done
-dx '[ -s /etc/travo-greenfield/tls/cert.pem ] && ls -l /etc/travo-greenfield/tls/key.pem | grep -q "^-rw-------"' ||
+dx '[ -s /etc/travo/tls/cert.pem ] && ls -l /etc/travo/tls/key.pem | grep -q "^-rw-------"' ||
   fail "self-signed certificate not stored with a private key file"
 echo "ok: HTTPS answers on :443 with the generated certificate"
-dx '[ -L /etc/rc.d/S99travo-greenfield ] && [ -L /etc/rc.d/K10travo-greenfield ]' || fail "boot links missing"
-dx '[ ! -e /etc/uci-defaults/90-travo-greenfield ]' || fail "uci-defaults script not consumed"
+dx '[ -L /etc/rc.d/S99travo ] && [ -L /etc/rc.d/K10travo ]' || fail "boot links missing"
+dx '[ ! -e /etc/uci-defaults/90-travo ]' || fail "uci-defaults script not consumed"
 # BusyBox tr has no [:upper:] class: it once turned OpenWrt into wenrt.lan
 # shellcheck disable=SC2018,SC2019 # same ASCII-only mapping as the script under test
 want=$(dx 'uci -q get system.@system[0].hostname' | tr 'A-Z' 'a-z').lan
-got=$(dx 'uci -q get travo-greenfield.main.host_allow')
+got=$(dx 'uci -q get travo.main.host_allow')
 [ "$got" = "$want" ] || fail "host_allow is '$got', want '$want'"
-dx 'sysupgrade -l 2>/dev/null' | grep -q travo-greenfield || fail "sysupgrade -l lists no travo-greenfield path"
+dx 'sysupgrade -l 2>/dev/null' | grep -q travo || fail "sysupgrade -l lists no travo path"
 
 step "offline AdGuard bundle: a foreign file is refused, the pinned one is staged in RAM"
 docker cp "$tmp/adguardhome-0.0-r0-test.apk" "$NAME:/tmp/agh-good.apk"
@@ -174,20 +174,20 @@ dx 'printf "other\n" >/tmp/agh-bad.apk'
 out=$(dx 'sh /tmp/tg/install.sh --adguard-bundle /tmp/agh-bad.apk 2>&1; echo rc=$?')
 echo "$out" | grep -qx 'rc=1' || fail "foreign bundle not refused: $out"
 echo "$out" | grep -q 'does not match this release' || fail "refusal does not name the mismatch: $out"
-dx '[ ! -e /tmp/travo-greenfield-bundle/adguardhome.apk ]' || fail "a refused bundle was staged"
+dx '[ ! -e /tmp/travo-bundle/adguardhome.apk ]' || fail "a refused bundle was staged"
 dx 'sh /tmp/tg/install.sh --adguard-bundle /tmp/agh-good.apk'
-dx 'cmp /tmp/agh-good.apk /tmp/travo-greenfield-bundle/adguardhome.apk' || fail "pinned bundle not staged"
-dx 'ls -ld /tmp/travo-greenfield-bundle' | grep -q '^drwx------' || fail "bundle dir is not root-only"
+dx 'cmp /tmp/agh-good.apk /tmp/travo-bundle/adguardhome.apk' || fail "pinned bundle not staged"
+dx 'ls -ld /tmp/travo-bundle' | grep -q '^drwx------' || fail "bundle dir is not root-only"
 echo "ok: bundle pin enforced by install.sh"
 
 step "reinstall drops UI files the release does not list, keeps the rest"
-dx 'touch /www/travo-greenfield/old-AbCd1234.js /www/travo-greenfield/..old.js /www/luci-stale-check'
+dx 'touch /www/travo/old-AbCd1234.js /www/travo/..old.js /www/luci-stale-check'
 dx 'sh /tmp/tg/install.sh'
-dx '[ ! -e /www/travo-greenfield/old-AbCd1234.js ] && [ ! -e /www/travo-greenfield/..old.js ]' || fail "stale UI asset survived a reinstall"
+dx '[ ! -e /www/travo/old-AbCd1234.js ] && [ ! -e /www/travo/..old.js ]' || fail "stale UI asset survived a reinstall"
 dx '[ -e /www/luci-stale-check ]' || fail "a file outside the UI directory was removed"
 dx 'rm -f /www/luci-stale-check'
-on_disk=$(dx 'ls /www/travo-greenfield | wc -l')
-listed=$(dx 'grep -c "^/www/travo-greenfield/" /etc/travo-greenfield/manifest.txt')
+on_disk=$(dx 'ls /www/travo | wc -l')
+listed=$(dx 'grep -c "^/www/travo/" /etc/travo/manifest.txt')
 [ "$on_disk" = "$listed" ] || fail "UI directory has $on_disk files, manifest lists $listed"
 echo "ok: UI directory equals the manifest"
 
@@ -205,29 +205,29 @@ docker cp "$tmp/pkg2/." "$NAME:/tmp/tg2/"
 out=$(dx 'sh /tmp/tg2/install.sh 2>&1; echo rc=$?')
 echo "$out" | grep -qx 'rc=1' || fail "different key not refused with exit 1: $out"
 echo "$out" | grep -q 'differs from the installed key' || fail "refusal does not say the key differs: $out"
-dx 'cat /etc/travo-greenfield/minisign.pub' | cmp - "$tmp/k1.pub" || fail "refused rotation changed the installed key"
+dx 'cat /etc/travo/minisign.pub' | cmp - "$tmp/k1.pub" || fail "refused rotation changed the installed key"
 dx 'sh /tmp/tg2/install.sh --rotate-key'
-dx 'cat /etc/travo-greenfield/minisign.pub' | cmp - "$tmp/k2.pub" || fail "--rotate-key did not store the new key"
+dx 'cat /etc/travo/minisign.pub' | cmp - "$tmp/k2.pub" || fail "--rotate-key did not store the new key"
 wait_health "after key rotation" 80
 echo "ok: different key refused, --rotate-key stored it"
 
 step "uninstall keeps config and ignores foreign manifest paths"
 # A tampered manifest must not reach files the package does not own.
-dx 'printf "%s\n" /etc/config/network /etc /www/travo-greenfield/../../etc/config/firewall >> /etc/travo-greenfield/manifest.txt'
+dx 'printf "%s\n" /etc/config/network /etc /www/travo/../../etc/config/firewall >> /etc/travo/manifest.txt'
 dx 'sh /tmp/tg/install.sh --uninstall'
 dx '[ -f /etc/config/network ] && [ -f /etc/config/firewall ] && [ -d /etc ]' || fail "uninstall followed a foreign manifest path"
 while IFS= read -r p; do
-  # the manifest copy lives under /etc/travo-greenfield/ and is not in the manifest
+  # the manifest copy lives under /etc/travo/ and is not in the manifest
   dx "[ ! -e '$p' ]" || fail "$p still exists after uninstall"
 done <"$tmp/pkg/manifest.txt"
-dx '[ ! -e /etc/rc.d/S99travo-greenfield ] && [ ! -e /etc/rc.d/K10travo-greenfield ]' || fail "boot links remain"
-dx '[ -e /etc/config/travo-greenfield ]' || fail "uninstall removed /etc/config/travo-greenfield"
-dx '[ ! -e /www/travo-greenfield ]' || fail "/www/travo-greenfield remains"
+dx '[ ! -e /etc/rc.d/S99travo ] && [ ! -e /etc/rc.d/K10travo ]' || fail "boot links remain"
+dx '[ -e /etc/config/travo ]' || fail "uninstall removed /etc/config/travo"
+dx '[ ! -e /www/travo ]' || fail "/www/travo remains"
 echo "ok: uninstalled, config kept"
 
 step "uninstall --purge"
 dx 'sh /tmp/tg/install.sh --uninstall --purge'
-dx '[ ! -e /etc/config/travo-greenfield ] && [ ! -e /etc/travo-greenfield ]' || fail "purge left config or state"
+dx '[ ! -e /etc/config/travo ] && [ ! -e /etc/travo ]' || fail "purge left config or state"
 echo "ok: purge removed config and state"
 
 # Signature cases 5 and 6 run on the clean container left by the purge: the tarball key is used.
@@ -235,28 +235,28 @@ step "signature: .sig from another key refuses"
 out=$(dx 'sh /tmp/tg-wrongsig/install.sh 2>&1; echo rc=$?')
 echo "$out" | grep -qx 'rc=1' || fail "wrong-key .sig not refused with exit 1: $out"
 echo "$out" | grep -q 'signature check failed' || fail "refusal is not 'signature check failed': $out"
-dx '[ ! -e /usr/bin/travo-greenfield ]' || fail "a refused install left files behind"
+dx '[ ! -e /usr/bin/travo ]' || fail "a refused install left files behind"
 echo "ok: refused: $(echo "$out" | head -n 1)"
 
 step "signature: tampered checksums.txt refuses"
 out=$(dx 'sh /tmp/tg-tampered/install.sh 2>&1; echo rc=$?')
 echo "$out" | grep -qx 'rc=1' || fail "tampered checksums.txt not refused with exit 1: $out"
 echo "$out" | grep -q 'signature check failed' || fail "refusal is not 'signature check failed': $out"
-dx '[ ! -e /usr/bin/travo-greenfield ] && [ ! -e /etc/travo-greenfield ]' || fail "a refused install left files behind"
+dx '[ ! -e /usr/bin/travo ] && [ ! -e /etc/travo ]' || fail "a refused install left files behind"
 echo "ok: refused: $(echo "$out" | head -n 1)"
 
 step "signature: unlisted file under root/ refuses"
 out=$(dx 'sh /tmp/tg-extra/install.sh 2>&1; echo rc=$?')
 echo "$out" | grep -qx 'rc=1' || fail "unlisted file not refused with exit 1: $out"
 echo "$out" | grep -q 'not all listed' || fail "refusal does not name the unlisted files: $out"
-dx '[ ! -e /etc/rc.d/S00evil ] && [ ! -e /usr/bin/travo-greenfield ]' || fail "a refused install left files behind"
+dx '[ ! -e /etc/rc.d/S00evil ] && [ ! -e /usr/bin/travo ]' || fail "a refused install left files behind"
 echo "ok: refused: $(echo "$out" | head -n 1)"
 
 step "signature: symlink under root/ refuses"
 out=$(dx 'sh /tmp/tg-link/install.sh 2>&1; echo rc=$?')
 echo "$out" | grep -qx 'rc=1' || fail "symlink not refused with exit 1: $out"
 echo "$out" | grep -q 'other than regular files' || fail "refusal does not name the symlink: $out"
-dx '[ ! -e /usr/bin/travo-greenfield ]' || fail "a refused install left files behind"
+dx '[ ! -e /usr/bin/travo ]' || fail "a refused install left files behind"
 echo "ok: refused: $(echo "$out" | head -n 1)"
 
 step "package test passed"

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
+	"github.com/raydak-labs/travo/internal/device/facts"
 )
 
 // Connection says how the router last saw a client.

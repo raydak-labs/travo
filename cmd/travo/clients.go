@@ -4,10 +4,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/api"
-	"github.com/blackdark-org/travo-greenfield/internal/app"
-	"github.com/blackdark-org/travo-greenfield/internal/clients"
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/api"
+	"github.com/raydak-labs/travo/internal/app"
+	"github.com/raydak-labs/travo/internal/clients"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // newClients wires the clients page; nil when the device cannot read leases, neighbours or

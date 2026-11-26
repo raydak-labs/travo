@@ -6,9 +6,9 @@ import (
 	"slices"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
-	"github.com/blackdark-org/travo-greenfield/internal/pkgmgr"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/guard"
+	"github.com/raydak-labs/travo/internal/pkgmgr"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // Interval of the reconciler. A rolled-back first apply restores the stock config while

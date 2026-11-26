@@ -6,7 +6,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/auth"
+	"github.com/raydak-labs/travo/internal/auth"
 )
 
 type setupInput struct {

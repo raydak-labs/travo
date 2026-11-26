@@ -11,12 +11,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/updatecheck"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/updatecheck"
 )
 
 const (
-	Root = "/tmp/travo-greenfield-update"
+	Root = "/tmp/travo-update"
 	ttl  = 30 * time.Minute
 )
 

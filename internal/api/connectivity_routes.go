@@ -6,8 +6,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/captive"
-	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
+	"github.com/raydak-labs/travo/internal/captive"
+	"github.com/raydak-labs/travo/internal/connectivity"
 )
 
 // DashboardConnectivity is the probe result plus the captive assist state the card acts on.

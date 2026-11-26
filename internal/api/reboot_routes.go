@@ -8,7 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/reboot"
+	"github.com/raydak-labs/travo/internal/reboot"
 )
 
 type rebootInput struct {

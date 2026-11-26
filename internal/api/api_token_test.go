@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/apitokens"
+	"github.com/raydak-labs/travo/internal/apitokens"
 )
 
 func newTokenEnv(t *testing.T) *env {

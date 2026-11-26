@@ -12,7 +12,7 @@ func TestReplaceKeepsForeignLines(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := foreign + "# travo-greenfield:leds begin\n0 23 * * * a\n30 6 * * * b\n# travo-greenfield:leds end\n"
+	want := foreign + "# travo:leds begin\n0 23 * * * a\n30 6 * * * b\n# travo:leds end\n"
 	if got != want {
 		t.Fatalf("got %q", got)
 	}
@@ -41,14 +41,14 @@ func TestReplaceEmpty(t *testing.T) {
 	if err != nil || got != "" {
 		t.Fatalf("%q %v", got, err)
 	}
-	got, _ = Replace("# travo-greenfield:leds begin\n0 1 * * * x\n# travo-greenfield:leds end\n", "leds", nil)
+	got, _ = Replace("# travo:leds begin\n0 1 * * * x\n# travo:leds end\n", "leds", nil)
 	if got != "" {
 		t.Fatalf("%q", got)
 	}
 }
 
 func TestReplaceDropsAnUnterminatedOwnBlock(t *testing.T) {
-	got, _ := Replace("1 1 * * * keep\n# travo-greenfield:leds begin\n0 1 * * * x\n", "leds", nil)
+	got, _ := Replace("1 1 * * * keep\n# travo:leds begin\n0 1 * * * x\n", "leds", nil)
 	if got != "1 1 * * * keep\n" {
 		t.Fatalf("%q", got)
 	}
@@ -81,7 +81,7 @@ func TestClockAndDaily(t *testing.T) {
 		}
 	}
 	line := Daily(c, HookCommand("leds-off"))
-	if line != "30 6 * * * /usr/bin/travo-greenfield --hook leds-off 2>&1 | logger -t travo-greenfield-hook" {
+	if line != "30 6 * * * /usr/bin/travo --hook leds-off 2>&1 | logger -t travo-hook" {
 		t.Fatalf("%q", line)
 	}
 	back, cmd, ok := ParseDaily(line)

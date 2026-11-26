@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 func TestListMergesTheCaptures(t *testing.T) {

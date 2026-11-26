@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/netview"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/netview"
 )
 
 // Prefix names the redirect sections Travo creates: travo_fwd_<n>.

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/adguard"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/adguard"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 type fakeTopology struct {

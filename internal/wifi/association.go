@@ -3,7 +3,7 @@ package wifi
 import (
 	"context"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
+	"github.com/raydak-labs/travo/internal/device/facts"
 )
 
 // Association is the observed identity of the managed uplink STA. The zero value

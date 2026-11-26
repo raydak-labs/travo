@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // The STA capture answers only the device it was taken on, so the AP broadcast check

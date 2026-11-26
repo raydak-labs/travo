@@ -6,7 +6,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/vpndns"
+	"github.com/raydak-labs/travo/internal/vpndns"
 )
 
 // VPNDNS reads and verifies the `vpn` DNS layer (internal/vpndns).

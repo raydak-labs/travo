@@ -8,7 +8,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/blackdark-org/travo-greenfield/internal/firmware"
+	"github.com/raydak-labs/travo/internal/firmware"
 )
 
 //go:embed testdata/validate-firmware-zero-image.json

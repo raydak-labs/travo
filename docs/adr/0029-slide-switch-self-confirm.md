@@ -9,7 +9,7 @@ exception) and the "only self-confirming path" sentence of
 ## Context
 
 #195 lets the operator bind a hardware slide switch (EV_SW, `BTN_0`..`BTN_9`) to the
-WireGuard tunnel or the guest AP (`travo-greenfield.button_<node>.action`). Nobody sits at a
+WireGuard tunnel or the guest AP (`travo.button_<node>.action`). Nobody sits at a
 browser when the switch moves, so a transaction left for a user confirm would always roll
 back after 60 s. The implementation (`internal/buttons/fire.go`) therefore confirms the
 transaction itself once its probe passed. Invariants §1 forbade that outside a named list
@@ -19,7 +19,7 @@ that held only the WiFi schedule, so the code broke the invariant until this rec
 
 The slide switch is the second automated self-confirm exception.
 
-- Trigger: procd runs `/etc/hotplug.d/button/50-travo-greenfield` for a `BTN_<n>`
+- Trigger: procd runs `/etc/hotplug.d/button/50-travo` for a `BTN_<n>`
   `pressed`/`released` event; it calls the `button-btn-<n>-pressed|released` hook action
   (ADR 0024). `pressed` turns the configured action on, `released` off. Push buttons and
   the reset button never reach it. The operator gave the confirmation in advance by binding

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
+	"github.com/raydak-labs/travo/internal/device/facts"
+	"github.com/raydak-labs/travo/internal/guard"
 )
 
 // Keys of the firmware guard's detail (ADR 0030).

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/clients"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/clients"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 type fakeClients struct {

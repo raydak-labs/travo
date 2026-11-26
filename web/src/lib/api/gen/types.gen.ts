@@ -189,7 +189,7 @@ export type AppBody = {
      */
     build_time: string;
     /**
-     * travo-greenfield build version
+     * travo build version
      */
     version: string;
 };

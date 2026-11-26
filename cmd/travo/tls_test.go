@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/tlscert"
+	"github.com/raydak-labs/travo/internal/tlscert"
 )
 
 func freeAddr(t *testing.T) string {

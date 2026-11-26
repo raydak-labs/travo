@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/blackdark-org/travo-greenfield/internal/app"
-	"github.com/blackdark-org/travo-greenfield/internal/firmware"
+	"github.com/raydak-labs/travo/internal/app"
+	"github.com/raydak-labs/travo/internal/firmware"
 )
 
 // startFirmware builds the firmware service and, before any guarded feature starts,

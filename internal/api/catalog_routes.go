@@ -8,8 +8,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/catalog"
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
+	"github.com/raydak-labs/travo/internal/catalog"
+	"github.com/raydak-labs/travo/internal/guard"
 )
 
 // Catalog is the services catalog (internal/catalog).

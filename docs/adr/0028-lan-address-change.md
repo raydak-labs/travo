@@ -33,11 +33,11 @@ plus login.
   - `lan_dependents_outside`: a dhcp `host` reservation or `domain` name, or a firewall
     `redirect` `dest_ip`, lies outside the new subnet or equals the new router address.
     Same-subnet moves (a new host number) keep them valid.
-  - `lan_adguard_expert`: `travo-greenfield.main.adguard_topology` is `expert` (ADR 0021).
+  - `lan_adguard_expert`: `travo.main.adguard_topology` is `expert` (ADR 0021).
     Expert mode writes the current lan address into `dhcp.lan` `dhcp_option 6,<addr>` and
     AdGuard Home's `bind_hosts`; moving lan under it would strand LAN DNS. The user switches
     back to the default topology first (same refusal as guest creation). An unreadable
-    `travo-greenfield` config refuses with `lan_unavailable` (fails closed); a missing one
+    `travo` config refuses with `lan_unavailable` (fails closed); a missing one
     is the default topology.
 - The transaction uses a per-transaction window of 180 s (`txn.BeginWindow`, never shorter
   than the manager's window), counted from arming as before.

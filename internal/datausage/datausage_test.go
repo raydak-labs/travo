@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/statshistory"
-	"github.com/blackdark-org/travo-greenfield/internal/syssettings"
+	"github.com/raydak-labs/travo/internal/statshistory"
+	"github.com/raydak-labs/travo/internal/syssettings"
 )
 
 func day(d string, u ...statshistory.UplinkBytes) statshistory.Day {

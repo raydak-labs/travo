@@ -8,8 +8,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/buttons"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/buttons"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // Buttons lists the hardware buttons and maps the slide switch to an action (internal/buttons).
@@ -44,7 +44,7 @@ func buttonsError(err error) error {
 	case errors.Is(err, buttons.ErrNotFound):
 		return fail(http.StatusNotFound, "button_not_found", err.Error())
 	case errors.Is(err, txn.ErrForeignStaged):
-		return fail(http.StatusConflict, "uci_busy", "another change to the travo-greenfield config is staged; try again")
+		return fail(http.StatusConflict, "uci_busy", "another change to the travo config is staged; try again")
 	}
 	slog.Warn("buttons", "err", err)
 	return fail(http.StatusServiceUnavailable, "buttons_unavailable", "The buttons are unavailable")

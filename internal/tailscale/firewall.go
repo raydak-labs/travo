@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // Firewall sections Travo owns by name (docs/adr/0017). tailscaled has no netifd interface,

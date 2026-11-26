@@ -12,9 +12,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/tlscert"
-	"github.com/blackdark-org/travo-greenfield/internal/trust"
-	"github.com/blackdark-org/travo-greenfield/internal/version"
+	"github.com/raydak-labs/travo/internal/tlscert"
+	"github.com/raydak-labs/travo/internal/trust"
+	"github.com/raydak-labs/travo/internal/version"
 )
 
 // adguardProxyTLSPort serves the AGH proxy to pages loaded over HTTPS: a session cookie set

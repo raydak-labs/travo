@@ -13,9 +13,9 @@ tmp=$(mktemp -d)
 trap 'cleanup; rm -rf "$tmp"' EXIT
 mise run package
 mkdir "$tmp/old" "$tmp/new"
-tar -xzf "dist/travo-greenfield-$VERSION-aarch64.tar.gz" -C "$tmp/old"
+tar -xzf "dist/travo-$VERSION-aarch64.tar.gz" -C "$tmp/old"
 VERSION=1.2.345 mise run package
-tar -xzf dist/travo-greenfield-1.2.345-aarch64.tar.gz -C "$tmp/new"
+tar -xzf dist/travo-1.2.345-aarch64.tar.gz -C "$tmp/new"
 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go test -tags integration -c -o "$tmp/apply.test" ./internal/updateapply
 
 docker run -d --name "$NAME" --platform "$PLATFORM" "$IMAGE" /sbin/init >/dev/null
@@ -29,12 +29,12 @@ wait_health "old version" 8097
 step "installer refuses contention and interrupted update"
 # shellcheck disable=SC2016 # Expand variables inside the container.
 dx 'set -eu
-lock=/var/lock/travo-greenfield-update.lock
-guard=/etc/travo-greenfield-guards/update-in-progress
-journal=/etc/travo-greenfield/update-operation/journal.json
-mkdir -p /etc/travo-greenfield/update-operation /etc/travo-greenfield-guards
+lock=/var/lock/travo-update.lock
+guard=/etc/travo-guards/update-in-progress
+journal=/etc/travo/update-operation/journal.json
+mkdir -p /etc/travo/update-operation /etc/travo-guards
 printf "rollback state\n" >"$journal"
-capture() { sha256sum /usr/bin/travo-greenfield /www/travo-greenfield/index.html /etc/travo-greenfield/manifest.txt "$journal"; }
+capture() { sha256sum /usr/bin/travo /www/travo/index.html /etc/travo/manifest.txt "$journal"; }
 before=$(capture)
 (
  exec 8>>"$lock"

@@ -1,5 +1,5 @@
 {
-  "name": "travo-greenfield-web",
+  "name": "travo-web",
   "private": true,
   "type": "module",
   "scripts": {

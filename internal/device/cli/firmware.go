@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/blackdark-org/travo-greenfield/internal/firmware"
+	"github.com/raydak-labs/travo/internal/firmware"
 )
 
 // firmwareName keeps every firmware path a plain file name in /tmp: it reaches a shell line.

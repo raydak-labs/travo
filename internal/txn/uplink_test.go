@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 func TestWireGuardRecordsUplinkBeforeSpawning(t *testing.T) {

@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 
-	"github.com/blackdark-org/travo-greenfield/internal/adguard"
-	"github.com/blackdark-org/travo-greenfield/internal/api"
-	"github.com/blackdark-org/travo-greenfield/internal/app"
-	"github.com/blackdark-org/travo-greenfield/internal/catalog"
-	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
+	"github.com/raydak-labs/travo/internal/adguard"
+	"github.com/raydak-labs/travo/internal/api"
+	"github.com/raydak-labs/travo/internal/app"
+	"github.com/raydak-labs/travo/internal/catalog"
+	"github.com/raydak-labs/travo/internal/connectivity"
 )
 
 // newCatalog wires the services catalog; nil (503) without the services port.

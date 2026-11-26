@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 type setTunnelFunc func(context.Context, bool) (txn.Status, error)

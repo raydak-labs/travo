@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/vpndns"
+	"github.com/raydak-labs/travo/internal/vpndns"
 )
 
 type vpnDNSFake struct {

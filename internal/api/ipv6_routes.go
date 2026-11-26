@@ -8,8 +8,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/ipv6settings"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/ipv6settings"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // IPv6Settings is the IPv6 switch for uplinks and LAN (internal/ipv6settings).

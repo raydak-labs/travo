@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/portfwd"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/portfwd"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 type fakePortForwards struct {

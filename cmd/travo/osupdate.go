@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/api"
-	"github.com/blackdark-org/travo-greenfield/internal/app"
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
-	"github.com/blackdark-org/travo-greenfield/internal/osupdate"
+	"github.com/raydak-labs/travo/internal/api"
+	"github.com/raydak-labs/travo/internal/app"
+	"github.com/raydak-labs/travo/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/osupdate"
 )
 
 // newOpenWrtUpdates wires the report-only OpenWrt check; mock mode answers the captured index.

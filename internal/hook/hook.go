@@ -25,7 +25,7 @@ import (
 )
 
 // SocketPath is the router location; /var/run is RAM.
-const SocketPath = "/var/run/travo-greenfield/hook.sock"
+const SocketPath = "/var/run/travo/hook.sock"
 
 // ActionTimeout bounds one action; ClientTimeout leaves room for the reply.
 const (

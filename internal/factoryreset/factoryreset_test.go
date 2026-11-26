@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
+	"github.com/raydak-labs/travo/internal/guard"
 )
 
 // device records the order of events: the guard file must exist before the wipe is scheduled.

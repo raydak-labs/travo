@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/pkgmgr"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/pkgmgr"
 )
 
 func TestPlanMangleCleanupTakesOnlyMWAN3(t *testing.T) {

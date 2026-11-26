@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
-	"github.com/blackdark-org/travo-greenfield/internal/diagnostics"
+	"github.com/raydak-labs/travo/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/diagnostics"
 )
 
 func diagnosticsEnv(t *testing.T, d Diagnostics) (*env, string, string) {

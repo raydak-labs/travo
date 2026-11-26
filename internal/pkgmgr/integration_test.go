@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/runner"
+	"github.com/raydak-labs/travo/internal/runner"
 )
 
 // Runs inside an OpenWrt container: Detect must pick the right manager and read real output.

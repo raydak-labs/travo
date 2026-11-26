@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // Interface is the netifd interface Travo edits; wan6 and the device stay untouched.

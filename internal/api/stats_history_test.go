@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/statshistory"
+	"github.com/raydak-labs/travo/internal/statshistory"
 )
 
 type fakeStatsHistory struct {

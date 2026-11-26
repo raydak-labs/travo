@@ -20,7 +20,7 @@ go test ./...
 [tasks."check:sh"]
 description = "sh -n and shellcheck (POSIX sh) on install, init and helper scripts"
 run = '''
-set -- packaging/install.sh packaging/port80.sh packaging/files/etc/init.d/travo-greenfield packaging/files/etc/uci-defaults/90-travo-greenfield packaging/files/etc/hotplug.d/button/50-travo-greenfield scripts/*.sh scripts/lib/*.sh
+set -- packaging/install.sh packaging/port80.sh packaging/files/etc/init.d/travo packaging/files/etc/uci-defaults/90-travo packaging/files/etc/hotplug.d/button/50-travo scripts/*.sh scripts/lib/*.sh
 for f in "$@"; do sh -n "$f"; done
 shellcheck -s sh "$@"
 '''
@@ -55,12 +55,12 @@ test -z "$(git status --porcelain -- web/src/lib/api/gen)"
 description = "Static aarch64 binary for the router"
 run = '''
 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath \
-  -ldflags "-s -w -X github.com/blackdark-org/travo-greenfield/internal/version.Version=${VERSION:-dev} -X github.com/blackdark-org/travo-greenfield/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  -o dist/travo-greenfield-arm64 ./cmd/travo-greenfield
+  -ldflags "-s -w -X github.com/raydak-labs/travo/internal/version.Version=${VERSION:-dev} -X github.com/raydak-labs/travo/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  -o dist/travo-arm64 ./cmd/travo
 '''
 
 [tasks.package]
-description = "Release tarball dist/travo-greenfield-<version>-aarch64.tar.gz (+ dist/checksums.txt), reproducible from SOURCE_DATE_EPOCH; PUBKEY (default packaging/minisign.pub, when present) ships as minisign.pub"
+description = "Release tarball dist/travo-<version>-aarch64.tar.gz (+ dist/checksums.txt), reproducible from SOURCE_DATE_EPOCH; PUBKEY (default packaging/minisign.pub, when present) ships as minisign.pub"
 depends = ["web:install"]
 run = '''
 SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct)}
@@ -73,16 +73,16 @@ build_time=$(date -u -r "$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || 
 bundle_flags=
 if [ -n "${ADGUARD_BUNDLE:-}" ]; then
   sum=$(sha256sum "$ADGUARD_BUNDLE" 2>/dev/null || shasum -a 256 "$ADGUARD_BUNDLE")
-  agh=github.com/blackdark-org/travo-greenfield/internal/adguard
+  agh=github.com/raydak-labs/travo/internal/adguard
   bundle_flags="-X $agh.BundleSHA256=${sum%% *} -X $agh.BundleName=$(basename "$ADGUARD_BUNDLE")"
 fi
 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath \
-  -ldflags "-s -w -X github.com/blackdark-org/travo-greenfield/internal/version.Version=$VERSION -X github.com/blackdark-org/travo-greenfield/internal/version.BuildTime=$build_time $bundle_flags" \
-  -o dist/travo-greenfield-arm64 ./cmd/travo-greenfield
+  -ldflags "-s -w -X github.com/raydak-labs/travo/internal/version.Version=$VERSION -X github.com/raydak-labs/travo/internal/version.BuildTime=$build_time $bundle_flags" \
+  -o dist/travo-arm64 ./cmd/travo
 PUBKEY=${PUBKEY:-}
 [ -n "$PUBKEY" ] || ! [ -f packaging/minisign.pub ] || PUBKEY=packaging/minisign.pub
-go run ./cmd/mkpkg -out "dist/travo-greenfield-$VERSION-aarch64.tar.gz" -version "$VERSION" \
-  -binary dist/travo-greenfield-arm64 -web web/dist -files packaging/files -install packaging/install.sh -port80 packaging/port80.sh \
+go run ./cmd/mkpkg -out "dist/travo-$VERSION-aarch64.tar.gz" -version "$VERSION" \
+  -binary dist/travo-arm64 -web web/dist -files packaging/files -install packaging/install.sh -port80 packaging/port80.sh \
   ${PUBKEY:+-pubkey "$PUBKEY"}
 '''
 
@@ -134,7 +134,7 @@ done
 description = "Stripped arm64 binary stays within the 12.8 MB budget (invariants §15)"
 depends = ["build"]
 run = '''
-size=$(wc -c < dist/travo-greenfield-arm64)
+size=$(wc -c < dist/travo-arm64)
 echo "binary: $size bytes (budget 13421772)"
 test "$size" -le 13421772
 '''

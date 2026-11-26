@@ -10,15 +10,15 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
+	"github.com/raydak-labs/travo/internal/atomicfile"
 )
 
 const freeFloor = 20 << 20
 
 // Owned by install.sh (docs/adr/0007): listed in the manifest, never replaced by an update.
 var installerFiles = []string{
-	"/etc/hotplug.d/button/50-travo-greenfield", "/etc/init.d/travo-greenfield",
-	"/etc/uci-defaults/90-travo-greenfield", "/lib/upgrade/keep.d/travo-greenfield",
+	"/etc/hotplug.d/button/50-travo", "/etc/init.d/travo",
+	"/etc/uci-defaults/90-travo", "/lib/upgrade/keep.d/travo",
 }
 
 type layout struct {
@@ -26,7 +26,7 @@ type layout struct {
 }
 
 func realLayout() layout {
-	return layout{"/etc/travo-greenfield/update-operation", "/usr/bin/travo-greenfield", "/www/travo-greenfield", "/etc/travo-greenfield/manifest.txt", "/var/lock/travo-greenfield-update.lock"}
+	return layout{"/etc/travo/update-operation", "/usr/bin/travo", "/www/travo", "/etc/travo/manifest.txt", "/var/lock/travo-update.lock"}
 }
 
 func (l layout) path(parts ...string) string {
@@ -204,8 +204,8 @@ func space(allocations []allocation) error {
 }
 
 func (l layout) prepare(payload, recovery string) error {
-	incomingBin := filepath.Join(payload, "root/usr/bin/travo-greenfield")
-	incomingUI := filepath.Join(payload, "root/www/travo-greenfield")
+	incomingBin := filepath.Join(payload, "root/usr/bin/travo")
+	incomingUI := filepath.Join(payload, "root/www/travo")
 	next, err := tree(incomingUI)
 	if err != nil {
 		return err

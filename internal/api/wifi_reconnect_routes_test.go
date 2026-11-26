@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/wifireconnect"
+	"github.com/raydak-labs/travo/internal/wifireconnect"
 )
 
 type wifiReconnectResult struct {

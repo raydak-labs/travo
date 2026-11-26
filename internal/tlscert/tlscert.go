@@ -58,7 +58,7 @@ func Generate(random io.Reader, names Names, at time.Time) (certPEM, keyPEM []by
 	notBefore := at.Add(-backdate).UTC().Truncate(time.Second)
 	tmpl := &x509.Certificate{
 		SerialNumber:          serial,
-		Subject:               pkix.Name{CommonName: "travo-greenfield", Organization: []string{"Travo (self-signed)"}},
+		Subject:               pkix.Name{CommonName: "travo", Organization: []string{"Travo (self-signed)"}},
 		NotBefore:             notBefore,
 		NotAfter:              notBefore.Add(Validity),
 		KeyUsage:              x509.KeyUsageDigitalSignature,

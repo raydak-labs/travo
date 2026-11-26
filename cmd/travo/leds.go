@@ -1,11 +1,11 @@
 package main
 
 import (
-	"github.com/blackdark-org/travo-greenfield/internal/app"
-	"github.com/blackdark-org/travo-greenfield/internal/crontab"
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/hook"
-	"github.com/blackdark-org/travo-greenfield/internal/leds"
+	"github.com/raydak-labs/travo/internal/app"
+	"github.com/raydak-labs/travo/internal/crontab"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/hook"
+	"github.com/raydak-labs/travo/internal/leds"
 )
 
 // startLEDs builds the LED service and registers the night schedule's hook actions. nil

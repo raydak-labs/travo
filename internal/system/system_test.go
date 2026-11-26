@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/device/mock"
 )
 
 func TestReadSeededMock(t *testing.T) {

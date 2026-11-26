@@ -6,15 +6,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/adguard"
-	"github.com/blackdark-org/travo-greenfield/internal/api"
-	"github.com/blackdark-org/travo-greenfield/internal/app"
-	"github.com/blackdark-org/travo-greenfield/internal/connectivity"
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/dnslayer"
-	"github.com/blackdark-org/travo-greenfield/internal/failover"
-	"github.com/blackdark-org/travo-greenfield/internal/lifecycle"
-	"github.com/blackdark-org/travo-greenfield/internal/tailscale"
+	"github.com/raydak-labs/travo/internal/adguard"
+	"github.com/raydak-labs/travo/internal/api"
+	"github.com/raydak-labs/travo/internal/app"
+	"github.com/raydak-labs/travo/internal/connectivity"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/dnslayer"
+	"github.com/raydak-labs/travo/internal/failover"
+	"github.com/raydak-labs/travo/internal/lifecycle"
+	"github.com/raydak-labs/travo/internal/tailscale"
 )
 
 // startTailscale builds the Tailscale supervisor and the reconciler that owns the

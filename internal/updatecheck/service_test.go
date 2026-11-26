@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
+	"github.com/raydak-labs/travo/internal/atomicfile"
 )
 
 type roundTrip func(*http.Request) (*http.Response, error)
@@ -24,13 +24,13 @@ func response(status int, body string) *http.Response {
 }
 
 const releasesJSON = `[
- {"tag_name":"v0.10.0","assets":[{"name":"travo-greenfield-0.10.0-aarch64.tar.gz"},{"name":"checksums.txt"},{"name":"checksums.txt.sig"}]},
- {"tag_name":"v0.9.9","assets":[{"name":"travo-greenfield-0.9.9-aarch64.tar.gz"},{"name":"checksums.txt"},{"name":"checksums.txt.sig"}]},
- {"tag_name":"v1.0.0","draft":true,"assets":[{"name":"travo-greenfield-1.0.0-aarch64.tar.gz"},{"name":"checksums.txt"},{"name":"checksums.txt.sig"}]},
- {"tag_name":"v2.0.0","prerelease":true,"assets":[{"name":"travo-greenfield-2.0.0-aarch64.tar.gz"},{"name":"checksums.txt"},{"name":"checksums.txt.sig"}]},
- {"tag_name":"v3.0.0","assets":[{"name":"travo-greenfield-3.0.0-aarch64.tar.gz"},{"name":"checksums.txt"}]},
- {"tag_name":"v4.0.0","assets":[{"name":"travo-greenfield-4.0.0-aarch64.tar.gz"},{"name":"checksums.txt"},{"name":"checksums.txt"},{"name":"checksums.txt.sig"}]},
- {"tag_name":"v05.0.0","assets":[{"name":"travo-greenfield-05.0.0-aarch64.tar.gz"},{"name":"checksums.txt"},{"name":"checksums.txt.sig"}]}
+ {"tag_name":"v0.10.0","assets":[{"name":"travo-0.10.0-aarch64.tar.gz"},{"name":"checksums.txt"},{"name":"checksums.txt.sig"}]},
+ {"tag_name":"v0.9.9","assets":[{"name":"travo-0.9.9-aarch64.tar.gz"},{"name":"checksums.txt"},{"name":"checksums.txt.sig"}]},
+ {"tag_name":"v1.0.0","draft":true,"assets":[{"name":"travo-1.0.0-aarch64.tar.gz"},{"name":"checksums.txt"},{"name":"checksums.txt.sig"}]},
+ {"tag_name":"v2.0.0","prerelease":true,"assets":[{"name":"travo-2.0.0-aarch64.tar.gz"},{"name":"checksums.txt"},{"name":"checksums.txt.sig"}]},
+ {"tag_name":"v3.0.0","assets":[{"name":"travo-3.0.0-aarch64.tar.gz"},{"name":"checksums.txt"}]},
+ {"tag_name":"v4.0.0","assets":[{"name":"travo-4.0.0-aarch64.tar.gz"},{"name":"checksums.txt"},{"name":"checksums.txt"},{"name":"checksums.txt.sig"}]},
+ {"tag_name":"v05.0.0","assets":[{"name":"travo-05.0.0-aarch64.tar.gz"},{"name":"checksums.txt"},{"name":"checksums.txt.sig"}]}
 ]`
 
 func TestLatest(t *testing.T) {

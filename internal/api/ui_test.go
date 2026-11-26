@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/auth"
+	"github.com/raydak-labs/travo/internal/auth"
 )
 
 func TestUIRoutes(t *testing.T) {

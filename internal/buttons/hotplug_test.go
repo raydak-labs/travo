@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const hotplugScript = "../../packaging/files/etc/hotplug.d/button/50-travo-greenfield"
+const hotplugScript = "../../packaging/files/etc/hotplug.d/button/50-travo"
 
 // runHotplug sources the script the way hotplug-call does, with a fake daemon client and
 // logger on PATH, and returns what the fake client was asked (empty when not called).
@@ -19,8 +19,8 @@ func runHotplug(t *testing.T, button, action string) string {
 	calls := filepath.Join(bin, "calls")
 	logged := filepath.Join(bin, "logged")
 	fakes := map[string]string{
-		"travo-greenfield": "#!/bin/sh\necho \"$*\" >> " + calls + "\necho 'error unknown-action'\n",
-		"logger":           "#!/bin/sh\necho \"$*: $(cat)\" >> " + logged + "\n",
+		"travo":  "#!/bin/sh\necho \"$*\" >> " + calls + "\necho 'error unknown-action'\n",
+		"logger": "#!/bin/sh\necho \"$*: $(cat)\" >> " + logged + "\n",
 	}
 	for name, body := range fakes {
 		if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0o755); err != nil {
@@ -41,7 +41,7 @@ func runHotplug(t *testing.T, button, action string) string {
 		deadline := time.Now().Add(2 * time.Second)
 		for {
 			l, _ := os.ReadFile(logged)
-			if strings.Contains(string(l), "-t travo-greenfield-hook: error unknown-action") {
+			if strings.Contains(string(l), "-t travo-hook: error unknown-action") {
 				break
 			}
 			if time.Now().After(deadline) {

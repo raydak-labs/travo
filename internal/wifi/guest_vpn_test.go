@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
-	"github.com/blackdark-org/travo-greenfield/internal/vpnkill"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/vpnkill"
 )
 
 // writeSections stages sections the way vpnkill writes them, then commits.
@@ -114,7 +114,7 @@ func TestPlanGuestRefusesForeignSectionOnOwnedName(t *testing.T) {
 
 func TestPlanGuestRefusedWhileAdGuardOwnsPort53(t *testing.T) {
 	c, live := guestFixtures(t)
-	c.travo = []device.Section{{Name: "main", Type: "travo-greenfield", Options: map[string]string{"adguard_topology": "expert"}}}
+	c.travo = []device.Section{{Name: "main", Type: "travo", Options: map[string]string{"adguard_topology": "expert"}}}
 	if _, _, _, err := planGuest(c, live, GuestRequest{SSID: "Guests", Key: "example-only", Enabled: true}); err != ErrGuestAdGuardExpert {
 		t.Fatalf("a new guest pool would get no DNS in the expert topology: %v", err)
 	}

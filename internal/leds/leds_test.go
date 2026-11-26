@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/crontab"
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/crontab"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/cli"
+	"github.com/raydak-labs/travo/internal/device/mock"
 )
 
 const capture = "../../testdata/device/axt1800-25.12.6/leds/"
@@ -167,10 +167,10 @@ func TestScheduleKeepsForeignCronLines(t *testing.T) {
 		t.Fatalf("%+v %v", st.Schedule, err)
 	}
 	got, _ := dev.ReadCrontab(ctx)
-	want := foreign + "# travo-greenfield:leds begin\n" +
-		"30 22 * * * /usr/bin/travo-greenfield --hook leds-off 2>&1 | logger -t travo-greenfield-hook\n" +
-		"45 6 * * * /usr/bin/travo-greenfield --hook leds-on 2>&1 | logger -t travo-greenfield-hook\n" +
-		"# travo-greenfield:leds end\n"
+	want := foreign + "# travo:leds begin\n" +
+		"30 22 * * * /usr/bin/travo --hook leds-off 2>&1 | logger -t travo-hook\n" +
+		"45 6 * * * /usr/bin/travo --hook leds-on 2>&1 | logger -t travo-hook\n" +
+		"# travo:leds end\n"
 	if got != want {
 		t.Fatalf("crontab %q", got)
 	}

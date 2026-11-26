@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // deviceCapture reads an AXT1800 capture (testdata/device/axt1800-25.12.6/mwan3/PROVENANCE).

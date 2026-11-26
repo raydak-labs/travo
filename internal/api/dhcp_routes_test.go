@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/dhcpserver"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/dhcpserver"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // fakeDHCP answers with err when set and records what the routes passed on.

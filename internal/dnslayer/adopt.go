@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/blackdark-org/travo-greenfield/internal/atomicfile"
+	"github.com/raydak-labs/travo/internal/atomicfile"
 )
 
 // Adopt turns live dnsmasq options that already equal replace layer l (written before the

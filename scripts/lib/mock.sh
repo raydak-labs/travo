@@ -38,7 +38,7 @@ trap 'exit 143' TERM
 # start_daemon [--mock-firstrun]: mock daemon on 127.0.0.1:$DAEMON_PORT, returns when healthy.
 start_daemon() {
   require_free_port daemon "$DAEMON_PORT"
-  go run ./cmd/travo-greenfield --mock "$@" --listen "127.0.0.1:$DAEMON_PORT" &
+  go run ./cmd/travo --mock "$@" --listen "127.0.0.1:$DAEMON_PORT" &
   daemon_pid=$!
   pids="$daemon_pid $pids"
   wait_http "http://127.0.0.1:$DAEMON_PORT/api/health" "$daemon_pid" daemon

@@ -1,4 +1,4 @@
-# travo-greenfield
+# travo
 
 Travel-router web UI and API for OpenWrt (GL.iNet Slate AX, Beryl AX), for travellers who are not network admins and for power users who want an API. Join hotel WiFi, get through captive portals, see whether you are online, switch the VPN on and off, and filter DNS with AdGuard Home. Runs on the router next to LuCI.
 
@@ -9,15 +9,15 @@ Travel-router web UI and API for OpenWrt (GL.iNet Slate AX, Beryl AX), for trave
 
 ## Install
 
-Download `travo-greenfield-<version>-aarch64.tar.gz` and `checksums.txt.sig` from the [latest release](https://github.com/blackdark-org/travo-greenfield/releases/latest), copy both to the router, then run as root:
+Download `travo-<version>-aarch64.tar.gz` and `checksums.txt.sig` from the [latest release](https://github.com/raydak-labs/travo/releases/latest), copy both to the router, then run as root:
 
 ```sh
-mkdir -p /tmp/tg && tar -xzf travo-greenfield-<version>-aarch64.tar.gz -C /tmp/tg
+mkdir -p /tmp/tg && tar -xzf travo-<version>-aarch64.tar.gz -C /tmp/tg
 cp checksums.txt.sig /tmp/tg/
 sh /tmp/tg/install.sh
 ```
 
-The installer checks the signature with the router's `usign` before it changes anything. The first install trusts the release key in the tarball and stores it in `/etc/travo-greenfield/minisign.pub`. Later installs must match that key; pass `--rotate-key` once when the release notes announce a new one.
+The installer checks the signature with the router's `usign` before it changes anything. The first install trusts the release key in the tarball and stores it in `/etc/travo/minisign.pub`. Later installs must match that key; pass `--rotate-key` once when the release notes announce a new one.
 
 | Option | Effect |
 |---|---|
@@ -28,7 +28,7 @@ The installer checks the signature with the router's `usign` before it changes a
 
 ## First use
 
-Open `http://<router>/` and set the password; LuCI moves to ports 8080 and 8443. After `--port N`, open `http://<router>:N/` instead; LuCI stays on port 80. `https://<router>/` serves the same UI with a certificate the router generated itself; its fingerprint is in `logread -e travo-greenfield`. Settings live in `/etc/config/travo-greenfield` (to turn HTTPS off: `uci set travo-greenfield.main.listen_tls=off && uci commit travo-greenfield && /etc/init.d/travo-greenfield restart`).
+Open `http://<router>/` and set the password; LuCI moves to ports 8080 and 8443. After `--port N`, open `http://<router>:N/` instead; LuCI stays on port 80. `https://<router>/` serves the same UI with a certificate the router generated itself; its fingerprint is in `logread -e travo`. Settings live in `/etc/config/travo` (to turn HTTPS off: `uci set travo.main.listen_tls=off && uci commit travo && /etc/init.d/travo restart`).
 
 Changes that can cut you off (WiFi, VPN, firewall, LAN address, WAN) are applied, verified and then wait for you to confirm. If you don't confirm in time, the router rolls the change back.
 
@@ -49,7 +49,7 @@ A banner above every page names conditions that need you, such as a guard left b
 
 ## Updating
 
-Under System, Travo checks GitHub for a newer stable release at most once a day, or on **Check for updates**. **Verify package** checks the signed archive and stages it; **Apply update** installs it and restarts the service, so sign in again afterwards. If the updater reports that recovery is required, use **Retry recovery** or the console command in [ADR 0007](docs/adr/0007-distribution-and-self-update.md). To use another release source, set `travo-greenfield.main.release_source` to `OWNER/REPO` (or `off`) and restart the daemon. The Updates page says when checks are turned off or the running build is not a release.
+Under System, Travo checks GitHub for a newer stable release at most once a day, or on **Check for updates**. **Verify package** checks the signed archive and stages it; **Apply update** installs it and restarts the service, so sign in again afterwards. If the updater reports that recovery is required, use **Retry recovery** or the console command in [ADR 0007](docs/adr/0007-distribution-and-self-update.md). To use another release source, set `travo.main.release_source` to `OWNER/REPO` (or `off`) and restart the daemon. The Updates page says when checks are turned off or the running build is not a release.
 
 Firmware: **System → Firmware → OpenWrt updates** checks downloads.openwrt.org and links LuCI attended sysupgrade. **System → Firmware → Firmware upgrade** flashes an image you uploaded, after checking that it fits this board.
 
@@ -77,7 +77,7 @@ mise run screenshots  # PNGs of every page into web/screenshots/
 mise run package      # release tarball
 ```
 
-Contributors and agents start with [AGENTS.md](AGENTS.md). Work is tracked in [GitHub issues](https://github.com/blackdark-org/travo-greenfield/issues) and on the [project board](https://github.com/orgs/blackdark-org/projects/1).
+Contributors and agents start with [AGENTS.md](AGENTS.md). Work is tracked in [GitHub issues](https://github.com/raydak-labs/travo/issues) and on the [project board](https://github.com/orgs/blackdark-org/projects/1).
 
 ## Docs
 

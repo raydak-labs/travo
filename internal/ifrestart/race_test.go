@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
+	"github.com/raydak-labs/travo/internal/guard"
 )
 
 // A guarded operation racing the restart's guard check: exactly one of them proceeds.

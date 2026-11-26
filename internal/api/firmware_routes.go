@@ -11,7 +11,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 
-	"github.com/blackdark-org/travo-greenfield/internal/firmware"
+	"github.com/raydak-labs/travo/internal/firmware"
 )
 
 // Firmware stages and flashes a sysupgrade image (internal/firmware).

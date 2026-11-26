@@ -7,17 +7,17 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/adguard"
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/facts"
-	"github.com/blackdark-org/travo-greenfield/internal/dhcpserver"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/adguard"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/facts"
+	"github.com/raydak-labs/travo/internal/dhcpserver"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // Inputs is everything the checks read: committed configs and netifd's live addresses.
 type Inputs struct {
 	Network, DHCP, Firewall []device.Section
-	// Travo is the travo-greenfield config; its AdGuard topology gates the change.
+	// Travo is the travo config; its AdGuard topology gates the change.
 	Travo []device.Section
 	Live  []facts.Interface
 }

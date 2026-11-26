@@ -8,7 +8,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
+	"github.com/raydak-labs/travo/internal/guard"
 )
 
 // GuardName stays until the overlay is wiped; a leftover one means the reset never ran.

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 func (*Device) ReadInterfaceCounters(ctx context.Context) (map[string]device.InterfaceCounters, error) {

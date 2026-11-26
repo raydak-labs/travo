@@ -6,7 +6,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/throughput"
+	"github.com/raydak-labs/travo/internal/throughput"
 )
 
 type throughputBody struct {

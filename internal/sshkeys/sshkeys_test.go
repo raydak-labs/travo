@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/device/mock"
 )
 
 // Throwaway public keys from `ssh-keygen -t <type>`; fingerprints from `ssh-keygen -lf -E sha256`.

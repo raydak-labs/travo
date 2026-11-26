@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
-	"github.com/blackdark-org/travo-greenfield/internal/runner"
-	"github.com/blackdark-org/travo-greenfield/internal/vpnprofiles"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/cli"
+	"github.com/raydak-labs/travo/internal/runner"
+	"github.com/raydak-labs/travo/internal/vpnprofiles"
 )
 
 type configResult struct {

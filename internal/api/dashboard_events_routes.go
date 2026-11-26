@@ -11,8 +11,8 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 
-	"github.com/blackdark-org/travo-greenfield/internal/tailscale"
-	"github.com/blackdark-org/travo-greenfield/internal/throughput"
+	"github.com/raydak-labs/travo/internal/tailscale"
+	"github.com/raydak-labs/travo/internal/throughput"
 )
 
 const (

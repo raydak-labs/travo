@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
+	"github.com/raydak-labs/travo/internal/device"
 )
 
 // Applier is txn.Manager.Apply: lock, refuse foreign staged changes, stage, commit, reload.

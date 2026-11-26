@@ -8,7 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/sshkeys"
+	"github.com/raydak-labs/travo/internal/sshkeys"
 )
 
 // SSHKeys manages root's dropbear authorized_keys (internal/sshkeys, invariants §3).

@@ -9,8 +9,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/clients"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/clients"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // Clients lists LAN clients and changes their alias, reservation and access (internal/clients).

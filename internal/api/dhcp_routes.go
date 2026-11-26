@@ -9,8 +9,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/dhcpserver"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/dhcpserver"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // DHCPServer is the lan DHCP server and the local DNS names (internal/dhcpserver).

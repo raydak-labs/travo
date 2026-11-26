@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live as GitHub issues in `blackdark-org/travo-greenfield`, the milestone of the next release (`gh api repos/blackdark-org/travo-greenfield/milestones --jq ".[].title"`), project board https://github.com/orgs/blackdark-org/projects/1. Use the `gh` CLI for all operations (gh 2.94+: native sub-issues and blocked-by).
+Issues and specs for this repo live as GitHub issues in `raydak-labs/travo`, the milestone of the next release (`gh api repos/raydak-labs/travo/milestones --jq ".[].title"`). No project board: state lives on the issue (see **Issue state** below). Use the `gh` CLI for all operations (gh 2.94+: native sub-issues and blocked-by).
 
 ## Conventions
 
@@ -16,7 +16,7 @@ Issues and specs for this repo live as GitHub issues in `blackdark-org/travo-gre
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
-File issues only into the user's own repo. This repo is `blackdark-org/travo-greenfield`. In a fork, `gh` can default to the upstream parent, so before the first `gh issue create` of a session, check the target with `gh repo view --json nameWithOwner` and confirm it with the user if it is not their repo.
+File issues only into the user's own repo. This repo is `raydak-labs/travo`. In a fork, `gh` can default to the upstream parent, so before the first `gh issue create` of a session, check the target with `gh repo view --json nameWithOwner` and confirm it with the user if it is not their repo.
 
 ## Pull requests as a triage surface
 
@@ -49,9 +49,13 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 - **Claim**: `gh issue edit <n> --add-assignee @me`, the session's first write.
 - **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.
 
-## Project board
+## Issue state
 
-Status column per issue: `Backlog` (epic or not ready) → `Ready` (`ready-for-agent`, no open blockers) → `In progress` (claimed, worktree open) → `In review` (PR open) → `Needs hardware` (merged; waiting for the playbook step on the router) → `Done`.
+No project board. The state of an issue is read from the issue itself:
 
-- Move a card: `gh project item-edit 1 --owner blackdark-org --url <issue-url> --field Status --value "In progress"`.
-- Add a new issue to the board: `gh project item-add 1 --owner blackdark-org --url <issue-url>`.
+- Backlog: `epic`, or no `ready-for-agent` label.
+- Ready: `ready-for-agent` and no open blockers.
+- In progress: assigned (`gh issue edit <n> --add-assignee @me`).
+- In review: a linked open PR.
+- Needs hardware: merged and still open with `needs-hardware`; the step is in `docs/testing.md` "Hardware playbook".
+- Done: closed.

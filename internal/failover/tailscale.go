@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/blackdark-org/travo-greenfield/internal/pkgmgr"
+	"github.com/raydak-labs/travo/internal/pkgmgr"
 )
 
 // TailscalePackage is the OpenWrt package and init script of Tailscale (tailscale.Package).

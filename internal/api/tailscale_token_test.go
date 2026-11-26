@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/apitokens"
-	"github.com/blackdark-org/travo-greenfield/internal/tailscale"
+	"github.com/raydak-labs/travo/internal/apitokens"
+	"github.com/raydak-labs/travo/internal/tailscale"
 )
 
 const pendingAuthURL = "https://login.tailscale.com/a/x"

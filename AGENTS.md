@@ -1,6 +1,6 @@
-# travo-greenfield
+# travo
 
-Travel-router web UI and API (Go daemon + Svelte SPA) that runs on OpenWrt next to LuCI. Clean-room rewrite of Travo.
+Travel-router web UI and API (Go daemon + Svelte SPA) that runs on OpenWrt next to LuCI. Clean-room rewrite that replaced the original Travo code in 0.11.0 (old code on the `legacy` branch).
 
 ## Verify
 
@@ -37,7 +37,7 @@ Work is GitHub issues, rules are `docs/`. Before any task, read `docs/agents/wor
 
 ### Issue tracker
 
-GitHub issues on `blackdark-org/travo-greenfield`, milestone of the next release (`gh api repos/blackdark-org/travo-greenfield/milestones --jq ".[].title"`), project board 1, native sub-issues and blocked-by. See `docs/agents/issue-tracker.md`.
+GitHub issues on `raydak-labs/travo`, milestone of the next release (`gh api repos/raydak-labs/travo/milestones --jq ".[].title"`), no project board, native sub-issues and blocked-by. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

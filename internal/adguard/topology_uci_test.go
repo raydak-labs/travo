@@ -6,8 +6,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device"
-	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
+	"github.com/raydak-labs/travo/internal/device"
+	"github.com/raydak-labs/travo/internal/device/cli"
 )
 
 const fixtures = "../../testdata/device/axt1800-25.12.6/"
@@ -48,7 +48,7 @@ func TestPlanExpertOnTheRouterConfig(t *testing.T) {
 		{Config: "dhcp", Section: dm, Option: "port", Before: []string{"53"}, After: []string{"5354"}},
 		{Config: "dhcp", Section: "lan", Option: "dhcp_option", List: true, After: []string{"6,192.168.1.1"}},
 		{Config: "dhcp", Section: "lan", Option: "dns_service", After: []string{"0"}},
-		{Config: "travo-greenfield", Section: "main", Option: "adguard_topology", After: []string{"expert"}},
+		{Config: "travo", Section: "main", Option: "adguard_topology", After: []string{"expert"}},
 	}
 	if len(plan.Edits) != len(want) {
 		t.Fatalf("edits %+v", plan.Edits)
@@ -81,7 +81,7 @@ func TestPlanExpertServesTheGuestNetwork(t *testing.T) {
 		t.Fatalf("guest pool must advertise its own address: %+v", plan.Edits)
 	}
 	if Mode(nil) != TopologyDefault || Mode([]device.Section{{Name: "main", Options: map[string]string{"adguard_topology": "expert"}}}) != TopologyExpert {
-		t.Fatal("Mode reads travo-greenfield.main.adguard_topology")
+		t.Fatal("Mode reads travo.main.adguard_topology")
 	}
 }
 

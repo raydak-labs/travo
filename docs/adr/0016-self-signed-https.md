@@ -2,12 +2,12 @@
 
 Status: accepted (#183; container-tested, browser check in the hardware playbook)
 
-The daemon serves the same handler over TLS on `--listen-tls` (UCI `travo-greenfield.main.listen_tls`; empty or `off` = no TLS). Plain HTTP on `--listen` stays and does not redirect. TLS changes nothing in the trust boundary of [0008](0008-auth-and-trust-boundary.md): the source check (`RemoteAddr`), the `Host` check, default-deny, cookie session and CSRF header apply unchanged, because both listeners share one `http.Handler`.
+The daemon serves the same handler over TLS on `--listen-tls` (UCI `travo.main.listen_tls`; empty or `off` = no TLS). Plain HTTP on `--listen` stays and does not redirect. TLS changes nothing in the trust boundary of [0008](0008-auth-and-trust-boundary.md): the source check (`RemoteAddr`), the `Host` check, default-deny, cookie session and CSRF header apply unchanged, because both listeners share one `http.Handler`.
 
 ## Certificate
 
 - Self-signed ECDSA P-256 from the standard library (`internal/tlscert`); no new module dependency. The stripped arm64 binary grows by 589,824 bytes (9,633,952 → 10,223,776, budget 13,421,772): the server side of `crypto/tls` and certificate creation were not linked before (the update check only uses the client side).
-- Generated on the router on the first TLS handshake, not at start: by then the trust provider knows the lan addresses for the SANs and the clock had time to sync. Stored in `/etc/travo-greenfield/tls/` (key 0600, atomic writes, key before certificate so a torn pair fails to parse and is regenerated). The state dir is in the sysupgrade keep-list, so the fingerprint survives upgrades.
+- Generated on the router on the first TLS handshake, not at start: by then the trust provider knows the lan addresses for the SANs and the clock had time to sync. Stored in `/etc/travo/tls/` (key 0600, atomic writes, key before certificate so a torn pair fails to parse and is regenerated). The state dir is in the sysupgrade keep-list, so the fingerprint survives upgrades.
 - SANs: `localhost`, `127.0.0.1`, the lan IPv4 addresses at generation, the `--host-allow` names. A lan address change does not regenerate: the browser warns for a self-signed certificate anyway, and a new key would force a new exception.
 - Validity 825 days (the maximum Apple platforms accept), starting one day before max(clock, build time): a router that boots at 1970 still gets a certificate valid today. Regenerated within 30 days of expiry or when unreadable. The SHA-256 fingerprint goes to the log so an operator can compare it with the browser's warning page.
 

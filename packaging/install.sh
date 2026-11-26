@@ -1,6 +1,6 @@
 #!/bin/sh
-# Installs or removes travo-greenfield on OpenWrt. Run as root from the extracted tarball:
-#   tar -xzf travo-greenfield-<version>-aarch64.tar.gz -C /tmp/tg && sh /tmp/tg/install.sh
+# Installs or removes travo on OpenWrt. Run as root from the extracted tarball:
+#   tar -xzf travo-<version>-aarch64.tar.gz -C /tmp/tg && sh /tmp/tg/install.sh
 # Flags: (none) install | --uninstall | --purge (with --uninstall: also config and state)
 #        | --port N (alternate port, keeps LuCI unchanged)
 #        | --force (skip the OS and architecture checks only)
@@ -8,16 +8,16 @@
 #        | --adguard-bundle FILE (offline AdGuard Home package from the same release, docs/adr/0020).
 # Before installing it verifies $here/checksums.txt.sig over checksums.txt with usign (docs/adr/0007).
 # Test hooks: TRAVO_TEST_STOP_AFTER_SWAP=1 exits after moving LuCI.
-# TRAVO_TEST_HOLD_80=1 starts a listener that blocks greenfield from taking port 80.
+# TRAVO_TEST_HOLD_80=1 starts a listener that blocks travo from taking port 80.
 # Touches only the paths in manifest.txt, the ones named in uninstall() and stale files in the
 # UI directory it owns (invariants §15).
 set -eu
 
-NAME=travo-greenfield
-STATE_DIR=/etc/travo-greenfield
+NAME=travo
+STATE_DIR=/etc/travo
 MIN_FREE_KIB=20480
-PORT_SWAP_GUARD=/etc/travo-greenfield-guards/port-swap
-UI_DIR=/www/travo-greenfield
+PORT_SWAP_GUARD=/etc/travo-guards/port-swap
+UI_DIR=/www/travo
 
 die() {
   echo "install.sh: $*" >&2
@@ -176,7 +176,7 @@ install() {
   stage_adguard_bundle
 
   load_port80
-  mkdir -p /etc/travo-greenfield-guards
+  mkdir -p /etc/travo-guards
   recover_port_swap
   first_install=0
   [ -e /etc/init.d/$NAME ] || first_install=1
@@ -209,7 +209,7 @@ install() {
   fi
   # A healthy reinstall is the explicit retry path after a firmware flash (invariants §1);
   # the keep-list carried its guard across the flash. Cleared by name, never by glob.
-  rm -f /etc/travo-greenfield-guards/firmware-upgrade-in-progress
+  rm -f /etc/travo-guards/firmware-upgrade-in-progress
   install_ports "$version"
 }
 
@@ -254,7 +254,7 @@ uninstall() {
   rmdir /www/$NAME 2>/dev/null || true
   if [ "$purge" = 1 ]; then
     rm -f /etc/config/$NAME
-    rm -rf "$STATE_DIR" /etc/travo-greenfield-guards
+    rm -rf "$STATE_DIR" /etc/travo-guards
   fi
   echo "$NAME removed"
 }
@@ -291,11 +291,11 @@ done
 
 [ "$(id -u)" = 0 ] || die "must run as root"
 mkdir -p /var/lock
-exec 9>>/var/lock/travo-greenfield-update.lock
+exec 9>>/var/lock/travo-update.lock
 flock -n -x 9 || die "update or installation already in progress"
-update_guard=/etc/travo-greenfield-guards/update-in-progress
+update_guard=/etc/travo-guards/update-in-progress
 if [ -e "$update_guard" ] || [ -L "$update_guard" ]; then
-  die "update recovery required: run /usr/bin/travo-greenfield --recover-update (or the saved recovery executable)"
+  die "update recovery required: run /usr/bin/travo --recover-update (or the saved recovery executable)"
 fi
 here=$(cd "$(dirname "$0")" && pwd)
 "$mode"

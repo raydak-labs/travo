@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/vpnstatus"
+	"github.com/raydak-labs/travo/internal/vpnstatus"
 )
 
 type vpnStatusResult struct {

@@ -8,8 +8,8 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/lanaddress"
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
+	"github.com/raydak-labs/travo/internal/lanaddress"
+	"github.com/raydak-labs/travo/internal/txn"
 )
 
 // LANAddress is the router's own lan address (internal/lanaddress, ADR 0028).

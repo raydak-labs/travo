@@ -8,9 +8,9 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/blackdark-org/travo-greenfield/internal/txn"
-	"github.com/blackdark-org/travo-greenfield/internal/wifi"
-	"github.com/blackdark-org/travo-greenfield/internal/wifiprofiles"
+	"github.com/raydak-labs/travo/internal/txn"
+	"github.com/raydak-labs/travo/internal/wifi"
+	"github.com/raydak-labs/travo/internal/wifiprofiles"
 )
 
 const wifiProfileCreateOperation = "createWiFiProfile"

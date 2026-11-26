@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device/cli"
-	dfacts "github.com/blackdark-org/travo-greenfield/internal/device/facts"
-	"github.com/blackdark-org/travo-greenfield/internal/guard"
-	"github.com/blackdark-org/travo-greenfield/internal/uciwrite"
+	"github.com/raydak-labs/travo/internal/device/cli"
+	dfacts "github.com/raydak-labs/travo/internal/device/facts"
+	"github.com/raydak-labs/travo/internal/guard"
+	"github.com/raydak-labs/travo/internal/uciwrite"
 )
 
 // Spike S4 on the router. Run from Ethernet only. Each test changes live wireless state
@@ -26,8 +26,8 @@ import (
 func hwManager() *Manager {
 	return &Manager{
 		Device: cli.New(), Locks: &uciwrite.Locks{},
-		Guards:    guard.Dir{Path: "/tmp/greenfield-hw/guards", Now: time.Now},
-		Dir:       "/etc/greenfield-hw-txn", // flash: must survive reboot
+		Guards:    guard.Dir{Path: "/tmp/travo-hw/guards", Now: time.Now},
+		Dir:       "/etc/travo-hw-txn", // flash: must survive reboot
 		ConfigDir: "/etc/config", Reload: []string{"reload_config"}, UCI: "uci",
 		Spawner:  ShellSpawner{Shell: "/bin/sh", RunTimeout: 120 * time.Second},
 		Clock:    realClock{},
@@ -184,7 +184,7 @@ func TestHWHelperBeginSTAAndDie(t *testing.T) {
 	}
 	m := hwManager()
 	_, err := m.Begin(context.Background(), "hw: bad sta", []string{"wireless"}, func(ctx context.Context) error {
-		return m.Device.Set(ctx, "wireless", "wifinet3", "ssid", "TravoGreenfieldNoSuchNet")
+		return m.Device.Set(ctx, "wireless", "wifinet3", "ssid", "TravoNoSuchNet")
 	}, nil)
 	if err != nil {
 		os.Exit(3)
@@ -236,7 +236,7 @@ func TestHWBadUplinkDaemonDiesWatchdogRestores(t *testing.T) {
 func TestHWRebootPrepare(t *testing.T) {
 	m := hwManager()
 	orig := uciGet("wireless.default_radio1.ssid")
-	_ = os.WriteFile("/etc/greenfield-hw-orig-ssid", []byte(orig), 0o600)
+	_ = os.WriteFile("/etc/travo-hw-orig-ssid", []byte(orig), 0o600)
 	st, err := m.Begin(context.Background(), "hw: reboot", []string{"wireless"}, func(ctx context.Context) error {
 		return m.Device.Set(ctx, "wireless", "default_radio1", "ssid", orig+"-reboot")
 	}, nil)
@@ -250,15 +250,15 @@ func TestHWRebootPrepare(t *testing.T) {
 func TestHWRecoverAtBoot(t *testing.T) {
 	out, err := hwManager().Recover(context.Background(), ProcAlive)
 	b, _ := json.Marshal(map[string]any{"recover": out, "err": fmt.Sprint(err), "uptime": uptime()})
-	_ = os.WriteFile("/etc/greenfield-hw-boot-result.json", b, 0o600)
+	_ = os.WriteFile("/etc/travo-hw-boot-result.json", b, 0o600)
 }
 
 func uptime() string { b, _ := os.ReadFile("/proc/uptime"); return strings.Fields(string(b))[0] }
 
 // Reboot part 2: after boot, verify restore and AP state.
 func TestHWRebootVerify(t *testing.T) {
-	orig, _ := os.ReadFile("/etc/greenfield-hw-orig-ssid")
-	res, _ := os.ReadFile("/etc/greenfield-hw-boot-result.json")
+	orig, _ := os.ReadFile("/etc/travo-hw-orig-ssid")
+	res, _ := os.ReadFile("/etc/travo-hw-boot-result.json")
 	emit("boot_result", string(res))
 	emit("uci_ssid_restored", uciGet("wireless.default_radio1.ssid") == string(orig))
 	d, ok := waitSSID("phy1-ap0", string(orig), 90*time.Second)

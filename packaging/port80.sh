@@ -2,7 +2,7 @@
 # Sourced by install.sh after checking package integrity.
 
 port80_holder() {
-  if [ "$(uci -q get travo-greenfield.main.listen)" = :80 ]; then
+  if [ "$(uci -q get travo.main.listen)" = :80 ]; then
     echo self
   elif uhttpd_listen_lines | grep -q " listen_http .*:80'$"; then
     echo uhttpd
@@ -87,23 +87,23 @@ wait_listen() (
   done
 )
 
-set_greenfield_listen() {
-  uci set "travo-greenfield.main.listen=$1" || return 1
+set_travo_listen() {
+  uci set "travo.main.listen=$1" || return 1
   # Off :80, uhttpd keeps or gets back :443: drop the HTTPS port enable_tls_listen set.
-  if [ "$1" != :80 ] && [ "$(uci -q get travo-greenfield.main.listen_tls)" = :443 ]; then
-    uci delete travo-greenfield.main.listen_tls || return 1
+  if [ "$1" != :80 ] && [ "$(uci -q get travo.main.listen_tls)" = :443 ]; then
+    uci delete travo.main.listen_tls || return 1
   fi
-  uci commit travo-greenfield
+  uci commit travo
 }
 
 # HTTPS on :443 (ADR 0016) once uhttpd no longer serves it. Succeeds only when it changed
 # the setting. Keeps any operator value, including `off`; skips a :443 held by another
 # process. A TLS listen failure is not fatal for the daemon, so this never blocks install.
 enable_tls_listen() {
-  [ -z "$(uci -q get travo-greenfield.main.listen_tls)" ] || return 1
+  [ -z "$(uci -q get travo.main.listen_tls)" ] || return 1
   ! uhttpd_listen_lines | grep -q " listen_https .*:443'$" || return 1
   ! port_is_listening 443 || return 1
-  uci set travo-greenfield.main.listen_tls=:443 && uci commit travo-greenfield
+  uci set travo.main.listen_tls=:443 && uci commit travo
 }
 
 clear_port_swap() {
@@ -111,7 +111,7 @@ clear_port_swap() {
 }
 
 port_swap_restore() {
-  /etc/init.d/travo-greenfield stop 9>&- || true
+  /etc/init.d/travo stop 9>&- || true
   # A failed uci operation can leave staged writes that would mask the snapshot.
   if ! uci revert uhttpd ||
      ! cp "$PORT_SWAP_GUARD.uhttpd" /etc/config/uhttpd ||
@@ -120,8 +120,8 @@ port_swap_restore() {
     return 1
   fi
   wait_restored_uhttpd "$PORT_SWAP_GUARD.uhttpd" &&
-    set_greenfield_listen 0.0.0.0:8090 &&
-    /etc/init.d/travo-greenfield start 9>&- &&
+    set_travo_listen 0.0.0.0:8090 &&
+    /etc/init.d/travo start 9>&- &&
     wait_healthy "${1:-}" &&
     clear_port_swap
 }
@@ -175,13 +175,13 @@ write_port_swap_guard() {
     date +%s >"$PORT_SWAP_GUARD"
 }
 
-stop_greenfield() {
-  [ ! -x /etc/init.d/travo-greenfield ] || /etc/init.d/travo-greenfield stop 9>&-
+stop_travo() {
+  [ ! -x /etc/init.d/travo ] || /etc/init.d/travo stop 9>&-
 }
 
 reset_saved_port() {
-  if [ "$(uci -q get travo-greenfield.main.listen)" = :80 ]; then
-    set_greenfield_listen 0.0.0.0:8090
+  if [ "$(uci -q get travo.main.listen)" = :80 ]; then
+    set_travo_listen 0.0.0.0:8090
   fi
 }
 
@@ -189,7 +189,7 @@ uninstall_port80() (
   orig=$STATE_DIR/uhttpd.orig
   moved=$(printf 'moved\t1')
   if [ ! -f "$orig" ] || [ "$(tail -n 1 "$orig")" != "$moved" ]; then
-    stop_greenfield || die "could not stop greenfield"
+    stop_travo || die "could not stop travo"
     reset_saved_port || die "could not reset the saved port"
     rm -f "$orig"
     exit
@@ -199,16 +199,16 @@ uninstall_port80() (
   uhttpd_listen_lines >"$comparison/current"
   uhttpd_expected_lines "$orig" >"$comparison/expected"
   if ! cmp -s "$comparison/current" "$comparison/expected"; then
-    stop_greenfield || die "could not stop greenfield"
+    stop_travo || die "could not stop travo"
     reset_saved_port || die "could not reset the saved port"
     echo "uhttpd listen values changed since install; leaving them" >&2
-    echo "uhttpd.orig kept in /etc/travo-greenfield/" >&2
+    echo "uhttpd.orig kept in /etc/travo/" >&2
     exit 0
   fi
   check_pending_uhttpd
   write_port_swap_guard || die "could not write the port-swap guard"
   trap 'port_swap_restore; exit 1' INT TERM HUP
-  if ! stop_greenfield || ! reset_saved_port ||
+  if ! stop_travo || ! reset_saved_port ||
      ! uhttpd_restore_lines "$orig" || ! wait_original_listeners "$orig"; then
     port_swap_restore || die "could not restore uhttpd listen values; recovery required"
     die "could not restore uhttpd listen values; left LuCI on the moved ports"
@@ -249,9 +249,9 @@ swap_uhttpd() {
 install_ports() {
   lan_ip=$(uci -q get network.lan.ipaddr || echo 192.168.1.1)
   if [ -n "$alternate_port" ]; then
-    if ! set_greenfield_listen "0.0.0.0:$alternate_port" ||
-       ! /etc/init.d/travo-greenfield restart 9>&- || ! wait_healthy "$1"; then
-      die "greenfield did not answer on :$alternate_port"
+    if ! set_travo_listen "0.0.0.0:$alternate_port" ||
+       ! /etc/init.d/travo restart 9>&- || ! wait_healthy "$1"; then
+      die "travo did not answer on :$alternate_port"
     fi
     echo "$NAME $1 installed and healthy on http://${lan_ip%%/*}:$alternate_port/"
     return
@@ -261,8 +261,8 @@ install_ports() {
   case "$holder" in
     self)
       if enable_tls_listen; then
-        if ! /etc/init.d/travo-greenfield restart 9>&- || ! wait_healthy "$1"; then
-          die "greenfield did not answer after enabling HTTPS"
+        if ! /etc/init.d/travo restart 9>&- || ! wait_healthy "$1"; then
+          die "travo did not answer after enabling HTTPS"
         fi
       fi
       echo "$NAME $1 installed and healthy on port 80"
@@ -283,24 +283,24 @@ install_ports() {
     fi
   fi
   enable_tls_listen || true
-  if ! set_greenfield_listen :80 ||
-     ! /etc/init.d/travo-greenfield restart 9>&- ||
+  if ! set_travo_listen :80 ||
+     ! /etc/init.d/travo restart 9>&- ||
      ! wait_healthy "$1"; then
     stop_test_holder
     if [ "$holder" = uhttpd ]; then
-      port_swap_restore "$1" || die "greenfield did not answer on :80; recovery required"
-      die "greenfield did not answer on :80; uhttpd restored"
+      port_swap_restore "$1" || die "travo did not answer on :80; recovery required"
+      die "travo did not answer on :80; uhttpd restored"
     fi
-    if ! set_greenfield_listen 0.0.0.0:8090 ||
-       ! /etc/init.d/travo-greenfield restart 9>&- || ! wait_healthy "$1"; then
-      die "greenfield did not answer on :80; could not restore :8090"
+    if ! set_travo_listen 0.0.0.0:8090 ||
+       ! /etc/init.d/travo restart 9>&- || ! wait_healthy "$1"; then
+      die "travo did not answer on :80; could not restore :8090"
     fi
-    die "greenfield did not answer on :80; left on :8090"
+    die "travo did not answer on :80; left on :8090"
   fi
   stop_test_holder
   if [ "$holder" = uhttpd ]; then
     clear_port_swap
     trap - INT TERM HUP
   fi
-  echo "travo-greenfield on http://${lan_ip%%/*}/ (and https://${lan_ip%%/*}/ with a self-signed certificate), LuCI on http://${lan_ip%%/*}:8080/"
+  echo "travo on http://${lan_ip%%/*}/ (and https://${lan_ip%%/*}/ with a self-signed certificate), LuCI on http://${lan_ip%%/*}:8080/"
 }

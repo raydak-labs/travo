@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/blackdark-org/travo-greenfield/internal/device/mock"
+	"github.com/raydak-labs/travo/internal/device/mock"
 )
 
 const wantSystemInfo = `{"hostname":"OpenWrt","model":"GL.iNet GL-AXT1800","board_name":"glinet,gl-axt1800",
