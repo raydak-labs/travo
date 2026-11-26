@@ -21,7 +21,6 @@ export const SQM_LINKLAYERS: readonly SqmSettings['linklayer'][] = ['none', 'eth
 
 export type InterfaceOption = { value: string; label: string };
 
-/** Maps the API's stable error codes to a message; never parses error text. */
 export function sqmError(code: string | undefined): string {
   switch (code) {
     case 'invalid_request':
@@ -37,10 +36,7 @@ export function sqmError(code: string | undefined): string {
   }
 }
 
-/**
- * Builds SelectField options for SQM's kernel interface from the netifd interface list,
- * putting uplinks first and always keeping the currently configured interface selectable.
- */
+// Uplinks first; always keep the configured interface selectable.
 export function sqmInterfaceOptions(
   interfaces: readonly Pick<NetworkInterface, 'name' | 'device' | 'uplink'>[],
   current: string,

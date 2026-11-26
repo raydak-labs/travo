@@ -13,7 +13,6 @@ import (
 	"github.com/raydak-labs/travo/internal/txn"
 )
 
-// SQM reads and writes essential SQM queue settings (internal/sqm).
 type SQM interface {
 	Get(context.Context) (sqm.Settings, error)
 	Set(context.Context, sqm.Settings) (sqm.Settings, error)

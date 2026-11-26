@@ -1,6 +1,5 @@
-// Package sqm reads and writes essential SQM queue settings (UCI `sqm.@queue[0]`,
-// typically `sqm.eth1`) for the optional `sqm-scripts` package (#302).
-// Unknown options and extra queue sections stay untouched for LuCI.
+// Package sqm manages essential UCI `sqm.@queue[0]` settings for `sqm-scripts` (#302),
+// leaving unknown options and extra queue sections untouched for LuCI.
 package sqm
 
 import (
@@ -26,17 +25,13 @@ const (
 )
 
 var (
-	// Qdiscs are the queue disciplines Travo exposes.
-	Qdiscs = []string{"cake", "fq_codel"}
-	// Scripts are the queue setup scripts shipped by sqm-scripts (/usr/lib/sqm/*.qos).
-	Scripts = []string{"piece_of_cake.qos", "layer_cake.qos", "simple.qos", "simplest.qos", "simplest_tbf.qos"}
-	// Linklayers are the link layer adaptation modes Travo exposes.
+	Qdiscs     = []string{"cake", "fq_codel"}
+	Scripts    = []string{"piece_of_cake.qos", "layer_cake.qos", "simple.qos", "simplest.qos", "simplest_tbf.qos"}
 	Linklayers = []string{"none", "ethernet", "atm"}
 
 	ErrUnavailable = errors.New("SQM settings are unavailable")
 )
 
-// FieldError names the request field that failed validation.
 type FieldError struct {
 	Field  string
 	Reason string
@@ -44,7 +39,6 @@ type FieldError struct {
 
 func (e *FieldError) Error() string { return fmt.Sprintf("%s: %s", e.Field, e.Reason) }
 
-// Settings is the symmetric GET/PUT body for the primary SQM queue section.
 type Settings struct {
 	Enabled   bool   `json:"enabled" doc:"Enable SQM queue management"`
 	Interface string `json:"interface" maxLength:"15" doc:"Kernel network device to shape (e.g. eth1, phy0-sta0)"`
@@ -56,12 +50,10 @@ type Settings struct {
 	Overhead  int    `json:"overhead" minimum:"0" maximum:"256" doc:"Per-packet overhead in bytes (0..256)"`
 }
 
-// Applier is txn.Manager.Apply: lock, refuse foreign staged changes, stage, commit, reload.
 type Applier interface {
 	Apply(ctx context.Context, configs []string, stage func(ctx context.Context) error) error
 }
 
-// Service reads and writes the primary SQM queue through the Device and PackageManager ports.
 type Service struct {
 	UCI      device.UCI
 	Packages pkgmgr.PackageManager
@@ -71,7 +63,6 @@ type Service struct {
 	mu sync.Mutex
 }
 
-// Get reads the primary SQM queue settings. Missing sqm-scripts returns pkgmgr.ErrNotInstalled.
 func (s *Service) Get(ctx context.Context) (Settings, error) {
 	if err := s.checkInstalled(ctx); err != nil {
 		return Settings{}, err
@@ -84,7 +75,6 @@ func (s *Service) Get(ctx context.Context) (Settings, error) {
 	return cur, nil
 }
 
-// Set validates want, stages only differing options through txn.Apply, and reloads sqm.
 func (s *Service) Set(ctx context.Context, want Settings) (Settings, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -148,7 +138,6 @@ func (s *Service) show(ctx context.Context) ([]device.Section, error) {
 	return secs, nil
 }
 
-// Parse extracts the first `queue` section from UCI `sqm` sections (or defaults if absent).
 func Parse(secs []device.Section) (string, Settings) {
 	out := Settings{
 		Interface: DefaultSection,
@@ -187,7 +176,6 @@ func Parse(secs []device.Section) (string, Settings) {
 	return sec.Name, out
 }
 
-// Validate checks every field explicitly (invariants §4).
 func Validate(in Settings) error {
 	switch {
 	case !validInterface(in.Interface):
@@ -208,8 +196,6 @@ func Validate(in Settings) error {
 	return nil
 }
 
-// Stage writes only the differing essential options onto the first `queue` section,
-// preserving its section name and all unknown options.
 func Stage(ctx context.Context, u device.UCI, secs []device.Section, want Settings) error {
 	name, _ := Parse(secs)
 	var curOpts map[string]string

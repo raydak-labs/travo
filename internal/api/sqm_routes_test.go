@@ -50,7 +50,6 @@ func TestSQMRoutes(t *testing.T) {
 		t.Fatalf("PUT: %d %s", rec.Code, rec.Body)
 	}
 
-	// Strict PUT rejects unknown fields, null, bad enums, out-of-range values.
 	for _, bad := range []string{
 		`{"enabled":true,"interface":"eth1","download":1000,"upload":1000,"qdisc":"cake","script":"piece_of_cake.qos","linklayer":"none","overhead":0,"extra":1}`,
 		`{"enabled":null,"interface":"eth1","download":1000,"upload":1000,"qdisc":"cake","script":"piece_of_cake.qos","linklayer":"none","overhead":0}`,
@@ -63,7 +62,6 @@ func TestSQMRoutes(t *testing.T) {
 		}
 	}
 
-	// Error mapping including missing sqm-scripts -> 503 naming sqm-scripts.
 	for code, tc := range map[string]struct {
 		err    error
 		status int
