@@ -16,7 +16,7 @@ import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
-import { disabledMessage } from '../update-check';
+import { disabledMessage, showOperation } from '../update-check';
 
 type Update = NonNullable<Awaited<ReturnType<typeof postSystemUpdateCheck>>['data']>;
 let result = $state<Update>();
@@ -32,6 +32,12 @@ let updating = $state(false);
 let applyFailed = $state(false);
 let operationRequest = 0;
 let readingOperation = false;
+// The daemon keeps the last operation's journal: an old "0.1.0 installed" stays there after a
+// later install.sh. Show a finished result only when this page started it or it matches what runs.
+let startedHere = $state(false);
+const shownOperation = $derived(
+  showOperation(operation, result?.running_version, startedHere) ? operation : undefined,
+);
 
 async function readOperation(request: AbortController) {
   if (readingOperation) return;
@@ -52,6 +58,7 @@ async function readOperation(request: AbortController) {
 async function changeOperation(request: AbortController, version?: string) {
   updating = true;
   applyFailed = false;
+  startedHere = true;
   operationRequest++;
   try {
     const options = { signal: request.signal };
@@ -197,17 +204,17 @@ onMount(() => {
     {/if}
   </div>
   {/if}
-  {#if operation || applyFailed}
+  {#if shownOperation || applyFailed}
   <div aria-live="polite">
-    {#if operation?.state === 'applying'}
+    {#if shownOperation?.state === 'applying'}
       <p class="mt-2">{m.update_applying()}</p>
-    {:else if operation?.state === 'succeeded'}
-      <p class="mt-2">{m.update_succeeded({ version: operation.version ?? '' })}</p>
-    {:else if operation?.state === 'rolled_back'}
+    {:else if shownOperation?.state === 'succeeded'}
+      <p class="mt-2">{m.update_succeeded({ version: shownOperation.version ?? '' })}</p>
+    {:else if shownOperation?.state === 'rolled_back'}
       <p class="text-danger">{m.update_rolled_back()}</p>
-    {:else if operation?.state === 'aborted'}
+    {:else if shownOperation?.state === 'aborted'}
       <p class="mt-2">{m.update_aborted()}</p>
-    {:else if operation?.state === 'recovery_required'}
+    {:else if shownOperation?.state === 'recovery_required'}
       <p class="text-danger">{m.update_recovery_required()}</p>
     {/if}
     {#if applyFailed}

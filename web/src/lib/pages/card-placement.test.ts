@@ -43,7 +43,7 @@ const CARD_COMPONENTS = [
   'SystemFirmwareCard',
   'SystemSSHKeysCard',
   'SystemFactoryResetCard',
-  'PasswordCard',
+  'PasswordDialog',
   'DoHCard',
   'AdGuardTopologyCard',
   'VPNKillSwitchRow',

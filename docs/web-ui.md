@@ -172,13 +172,14 @@ under `nav:v2`.
   bottom: Configure, or Open in LuCI for services without a page here), then Available with
   Install. A service page leaves the nav when its package is absent (a failed check is not
   absent).
-- **System overview:** a fact strip (model, OpenWrt, uptime, memory), the device settings form
-  and details. Restart and the app version are only in the header menu.
+- **System overview:** a fact strip (model, OpenWrt, uptime, Travo version), the device settings
+  form and details. Restart and the app version are only in the header menu.
 - **Hardware:** the LEDs and buttons the router really has (read from sysfs and the device
   tree; storage-activity LEDs stay with the kernel), each LED by a readable name with the kernel
   name as hint, one switch for all LEDs, night mode with its dark window, the side switch
   action (applies on change). Per-LED switches need a daemon change first.
-- **Access:** API tokens and SSH keys, both as lists.
+- **Access:** API tokens and SSH keys, both as lists; Change password in the header opens a
+  dialog.
 - **Logs:** one line per entry (time, level chip, process, message cut off; click expands), a
   fixed-height scroll area inside the card, filters that apply while typing, the privacy note.
 

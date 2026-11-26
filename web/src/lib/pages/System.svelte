@@ -55,10 +55,11 @@ const used = (total: number, available: number) =>
     {/snippet}
   </PageHeader>
 
-  <SummaryBand title={m.system_device()}>
+  <SummaryBand title={m.system_device()} cols={4}>
     <SummaryTile label={m.system_model()}>{@render fact(info.data?.model ?? '')}</SummaryTile>
     <SummaryTile label={m.system_openwrt()}>{@render fact(info.data?.openwrt ?? '')}</SummaryTile>
     <SummaryTile label={m.system_uptime()}>{@render fact(info.data ? formatUptime(info.data.uptime_seconds) : '')}</SummaryTile>
+    <SummaryTile label={m.system_app_version()}>{@render fact(info.data?.app.version ?? '')}</SummaryTile>
   </SummaryBand>
 
   <CardGrid cols={2}>
@@ -74,7 +75,6 @@ const used = (total: number, available: number) =>
           <SettingsRow label={m.system_load()}>{#snippet control()}{@render text(formatLoad(d.load))}{/snippet}</SettingsRow>
           <SettingsRow label={m.system_memory()}>{#snippet control()}{@render text(used(d.memory.total_bytes, d.memory.available_bytes))}{/snippet}</SettingsRow>
           <SettingsRow label={m.system_storage()}>{#snippet control()}{@render text(used(d.storage.total_bytes, d.storage.available_bytes))}{/snippet}</SettingsRow>
-          <SettingsRow label={m.system_app_version()}>{#snippet control()}{@render text(d.app.version)}{/snippet}</SettingsRow>
           <SettingsRow label={m.system_build_time()}>{#snippet control()}{@render text(d.app.build_time || '—')}{/snippet}</SettingsRow>
         </div>
       {/if}

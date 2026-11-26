@@ -20,9 +20,10 @@ describe('auth pages', () => {
     expect(body.match(/autocomplete="new-password"/g)).toHaveLength(2);
   });
 
-  it('Access: the change-password card (Log out is in the header menu)', async () => {
-    const { default: PasswordCard } = await import('./PasswordCard.svelte');
-    const { body } = render(PasswordCard);
+  it('Access: the change-password dialog (Log out is in the header menu)', async () => {
+    const { default: PasswordDialog } = await import('./PasswordDialog.svelte');
+    expect(render(PasswordDialog).body).toContain('Change password');
+    const { body } = render(PasswordDialog, { props: { open: true } });
     expect(body).toContain('for="password-current"');
     expect(body).toContain('autocomplete="current-password"');
     expect(body.match(/autocomplete="new-password"/g)).toHaveLength(2);

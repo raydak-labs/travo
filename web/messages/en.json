@@ -1339,5 +1339,6 @@
   "leds_one_default": "{name} is back to normal.",
   "nav_system_firmware": "Firmware",
   "system_firmware_description": "Updates for Travo and OpenWrt, flashing an image, and the factory reset.",
-  "internet_description": "How the router gets online: WiFi networks it joins, Ethernet, a phone over USB, and failover between them."
+  "internet_description": "How the router gets online: WiFi networks it joins, Ethernet, a phone over USB, and failover between them.",
+  "password_change_intro": "Sign in with the new password next time. API tokens keep working."
 }

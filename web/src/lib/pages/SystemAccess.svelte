@@ -26,7 +26,7 @@ import { notify } from '../ui/notify';
 import PageHeader from '../ui/PageHeader.svelte';
 import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
-import PasswordCard from './PasswordCard.svelte';
+import PasswordDialog from './PasswordDialog.svelte';
 import SystemSSHKeysCard from './SystemSSHKeysCard.svelte';
 import TokenSecretDialog from './TokenSecretDialog.svelte';
 
@@ -104,7 +104,9 @@ async function revoke(token: Token) {
 </script>
 
 <div class="flex flex-col gap-6">
-  <PageHeader title={m.nav_system_access()} description={m.system_access_description()} />
+  <PageHeader title={m.nav_system_access()} description={m.system_access_description()}>
+    {#snippet actions()}<PasswordDialog />{/snippet}
+  </PageHeader>
 
   <Section title={m.tokens_yours()} description={m.tokens_intro()}>
     {#snippet actions()}
@@ -143,7 +145,6 @@ async function revoke(token: Token) {
   </Section>
 
   <SystemSSHKeysCard />
-  <PasswordCard />
 </div>
 
 <Dialog.Root bind:open={creating}>
