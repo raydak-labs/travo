@@ -5,6 +5,7 @@ import {
   installTailscale,
   loginTailscale,
   logoutTailscale,
+  setTailscaleRunning,
   setTailscaleSettings,
   type TailscaleSettings,
   type TailscaleStatus,
@@ -20,7 +21,7 @@ export async function fetchTailscale(signal?: AbortSignal, requestClient: Client
   return data;
 }
 
-export type TailscaleAction = 'install' | 'login' | 'logout' | 'settings';
+export type TailscaleAction = 'install' | 'login' | 'logout' | 'settings' | 'on' | 'off';
 
 /** What the Tailscale page shows for one tailscaled install, run and backend state. */
 export type TailscalePhase = 'absent' | 'stopped' | 'login' | 'connected' | 'off' | 'starting';
@@ -84,10 +85,12 @@ export async function changeTailscale(
           ? await loginTailscale({ signal })
           : action === 'logout'
             ? await logoutTailscale({ signal })
-            : await setTailscaleSettings({
-                signal,
-                body: settings ?? { exit_node: '', advertise_lan: false, ssh: false },
-              });
+            : action === 'on' || action === 'off'
+              ? await setTailscaleRunning({ signal, body: { enabled: action === 'on' } })
+              : await setTailscaleSettings({
+                  signal,
+                  body: settings ?? { exit_node: '', advertise_lan: false, ssh: false },
+                });
     if (response.data) return { status: response.data };
     return { error: tailscaleError((response.error as { code?: string } | undefined)?.code) };
   } catch {

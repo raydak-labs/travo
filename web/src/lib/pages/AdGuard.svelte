@@ -48,18 +48,10 @@ const proxy = adguardUrl(window.location);
       {#if adguard.data?.running && adguard.data.loopback}
         <Button variant="outline" size="sm" href={proxy} target="_blank" rel="noopener">{m.adguard_open()}<ExternalLink aria-hidden="true" /></Button>
       {/if}
-    {/snippet}
-  </PageHeader>
-  <Section
-    title={m.adguard_service_title()}
-    description={adguard.data?.installed
-      ? [adguard.data.running ? m.adguard_state_running() : m.adguard_state_stopped(), m.adguard_version({ version: adguard.data.version }), adguard.data.config_error ? m.adguard_err_config() : '', adguard.data.migration_failed ? m.adguard_migration_failed() : ''].filter(Boolean).join(' · ')
-      : undefined}
-  >
-    {#snippet actions()}
       {#if adguard.data?.installed}
         {@const st = adguard.data}
         {#if st.busy}<Status kind="info">{m.adguard_busy()}</Status>{/if}
+        {#if !st.running}<Status kind="warn">{m.adguard_state_stopped()}</Status>{/if}
         <Switch
           id="adguard-running"
           aria-label={m.adguard_running_label()}
@@ -68,6 +60,13 @@ const proxy = adguardUrl(window.location);
         />
       {/if}
     {/snippet}
+  </PageHeader>
+  <Section
+    title={m.adguard_dns_title()}
+    description={adguard.data?.installed
+      ? [m.adguard_version({ version: adguard.data.version }), adguard.data.config_error ? m.adguard_err_config() : '', adguard.data.migration_failed ? m.adguard_migration_failed() : ''].filter(Boolean).join(' · ')
+      : undefined}
+  >
     <LoadState status={adguard.status} retry={adguard.retry} stale={adguard.data !== undefined}>
       {#if adguard.data}
         {@const st = adguard.data}
@@ -82,7 +81,7 @@ const proxy = adguardUrl(window.location);
           <p class="text-sm text-muted-foreground">{m.adguard_absent_body()}</p>
           <Button variant="outline" size="sm" type="button" class="self-start" disabled={pending !== undefined || st.busy} onclick={() => change('install', true)}>{m.adguard_install()}</Button>
         {:else}
-          <div class="border-t border-border">
+          <div>
 
             {#if st.topology !== 'expert'}
               <SettingsRow

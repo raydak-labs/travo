@@ -1,8 +1,9 @@
 <script lang="ts">
 import { onDestroy } from 'svelte';
+import Switch from '$lib/components/ui/switch/switch.svelte';
 import '../api/client';
 import { getVpnProfiles } from '../api/gen';
-import { fetchTailscale, tailscalePhase } from '../api/tailscale';
+import { changeTailscale, fetchTailscale, tailscalePhase } from '../api/tailscale';
 import { fetchVpnStatus } from '../api/vpn-status';
 import { formatUptime } from '../format';
 import { m } from '../paraglide/messages.js';
@@ -10,6 +11,7 @@ import { href } from '../router';
 import LinkRow from '../ui/LinkRow.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import { notify } from '../ui/notify';
 import PageHeader from '../ui/PageHeader.svelte';
 import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
@@ -29,6 +31,18 @@ const profiles = createLoader(async (signal) => {
 });
 const tailscale = createLoader(fetchTailscale, 10000);
 const tunnel = createTunnelControl(() => status.retry());
+let tsPending = $state(false);
+
+async function switchTailscale(on: boolean) {
+  if (tsPending) return;
+  tsPending = true;
+  notify.progress(m.tailscale_applying(), 'tailscale');
+  const result = await changeTailscale(on ? 'on' : 'off');
+  tsPending = false;
+  if ('error' in result) notify.error(result.error, 'tailscale');
+  else notify.success(m.tailscale_done(), 'tailscale');
+  await tailscale.retry();
+}
 onDestroy(() => {
   status.stop();
   profiles.stop();
@@ -71,8 +85,15 @@ const wireguardHint = $derived.by(() => {
       >
         {#snippet control()}
           {#if tailscale.data}
-            {@const state = tailscaleStates[tailscalePhase(tailscale.data)]}
-            <Status kind={state.kind}>{state.label()}</Status>
+            {@const st = tailscale.data}
+            {@const state = tailscaleStates[tailscalePhase(st)]}
+            {#if st.running}<Status kind={state.kind}>{state.label()}</Status>{/if}
+            {#if st.installed}
+              <Switch id="vpn-tailscale-switch" aria-label={m.tailscale_running_label()} disabled={tsPending || st.busy}
+                bind:checked={() => st.running, (on) => void switchTailscale(on)} />
+            {:else}
+              <Status kind="neutral">{state.label()}</Status>
+            {/if}
           {/if}
         {/snippet}
       </LinkRow>

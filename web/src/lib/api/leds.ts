@@ -1,6 +1,6 @@
 import { m } from '../paraglide/messages.js';
 import { client } from './client';
-import { getLeds, type LedSchedule, type LedStatus, setLedSchedule, setLeds } from './gen';
+import { getLeds, type LedSchedule, type LedStatus, setLed, setLedSchedule, setLeds } from './gen';
 import type { Client } from './gen/client';
 import { APIRequestError } from './request';
 
@@ -42,6 +42,15 @@ function result(data: LedStatus | undefined, error: unknown): Result {
 export async function setLEDsOff(off: boolean): Promise<Result> {
   try {
     const { data, error } = await setLeds({ body: { off } });
+    return result(data, error);
+  } catch {
+    return { error: ledsError(undefined) };
+  }
+}
+
+export async function setLEDOff(name: string, off: boolean): Promise<Result> {
+  try {
+    const { data, error } = await setLed({ body: { name, off } });
     return result(data, error);
   } catch {
     return { error: ledsError(undefined) };

@@ -4,7 +4,14 @@ import Button from '$lib/components/ui/button/button.svelte';
 import Input from '$lib/components/ui/input/input.svelte';
 import Switch from '$lib/components/ui/switch/switch.svelte';
 import type { LedSchedule } from '../api/gen';
-import { fetchLEDs, ledLabel, saveLEDSchedule, scheduleProblem, setLEDsOff } from '../api/leds';
+import {
+  fetchLEDs,
+  ledLabel,
+  saveLEDSchedule,
+  scheduleProblem,
+  setLEDOff,
+  setLEDsOff,
+} from '../api/leds';
 import { m } from '../paraglide/messages.js';
 import EmptyState from '../ui/EmptyState.svelte';
 import LoadState from '../ui/LoadState.svelte';
@@ -74,9 +81,10 @@ const formId = $props.id();
         <div aria-label={m.leds_title()} role="group" class="border-t border-border">
 
           {#each view.leds as led (led.name)}
-            <SettingsRow label={ledLabel(led.name)} description={led.name}>
+            <SettingsRow label={ledLabel(led.name)} description={led.name} for="led-{led.name}">
               {#snippet control()}
-                <Status kind={led.on ? 'ok' : 'neutral'}>{led.on ? m.leds_lit() : m.leds_dark()}</Status>
+                <Switch id="led-{led.name}" disabled={busy}
+                  bind:checked={() => !led.held_off, (on) => void run(() => setLEDOff(led.name, !on), on ? m.leds_one_default({ name: ledLabel(led.name) }) : m.leds_one_off({ name: ledLabel(led.name) }))} />
               {/snippet}
             </SettingsRow>
           {/each}

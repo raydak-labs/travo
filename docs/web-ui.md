@@ -85,9 +85,11 @@ what stays narrow is the control:
   for names, addresses and keys); they never stretch with the card.
 - **Settings are never laid out side by side:** two short cards next to each other leave holes
   and make rows hard to scan. Overview grids (Services, summary tiles) are the exception.
-- A card whose only control is one switch (WireGuard tunnel, AdGuard Home service, all LEDs)
-  puts the switch in its header and the state in its description, instead of a row that repeats
-  the card title.
+- A page whose subject can be switched on or off carries that switch, its state chip and its
+  one main action in the **page header** (WireGuard: tunnel; Tailscale: on/off plus Log in or
+  Log out; AdGuard Home: running). No card repeats them; cards hold only what adds to it.
+- A card whose only control is one switch (all LEDs, night mode) puts the switch in its header
+  and the state in its description, instead of a row that repeats the card title.
 
 ### Patterns
 

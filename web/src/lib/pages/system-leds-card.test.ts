@@ -15,8 +15,8 @@ const { loader } = vi.hoisted(() => ({
 vi.mock('../ui/loader.svelte', () => ({ createLoader: () => loader }));
 
 const leds = [
-  { name: 'blue:run', trigger: 'none', on: true },
-  { name: 'white:system', trigger: 'none', on: false },
+  { name: 'blue:run', trigger: 'none', on: true, held_off: false },
+  { name: 'white:system', trigger: 'none', on: false, held_off: false },
 ];
 const schedule = { enabled: false, off_at: '23:00', on_at: '07:00' };
 
@@ -29,14 +29,22 @@ describe('LEDs card', () => {
     expect(body).toContain('System (white)');
     expect(body).toContain('white:system');
     expect(switchState(body, 'leds-all')).toEqual({ checked: true, disabled: false });
+    // Each LED has its own switch; on means not held off.
+    expect(switchState(body, 'led-blue:run')).toEqual({ checked: true, disabled: false });
+    expect(switchState(body, 'led-white:system')).toEqual({ checked: true, disabled: false });
     expect(body).not.toContain('Held off by Travo');
     expect(body).toContain('Night schedule');
   });
 
   it('held off: the all-LEDs switch is off and says why', () => {
-    loader.data = { leds: leds.map((l) => ({ ...l, on: false })), off: true, schedule };
+    loader.data = {
+      leds: leds.map((l) => ({ ...l, on: false, held_off: true })),
+      off: true,
+      schedule,
+    };
     const body = render(SystemLEDsCard).body;
     expect(switchState(body, 'leds-all')).toEqual({ checked: false, disabled: false });
+    expect(switchState(body, 'led-blue:run')?.checked).toBe(false);
     expect(body).toContain('Held off by Travo');
   });
 

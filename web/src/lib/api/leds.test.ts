@@ -10,8 +10,8 @@ afterEach(() => vi.resetAllMocks());
 // The AXT1800 LEDs of testdata leds/sysfs-default.tsv (mmc0:: is left to the kernel).
 const status: LedStatus = {
   leds: [
-    { name: 'blue:run', trigger: 'none', on: true },
-    { name: 'white:system', trigger: 'none', on: false },
+    { name: 'blue:run', trigger: 'none', on: true, held_off: false },
+    { name: 'white:system', trigger: 'none', on: false, held_off: false },
   ],
   off: false,
   schedule: { enabled: false, off_at: '23:00', on_at: '07:00' },

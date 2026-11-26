@@ -40,6 +40,15 @@ const profiles = createLoader(async (signal) => {
 const tunnel = createTunnelControl(() => status.retry());
 const confirm = createConfirm();
 const formId = $props.id();
+// Why the switch is off-limits, or how fresh the tunnel is; shown under the header.
+const tunnelHint = $derived.by(() => {
+  const snapshot = status.data;
+  if (!snapshot) return undefined;
+  if (!profiles.data?.selected_id) return m.vpn_tunnel_needs_profile();
+  return snapshot.handshake_age_seconds !== null
+    ? m.vpn_handshake_age({ age: formatUptime(snapshot.handshake_age_seconds) })
+    : undefined;
+});
 let adding = $state(false);
 let name = $state('');
 let config = $state('');
@@ -122,31 +131,21 @@ async function change(action: 'import' | 'select' | 'delete', id = '', label = n
 </script>
 
 <div class="flex flex-col gap-6">
-  <PageHeader title={m.nav_vpn_wireguard()} description={m.wireguard_page_description()} />
-
-  <Section
-    title={m.vpn_tunnel()}
-    description={status.data
-      ? [
-          tunnelStates[status.data.state].label(),
-          !profiles.data?.selected_id
-            ? m.vpn_tunnel_needs_profile()
-            : status.data.handshake_age_seconds !== null
-              ? m.vpn_handshake_age({ age: formatUptime(status.data.handshake_age_seconds) })
-              : '',
-        ].filter(Boolean).join(' · ')
-      : undefined}
-  >
+  <PageHeader title={m.nav_vpn_wireguard()} description={m.wireguard_page_description()}>
     {#snippet actions()}
       {#if status.data}
-        {#if status.data.stale}<Status kind="stale">{m.load_stale()}</Status>{/if}
-        <VPNTunnelSwitch id="wireguard-tunnel-switch" snapshot={status.data} control={tunnel} canEnable={Boolean(profiles.data?.selected_id)} />
+        {@const snapshot = status.data}
+        {@const badge = tunnelStates[snapshot.state]}
+        <span title={tunnelHint ?? ''}><Status kind={badge.kind}>{badge.label()}</Status></span>
+        {#if snapshot.stale}<Status kind="stale">{m.load_stale()}</Status>{/if}
+        <VPNTunnelSwitch id="wireguard-tunnel-switch" {snapshot} control={tunnel} canEnable={Boolean(profiles.data?.selected_id)} />
       {/if}
     {/snippet}
-    {#if status.status.state !== 'ready' || !status.data}
-      <LoadState status={status.status} retry={status.retry} stale={status.data !== undefined}><span></span></LoadState>
-    {/if}
-  </Section>
+  </PageHeader>
+  {#if tunnelHint}<p class="-mt-4 text-sm text-muted-foreground">{tunnelHint}</p>{/if}
+  {#if status.status.state !== 'ready' && !status.data}
+    <LoadState status={status.status} retry={status.retry}><span></span></LoadState>
+  {/if}
 
   <Section title={m.vpn_saved_profiles()}>
     {#snippet actions()}

@@ -1299,7 +1299,7 @@
   "leds_fn_vpn": "VPN",
   "leds_named": "{name} ({color})",
   "leds_all": "LEDs",
-  "leds_all_hint": "Turn every LED off, or back to what the firmware shows.",
+  "leds_all_hint": "Turn every LED off, or back to normal. Each LED below can be switched on its own.",
   "leds_schedule_window": "Dark between",
   "system_details": "Details",
   "system_access_description": "Who and what can sign in: API tokens, SSH keys and the admin password.",
@@ -1329,5 +1329,12 @@
   "firmware_image": "Sysupgrade image",
   "topology_ipv6": "IPv6",
   "topology_on": "On",
-  "topology_off": "Off"
+  "topology_off": "Off",
+  "tailscale_running_label": "Tailscale on",
+  "tailscale_about_title": "Not installed",
+  "tailscale_off_body": "Tailscale {version} is installed and off. Your login is kept; switching it on rejoins your tailnet.",
+  "tailscale_device_title": "This router in your tailnet",
+  "adguard_dns_title": "DNS filtering",
+  "leds_one_off": "{name} is off.",
+  "leds_one_default": "{name} is back to normal."
 }
