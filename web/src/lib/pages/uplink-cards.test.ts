@@ -57,3 +57,10 @@ describe('UplinkCards details', () => {
       expect(body).not.toContain(`>${label}<`);
   });
 });
+
+describe('UplinkCards layout', () => {
+  it('stretches the cards of a row to equal height', () => {
+    const body = cards(filled);
+    expect(body).toMatch(/^<div class="grid items-stretch /);
+  });
+});

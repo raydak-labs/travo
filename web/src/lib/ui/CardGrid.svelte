@@ -6,6 +6,6 @@ import type { Snippet } from 'svelte';
 let { cols = 3, children }: { cols?: 2 | 3; children: Snippet } = $props();
 </script>
 
-<div class="grid items-start gap-6 lg:grid-cols-2 {cols === 3 ? 'xl:grid-cols-3' : ''}">
+<div class="grid items-stretch gap-6 lg:grid-cols-2 {cols === 3 ? 'xl:grid-cols-3' : ''}">
   {@render children()}
 </div>

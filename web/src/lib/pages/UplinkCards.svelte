@@ -59,7 +59,7 @@ const protoLabels: Record<string, () => string> = {
 const protoLabel = (proto: string) => protoLabels[proto]?.() ?? proto;
 </script>
 
-<div class="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
+<div class="grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
   {#each sources as source (source.name)}
     {@const Icon = icons[source.name]}
     {@const u = raw(source.name)}
