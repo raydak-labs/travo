@@ -20,7 +20,7 @@ async function check(expression, message) {
   assert.ok(await chrome.evaluate(expression), message);
 }
 async function key(key, code = key, modifiers = 0) {
-  const windowsVirtualKeyCode = { Tab: 9, Enter: 13, Escape: 27, ' ': 32 }[key];
+  const windowsVirtualKeyCode = { Tab: 9, Enter: 13, Escape: 27, ' ': 32, ArrowDown: 40 }[key];
   await chrome.send('Input.dispatchKeyEvent', {
     type: 'keyDown',
     key,
@@ -252,11 +252,10 @@ async function openRestartConfirm() {
   await chrome.evaluate(`document.querySelector('header button[aria-label="Open menu"]').focus()`);
   await key('Enter');
   await wait(`!!document.querySelector('[data-slot="dropdown-menu-content"]')`);
-  await chrome.evaluate(`(() => {
-    const item = [...document.querySelectorAll('[data-slot="dropdown-menu-item"]')]
-      .find((el) => el.textContent.includes('Restart router'));
-    item.click();
-  })()`);
+  const onRestart = `document.activeElement?.textContent.includes('Restart router')`;
+  for (let i = 0; i < 10 && !(await chrome.evaluate(onRestart)); i++) await key('ArrowDown');
+  await check(onRestart, 'Restart router is reachable from the keyboard');
+  await key('Enter');
   await wait(`!!document.querySelector('[role="alertdialog"]')`);
 }
 async function systemAndVpn(width, scheme) {
