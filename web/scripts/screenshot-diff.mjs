@@ -16,7 +16,9 @@ export function parseArgs(argv) {
     const key = argv[i]?.replace(/^--/, '');
     if (!['base', 'head', 'out', 'match', 'marks'].includes(key ?? ''))
       throw new Error(`unknown flag ${argv[i]}`);
-    out[key] = argv[i + 1];
+    const value = argv[i + 1];
+    if (!value || value.startsWith('--')) throw new Error(`--${key} needs a value`);
+    out[key] = value;
   }
   for (const k of ['base', 'head', 'out']) if (!out[k]) throw new Error(`--${k} is required`);
   return out;
