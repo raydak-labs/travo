@@ -573,6 +573,7 @@
   "adguard_busy": "Change in progress",
   "adguard_version": "Version {version}",
   "adguard_open": "Open AdGuard Home",
+  "adguard_absent_short": "Installs after the first Internet connection.",
   "adguard_absent_body": "AdGuard Home installs automatically after the first Internet connection. You can also install it now.",
   "adguard_install": "Install AdGuard Home",
   "adguard_installing": "Installing AdGuard Home…",
@@ -589,6 +590,7 @@
   "adguard_err_failed": "The change failed. See the system log.",
   "adguard_err_expert_topology": "AdGuard Home answers DNS on port 53 (expert). Switch back to the default DNS setup first.",
   "adguard_topology_title": "DNS setup",
+  "adguard_topology_short": "Choose whether AdGuard Home answers DNS directly on port 53.",
   "adguard_topology_intro": "AdGuard Home answers every device directly and sees each client's address; the router's own DNS moves behind it and keeps VPN, captive portal and Tailscale DNS working. If AdGuard Home stops answering, DNS is down for up to a minute until Travo switches back by itself.",
   "adguard_topology_state_default": "Router DNS first",
   "adguard_topology_state_expert": "Expert: AdGuard Home on port 53",
@@ -1144,6 +1146,7 @@
   "ddns_err_no_space": "Not enough free flash for ddns-scripts.",
   "ddns_failed": "Could not change dynamic DNS.",
   "doh_title": "DNS over HTTPS",
+  "doh_short": "Encrypts the lookups AdGuard Home sends upstream.",
   "doh_intro": "AdGuard Home sends every lookup to this encrypted server. During a captive-portal bypass the hotel's resolvers answer instead, and if the server stops answering AdGuard is bypassed (fail open).",
   "doh_state_encrypted": "Encrypted upstream",
   "doh_state_plain": "Unencrypted upstream",
@@ -1388,5 +1391,6 @@
   "sqm_err_invalid": "Invalid value. Check interface, speeds, and overhead.",
   "sqm_err_not_installed": "Install SQM from Services first.",
   "sqm_err_busy": "Another SQM change is in progress. Try again.",
-  "sqm_failed": "Could not load or save SQM settings."
+  "sqm_failed": "Could not load or save SQM settings.",
+  "info_more_about": "More about {topic}"
 }

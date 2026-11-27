@@ -47,7 +47,7 @@ async function toggle(on: boolean) {
 }
 </script>
 
-<Section title={m.adguard_topology_title()} description={m.adguard_topology_intro()}>
+<Section title={m.adguard_topology_title()} description={m.adguard_topology_short()} info={m.adguard_topology_intro()}>
   {#snippet actions()}
     <Status kind={expert ? 'warn' : 'neutral'}>{expert ? m.adguard_topology_state_expert() : m.adguard_topology_state_default()}</Status>
   {/snippet}

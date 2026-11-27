@@ -72,13 +72,14 @@ reimplementation only when it fits `web/scripts/size-budget.mjs` and the ADRs
 | Component | Use it for |
 |---|---|
 | `PageHeader` | The top of every page: `title` (the page's one `h1`), optional `description` and `actions` (vertically centred in one row, right of the title from `sm`, below it on phones). |
-| `Section` | Each block of the page: one card surface with an `h2` `title`, optional `description`, `actions` (top right of the card) and `footer` (bottom right: the Save of an edit form). There is no other card wrapper. |
-| `SettingsRow` | One setting, fact or form field inside a `Section`: `label` and `description` left, the `control` snippet right from `sm`, stacked on phones. Pass `for` when the control has an id. Consecutive rows get a divider by themselves. |
+| `Section` | Each block of the page: one card surface with an `h2` `title`, optional `description`, `info` (an `InfoTip` beside the title), `actions` (top right of the card) and `footer` (bottom right: the Save of an edit form). There is no other card wrapper. |
+| `SettingsRow` | One setting, fact or form field inside a `Section`: `label` (with an optional `info` tip) and `description` left, the `control` snippet right from `sm`, stacked on phones. Pass `for` when the control has an id. Consecutive rows get a divider by themselves. |
 | `LinkRow` | A `SettingsRow` that opens another page: the whole row is the link and ends in a chevron; an optional switch or value sits before the chevron and does not follow the link. |
 | `HeaderToggle` | The on/off switch of a page's subject in the `PageHeader` actions: label, state chip (and stale chip) and `Switch` in one bordered control, as high as a small button. |
 | `GroupHeading` | The only subheading. `level={2}` names a page-level category group above its `Section`s or `CardGrid` (Dashboard, Internet, LAN, Diagnostics); the default `level={3}` names a group inside a section or a summary tile. Heading levels never skip. |
 | `SummaryBand` / `SummaryTile` | The flat status tiles between the header and the first section. Each tile has its own load fallback, so one failed value never blanks the others. |
 | `Notice` | A page-level message: a tone (`info`, `ok`, `warn`, `danger`) with its icon, an optional `title`, the text and optional `actions` (right of the text from `sm`, below it on phones). `info` and `ok` are `role="status"`; `warn` and `danger` are `role="alert"` unless the caller passes a calmer role. Page-level messages always use `Notice`, never the raw shadcn `Alert` or the `.status` chip classes. |
+| `InfoTip` | A small info button that opens a popover with the longer explanation, by click, tap or keyboard (never hover only). `Section` and `SettingsRow` place one through their `info` prop. Visible descriptions stay to one short line (about 80 characters); longer explanation goes in an `InfoTip`. |
 | `EmptyState` | "Nothing here yet" content: icon, title, optional text and the add action. A failed load is never empty: `LoadState` shows that. |
 
 ### Width

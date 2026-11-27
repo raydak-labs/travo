@@ -39,7 +39,7 @@ async function save(event: SubmitEvent) {
 }
 </script>
 
-<Section title={m.doh_title()} description={m.doh_intro()}>
+<Section title={m.doh_title()} description={m.doh_short()} info={m.doh_intro()}>
   <LoadState status={loader.status} retry={loader.retry} stale={loader.data !== undefined}>
     {#if loader.data}
       {@const ups = loader.data.upstreams ?? []}

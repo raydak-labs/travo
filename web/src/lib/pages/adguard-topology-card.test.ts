@@ -8,6 +8,9 @@ describe('AdGuard topology card', () => {
     const body = render(AdGuardTopologyCard, { props: { expert: false, refresh: () => {} } }).body;
     expect(body).toContain('Router DNS first');
     expect(body).toContain('Move AdGuard Home to port 53');
+    expect(body).toContain('Choose whether AdGuard Home answers DNS directly on port 53.');
+    expect(body).toContain('aria-label="More about DNS setup"');
+    expect(body).not.toContain('sees each client');
   });
 
   it('shows the expert state with the addresses AdGuard answers on', () => {
