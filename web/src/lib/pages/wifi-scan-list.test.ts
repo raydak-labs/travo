@@ -27,11 +27,14 @@ function network(ssid: string, bands: Network['bands'], accessPoints: AccessPoin
   };
 }
 
-function view(result: Partial<ScanResult>): string {
+function view(result: Partial<ScanResult>, join?: (network: Network) => void): string {
   return render(WiFiScanList, {
-    props: { result: { networks: [], hidden: [], radios: [], ...result } },
-  }).body;
+    props: { result: { networks: [], hidden: [], radios: [], ...result }, join },
+  }).body.replace(/<!--[^>]*-->/g, '');
 }
+
+const trigger = (body: string) =>
+  body.match(/<button[^>]*aria-expanded=[^>]*>[\s\S]*?<\/button>/)?.[0] ?? '';
 
 describe('WiFi scan list', () => {
   it('shows dual and single band badges and discloses BSSIDs', () => {
@@ -107,5 +110,46 @@ describe('WiFi scan list', () => {
         ],
       }),
     ).not.toContain('No networks found');
+  });
+
+  it('puts Join right of the network row, outside the expand trigger', () => {
+    const body = view(
+      { networks: [network('HomeUplink', ['5g'], [ap('5g', '60:22:32:2f:05:2b')])] },
+      () => {},
+    );
+    const row = trigger(body);
+    expect(row).toContain('HomeUplink');
+    expect(row).not.toContain('Join');
+    expect(body).toMatch(/<\/button>\s*<button[^>]*aria-label="Join HomeUplink"/);
+  });
+
+  it('marks network and hidden rows as expandable with a hidden chevron', () => {
+    const body = view({
+      networks: [network('HomeUplink', ['5g'], [ap('5g', '60:22:32:2f:05:2b')])],
+      hidden: [ap('5g', '66:22:32:2f:05:2b')],
+    });
+    const chevrons = body.match(/<svg[^>]*lucide-chevron-right[^>]*>/g) ?? [];
+    expect(chevrons).toHaveLength(2);
+    for (const svg of chevrons) {
+      expect(svg).toContain('aria-hidden="true"');
+      expect(svg).toContain('group-data-[state=open]:rotate-90');
+    }
+  });
+
+  it('lists each access point with hidden band, signal and security icons', () => {
+    const open: AccessPoint = { ...ap('2g', '32:cd:a7:aa:79:cd', -71), security: 'open' };
+    const body = view({
+      networks: [network('Cafe', ['2g', '5g'], [ap('5g', '60:22:32:2f:05:2b'), open])],
+    });
+    const rows = body.match(/<li[^>]*>[\s\S]*?<\/li>/g) ?? [];
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row).toMatch(/<svg[^>]*lucide-radio[^>]*aria-hidden="true"/);
+      expect(row).toMatch(/<svg[^>]*lucide-signal[^>]*aria-hidden="true"/);
+    }
+    expect(rows[0]).toContain('5 GHz · Ch 36');
+    expect(rows[0]).toMatch(/<svg[^>]*lucide-lock\s[^>]*aria-hidden="true"/);
+    expect(rows[1]).toMatch(/<svg[^>]*lucide-lock-open[^>]*aria-hidden="true"/);
+    expect(rows[1]).toContain('-71 dBm');
   });
 });

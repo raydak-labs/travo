@@ -106,13 +106,30 @@ describe('WiFi page', () => {
     expect(render(WiFi).body).toContain('Access point settings');
   });
 
-  it('announces a slow scan and disables the button', () => {
+  it('announces a slow scan and spins the Scan button without changing its label', () => {
     const body = render(WiFi, {
       props: { part: 'uplink', connectOpen: true, initialScanStatus: { state: 'loading' } },
-    }).body;
+    }).body.replace(/<!--[^>]*-->/g, '');
+    const button = body.match(/<button[^>]*aria-busy="true"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? '';
+    expect(button).toMatch(/<svg[^>]*class="[^"]*animate-spin/);
+    expect(button).toMatch(/\sdisabled/);
+    expect(button).toMatch(/<\/svg>Scan<\/button>$/);
     expect(body).toContain('Scanning, this can take several seconds');
-    expect(body).toContain('aria-busy="true"');
-    expect(body).toContain('disabled');
+  });
+
+  it('labels the idle Scan button "Scan" without a spinner', () => {
+    const body = render(WiFi, {
+      props: {
+        part: 'uplink',
+        connectOpen: true,
+        initialScanStatus: { state: 'ready' },
+        initialScanData: scan,
+      },
+    }).body.replace(/<!--[^>]*-->/g, '');
+    const button = body.match(/<button[^>]*aria-busy="false"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? '';
+    expect(button).toMatch(/<\/svg>Scan<\/button>$/);
+    expect(button).not.toContain('animate-spin');
+    expect(body).not.toContain('Scan again');
   });
 
   it('keeps prior scan data dimmed and stale on error with Retry', () => {

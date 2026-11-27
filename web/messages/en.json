@@ -507,7 +507,7 @@
   "wifi_band_unknown": "Unknown band",
   "wifi_connect": "Connect to WiFi",
   "wifi_connect_description": "Networks the router can join as its uplink, strongest first. Pick one to connect.",
-  "wifi_scan_again": "Scan again",
+  "wifi_scan": "Scan",
   "wifi_scanning": "Scanning, this can take several seconds",
   "wifi_unavailable": "WiFi is unavailable. Try again.",
   "wifi_scan_failed": "No radio could complete the scan. Try again.",
