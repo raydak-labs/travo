@@ -18,7 +18,7 @@ export function readBrowserTimezone(
   }
 }
 
-export function serializeDismissedPair(routerZone: string, browserZone: string): string {
+function serializeDismissedPair(routerZone: string, browserZone: string): string {
   return JSON.stringify([routerZone, browserZone]);
 }
 
@@ -42,9 +42,7 @@ export function dismissTimezoneMismatch(
 ): void {
   try {
     storage?.setItem(TIMEZONE_DISMISS_KEY, serializeDismissedPair(routerZone, browserZone));
-  } catch {
-    // Ignore storage errors (private mode / blocked site data).
-  }
+  } catch {}
 }
 
 export function detectTimezoneMismatch(input: {
