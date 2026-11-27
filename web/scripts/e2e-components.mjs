@@ -59,7 +59,7 @@ async function click(selector) {
 }
 async function focusText(text) {
   await chrome.evaluate(
-    `Array.from((document.querySelector('[role="dialog"],[role="alertdialog"]') ?? document).querySelectorAll('button,a')).find(e=>e.textContent.trim()===${JSON.stringify(text)}).focus()`,
+    `Array.from((document.querySelector('[role="dialog"]:not([data-state="closed"]),[role="alertdialog"]:not([data-state="closed"])') ?? document).querySelectorAll('button,a')).find(e=>e.textContent.trim()===${JSON.stringify(text)}).focus()`,
   );
 }
 async function activate(text, activation = 'Enter') {

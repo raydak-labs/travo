@@ -190,7 +190,8 @@ async function main() {
   rmSync(OUT_DIR, { recursive: true, force: true });
   mkdirSync(OUT_DIR, { recursive: true });
   const marks = readMarks(process.env.SCREENSHOT_MARKS);
-  const chrome = await launchChrome();
+  // Emulate reduced motion so CSS animations (app.css) never catch overlays mid-frame.
+  const chrome = await launchChrome({ reducedMotion: true });
   if (marks) recordMarks(chrome, marks);
   try {
     await shootAll(chrome, ['/login']);
