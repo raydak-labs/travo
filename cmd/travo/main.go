@@ -459,7 +459,8 @@ func run(addr, listenTLS, proxyListen string, useMock, firstRun bool, hostAllow 
 		apiDeps.IPv6 = newIPv6(deps)
 		apiDeps.DDNS = newDDNS(deps, connection)
 		apiDeps.Catalog = newCatalog(deps, connection)
-		apiDeps.SQM = &sqm.Service{UCI: deps.Device, Packages: deps.Packages, Apply: deps.Txn}
+		sqmServices, _ := deps.Device.(device.Services)
+		apiDeps.SQM = &sqm.Service{UCI: deps.Device, Packages: deps.Packages, Services: sqmServices, Apply: deps.Txn}
 		apiDeps.PortForwards = &portfwd.Service{UCI: deps.Device, Txns: deps.Txn}
 		apiDeps.LAN = &lanaddress.Service{UCI: deps.Device, Ubus: deps.Device, Txns: deps.Txn, Now: time.Now,
 			OnMoved: func(c context.Context) { _ = provider.Refresh(c, deps.Device) }}

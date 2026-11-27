@@ -144,3 +144,7 @@ Design: [ADR 0017](adr/0017-tailscale.md). Captures: `tailscale/` (AXT1800, 25.1
 - [HW] `tailscale status` (text) exits 1 when logged out; `status --json` exits 0. `tailscale debug prefs` prints the prefs JSON.
 - [HW] After `up`, tailscaled adds `ip rule` 5210 to 5270 (`lookup 52`), the `tailscale0` link (MTU 1280, no address until login) and empty nft tables `ip filter` / `ip nat`.
 - [HW] `apk del tailscale` leaves `/etc/tailscale/` (state, `ssh/` host keys once `--ssh` was set), `/var/lib/tailscale/`, the empty nft tables and the loaded `tun` module.
+
+## 16. SQM (`sqm-scripts`)
+
+- [HW] Package `sqm-scripts` 1.7.2-r1: `/etc/init.d/sqm` sets `USE_PROCD=1` and `procd_add_reload_trigger "sqm"`, but `start_service` runs `/usr/lib/sqm/run.sh` without `procd_open_instance`. `ubus call service list '{"name":"sqm"}'` returns `{"sqm": {}}` with no triggers even while active, so `reload_config` never invokes SQM; saving UCI `sqm` must call `/etc/init.d/sqm reload` explicitly.

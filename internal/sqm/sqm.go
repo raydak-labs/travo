@@ -18,6 +18,7 @@ import (
 const (
 	Package          = "sqm-scripts"
 	Config           = "sqm"
+	InitScript       = "sqm"
 	DefaultSection   = "eth1"
 	DefaultInterface = "eth1"
 	MaxBandwidth     = 10_000_000 // 10 Gbit/s in kbit/s
@@ -57,6 +58,7 @@ type Applier interface {
 type Service struct {
 	UCI      device.UCI
 	Packages pkgmgr.PackageManager
+	Services device.Services
 	Apply    Applier
 
 	mu sync.Mutex
@@ -103,6 +105,12 @@ func (s *Service) Set(ctx context.Context, want Settings) (Settings, error) {
 	})
 	if err != nil {
 		return Settings{}, err
+	}
+	// reload_config never triggers sqm (no procd instance, device-facts §16).
+	if s.Services != nil {
+		if err := s.Services.ServiceAction(ctx, InitScript, "restart"); err != nil {
+			return Settings{}, err
+		}
 	}
 	return s.Get(ctx)
 }
