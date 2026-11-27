@@ -6,52 +6,28 @@ import LogOut from '@lucide/svelte/icons/log-out';
 import { onDestroy } from 'svelte';
 import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
-import type { TailscaleSettings } from '../api/gen';
-import {
-  changeTailscale,
-  fetchTailscale,
-  type TailscaleAction,
-  tailscalePhase,
-} from '../api/tailscale';
+import { fetchTailscale, tailscalePhase } from '../api/tailscale';
 import { m } from '../paraglide/messages.js';
+import { createTailscaleControl } from '../tailscale-control.svelte';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import HeaderToggle from '../ui/HeaderToggle.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
-import { notify } from '../ui/notify';
 import PageHeader from '../ui/PageHeader.svelte';
 import Section from '../ui/Section.svelte';
 import SettingsRow from '../ui/SettingsRow.svelte';
 import TailscaleOptions from './TailscaleOptions.svelte';
 import { tailscaleStates } from './tailscale-states';
 
-const request = new AbortController();
 const ts = createLoader(fetchTailscale, 10000);
 const confirm = createConfirm();
-let pending = $state<TailscaleAction>();
+const control = createTailscaleControl(() => ts.retry());
+const { change } = control;
 onDestroy(() => {
   ts.stop();
-  request.abort();
+  control.stop();
 });
-
-async function change(action: TailscaleAction, settings?: TailscaleSettings) {
-  if (pending) return;
-  pending = action;
-  notify.progress(
-    action === 'install' ? m.tailscale_installing() : m.tailscale_applying(),
-    'tailscale',
-  );
-  const result = await changeTailscale(action, request.signal, settings);
-  if (request.signal.aborted) {
-    notify.dismiss('tailscale');
-    return;
-  }
-  pending = undefined;
-  if ('error' in result) notify.error(result.error, 'tailscale');
-  else notify.success(m.tailscale_done(), 'tailscale');
-  await ts.retry();
-}
 
 async function logout() {
   const ok = await confirm.ask({
@@ -73,16 +49,16 @@ const phaseStatus = tailscaleStates;
         {@const st = ts.data}
         {@const phase = tailscalePhase(st)}
         {#if !st.installed}
-          <Button variant="outline" size="sm" type="button" disabled={pending !== undefined || st.busy} onclick={() => change('install')}><Download aria-hidden="true" />{m.tailscale_install()}</Button>
+          <Button variant="outline" size="sm" type="button" disabled={control.pending !== undefined || st.busy} onclick={() => change('install')}><Download aria-hidden="true" />{m.tailscale_install()}</Button>
         {:else}
           <HeaderToggle id="tailscale-running" label={m.tailscale_title()}
             status={st.busy ? m.tailscale_busy() : phaseStatus[phase].label()} kind={st.busy ? 'info' : phaseStatus[phase].kind}
-            checked={st.running} disabled={pending !== undefined || st.busy} onchange={(on) => void change(on ? 'on' : 'off')} />
+            checked={st.running} disabled={control.pending !== undefined || st.busy} onchange={(on) => void change(on ? 'on' : 'off')} />
           {#if st.running}
             {#if phase === 'connected'}
-              <Button variant="outline" size="sm" type="button" disabled={pending !== undefined || st.busy} onclick={logout}><LogOut aria-hidden="true" />{m.tailscale_logout()}</Button>
+              <Button variant="outline" size="sm" type="button" disabled={control.pending !== undefined || st.busy} onclick={logout}><LogOut aria-hidden="true" />{m.tailscale_logout()}</Button>
             {:else if phase === 'login' || phase === 'off'}
-              <Button variant="outline" size="sm" type="button" disabled={pending !== undefined || st.busy} onclick={() => change('login')}><LogIn aria-hidden="true" />{phase === 'login' ? m.tailscale_login() : m.tailscale_connect()}</Button>
+              <Button variant="outline" size="sm" type="button" disabled={control.pending !== undefined || st.busy} onclick={() => change('login')}><LogIn aria-hidden="true" />{phase === 'login' ? m.tailscale_login() : m.tailscale_connect()}</Button>
             {/if}
           {/if}
         {/if}
@@ -128,7 +104,7 @@ const phaseStatus = tailscaleStates;
   </LoadState>
 
   {#if ts.data && tailscalePhase(ts.data) === 'connected'}
-    <TailscaleOptions status={ts.data} disabled={pending !== undefined || ts.data.busy} {confirm} onchange={(settings) => change('settings', settings)} refresh={() => ts.retry()} />
+    <TailscaleOptions status={ts.data} disabled={control.pending !== undefined || ts.data.busy} {confirm} onchange={(settings) => change('settings', settings)} refresh={() => ts.retry()} />
   {/if}
 </div>
 
