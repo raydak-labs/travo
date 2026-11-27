@@ -118,9 +118,9 @@ const formId = $props.id();
   {#if moving}
     <Notice tone="warn" role="status">
       {#if left > 0}
-        <p>{m.lan_moving({ seconds: left })}</p>
+        <span class="block">{m.lan_moving({ seconds: left })}</span>
         <a class="font-medium underline" href={moving.url}>{moving.url}</a>
-        <p class="text-sm">{m.lan_moving_fallback({ old: moving.old })}</p>
+        <span class="block text-sm">{m.lan_moving_fallback({ old: moving.old })}</span>
       {:else}
         {m.lan_moving_over({ old: moving.old })}
       {/if}
