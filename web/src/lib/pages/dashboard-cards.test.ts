@@ -1,7 +1,8 @@
 import { render } from 'svelte/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clients, connectivity, throughput, uplinks } from '../topology.test-inputs';
+import { clients, connectivity, tailscale, throughput, uplinks } from '../topology.test-inputs';
 import type { LoadStatus } from '../ui/loader.svelte';
+import { switchState } from '../ui/switch-html.test-helper';
 import Dashboard from './Dashboard.svelte';
 
 // Responses of the mock daemon (topology.test-inputs); only the load states change per test.
@@ -79,6 +80,22 @@ describe('Dashboard cards', () => {
     expect(row).toContain('items-stretch');
     expect(row).toContain('lg:grid-cols-2');
     expect(body.slice(grid)).toMatch(/Quick status[\s\S]*Resources/);
+  });
+
+  it('carries the Tailscale switch in Quick status once installed', () => {
+    dashboardEvents.tailscale.data = {
+      ...tailscale,
+      installed: true,
+      running: true,
+      backend_state: 'Running',
+    };
+    const part = quick(dashboard());
+    expect(part).toContain('href="#/vpn/tailscale"');
+    expect(switchState(part, 'dashboard-tailscale-switch')).toEqual({
+      checked: true,
+      disabled: false,
+    });
+    dashboardEvents.tailscale.data = undefined;
   });
 
   it('marks partial client counts as incomplete and keeps them', () => {

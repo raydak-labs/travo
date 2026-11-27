@@ -107,10 +107,10 @@ let trafficOpen = $state(false);
         connectivity: connectivity.status,
         clients: events.clients.status,
         throughput: throughput.status,
-        tailscale: tailscale.status,
       }}
       {vpn}
       {tunnel}
+      {tailscale}
     />
     <SystemCard {resources} alerts={events.alerts.data?.alerts ?? []} />
   </CardGrid>

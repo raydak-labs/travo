@@ -1330,7 +1330,7 @@
   "netview_col_networks": "Networks",
   "update_off": "Off",
   "vpn_no_profile": "No profile yet",
-  "tailscale_vpn_row": "Your tailnet, exit nodes and LAN sharing.",
+  "tailscale_install_hint": "Open to install",
   "logs_search": "Search the log",
   "clients_unknown": "Unknown device",
   "osupdate_never_short": "Not since the service started",
