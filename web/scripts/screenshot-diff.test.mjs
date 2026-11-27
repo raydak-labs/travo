@@ -22,6 +22,12 @@ describe('screenshot diff', () => {
     );
     expect(() => parseArgs(['--base', 'a'])).toThrow('--head is required');
     expect(() => parseArgs(['--bsae', 'a'])).toThrow('unknown flag');
+    expect(() => parseArgs(['--base', 'a', '--head', 'b', '--out', 'c', '--marks'])).toThrow(
+      '--marks needs a value',
+    );
+    expect(() => parseArgs(['--marks', '--base', 'a', '--head', 'b', '--out', 'c'])).toThrow(
+      '--marks needs a value',
+    );
   });
 
   it('pairs shots into compared, new and removed', () => {
