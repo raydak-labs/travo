@@ -6,9 +6,9 @@
     "gen": "openapi-ts",
     "postinstall": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide",
     "dev": "vite",
-    "build": "vite build && node scripts/gzip-dist.mjs",
+    "build": "vite build && node scripts/gzip-dist.mjs && node scripts/size-report.mjs",
     "test": "vitest run",
-    "check": "biome check . && svelte-check --tsconfig ./tsconfig.json && vitest run && pnpm build && node scripts/size-report.mjs"
+    "check": "biome check . && svelte-check --tsconfig ./tsconfig.json && vitest run && pnpm build"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
