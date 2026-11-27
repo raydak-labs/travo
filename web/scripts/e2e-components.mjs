@@ -293,6 +293,32 @@ async function systemAndVpn(width, scheme) {
   console.log(`reboot/update/VPN controls ${width} ${scheme}: pass`);
 }
 
+async function infoTip(width, scheme) {
+  await chrome.open(`${base}/#/services/adguard`, { width, height: 844, scheme });
+  const trigger = `button[aria-label^="More about"]`;
+  const content = `[data-slot="popover-content"]`;
+  await wait(`!!document.querySelector(${JSON.stringify(trigger)})`);
+  await chrome.evaluate(`document.querySelector(${JSON.stringify(trigger)}).focus()`);
+  await key('Enter');
+  await wait(`!!document.querySelector(${JSON.stringify(content)})`);
+  await check(
+    `(c => c.getAttribute('role')==='dialog' && !!c.getAttribute('aria-label') && c.textContent.trim().length > 0)(document.querySelector(${JSON.stringify(content)}))`,
+    'InfoTip opens a named dialog from the keyboard',
+  );
+  await key('Escape');
+  await wait(`!document.querySelector(${JSON.stringify(content)})`);
+  await check(
+    `document.activeElement === document.querySelector(${JSON.stringify(trigger)})`,
+    'Escape returns focus to the InfoTip trigger',
+  );
+  await click(trigger);
+  await wait(`!!document.querySelector(${JSON.stringify(content)})`);
+  await noOverflow();
+  await click(trigger);
+  await wait(`!document.querySelector(${JSON.stringify(content)})`);
+  console.log(`InfoTip ${width} ${scheme}: pass`);
+}
+
 try {
   await chrome.open(`${base}/#/login`, { width: 1280, height: 800 });
   await fill('input', 'mock-password');
@@ -305,6 +331,7 @@ try {
     for (const scheme of ['light', 'dark']) {
       await wifi(width, scheme);
       await systemAndVpn(width, scheme);
+      await infoTip(width, scheme);
     }
 } finally {
   chrome.close();
