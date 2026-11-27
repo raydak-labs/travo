@@ -164,12 +164,13 @@ The chevron is its own 32 px button and only expands or collapses. A child route
 parent. The tree lives in `router.ts` (`NAV_GROUPS`, `GROUP_OVERVIEW`); open groups are stored
 under `nav:v2`.
 
-- **VPN overview:** a `LinkRow` per VPN with the current state as hint (WireGuard also carries
-  the tunnel switch), then the traffic rules as rows: kill switch (switch), split tunnel (value
+- **VPN overview:** a `LinkRow` per VPN with the current state as hint (WireGuard carries the
+  tunnel switch; Tailscale its on/off switch when installed, otherwise "Not installed · Open to
+  install"), then the traffic rules as rows: kill switch (switch), split tunnel (value
   and an Edit dialog), VPN DNS (state and a check).
 - **WireGuard:** the profile table with Add profile (dialog: paste or file) and row menus.
 - **Tailscale:** status, login and options. Target: off until the user switches it on here (the
-  package's post-install start undone by the install flow); needs a daemon on/off action first.
+  package's post-install start undone by the install flow).
 - **Services overview:** installed services first (status and one action pinned to the card
   bottom: Configure for AdGuard Home and SQM, or Open in LuCI for services without a page here), then Available with
   Install. A service page leaves the nav when its package is absent (a failed check is not
@@ -212,8 +213,8 @@ never the only signal. Each badge links to its page. DOM and tab order: sources,
   only the rates, connectivity or VPN the router, clients the client counts. A failed clients
   read shows Unknown, never 0.
 
-Under the map: Quick status (clients, live traffic, Tailscale, the VPN tunnel with its guarded
-toggle) beside the System card (CPU load, memory and storage bars, uptime, the daemon's
+Under the map: Quick status (clients, live traffic, Tailscale with its on/off switch when
+installed, the VPN tunnel with its guarded toggle) beside the System card (CPU load, memory and storage bars, uptime, the daemon's
 low-memory warning), then interface traffic and the history. Below `lg` the uplink cards come
 first. The page header holds Connect to WiFi as an outline action.
 

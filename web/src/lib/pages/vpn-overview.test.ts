@@ -2,6 +2,7 @@ import { render } from 'svelte/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchTailscale } from '../api/tailscale';
 import { fetchVpnStatus } from '../api/vpn-status';
+import { tailscale } from '../topology.test-inputs';
 import type { LoadStatus } from '../ui/loader.svelte';
 import { switchState } from '../ui/switch-html.test-helper';
 import VPN from './VPN.svelte';
@@ -16,16 +17,20 @@ vi.mock('./VPNDNSRow.svelte', () => ({ default: () => {} }));
 
 const loader = (data: unknown) => ({ status: ready, data, retry: vi.fn(), stop: vi.fn() });
 
-function page(profiles: unknown, tunnel: string, tailscale: unknown) {
+function page(profiles: unknown, tunnel: string, ts: unknown) {
   createLoader.mockImplementation((fn: unknown) =>
     fn === fetchVpnStatus
       ? loader({ state: tunnel, stale: false, observed_at: '', handshake_age_seconds: null })
       : fn === fetchTailscale
-        ? loader(tailscale)
+        ? loader(ts)
         : loader(profiles),
   );
-  return render(VPN).body;
+  return render(VPN).body.replace(/<!--[^>]*-->/g, '');
 }
+const tailscaleRow = (body: string) => {
+  const start = body.indexOf('href="#/vpn/tailscale"');
+  return body.slice(start, body.indexOf('data-slot="settings-row"', start));
+};
 
 describe('VPN overview', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -48,5 +53,29 @@ describe('VPN overview', () => {
     expect(body).toContain('Mullvad DE');
     expect(switchState(body, 'vpn-tunnel-switch')).toEqual({ checked: true, disabled: false });
     expect(body).toContain('Connected');
+  });
+
+  it('offers the Tailscale page to install it, without a switch, when absent', () => {
+    const row = tailscaleRow(page({ profiles: [], selected_id: null }, 'disabled', tailscale));
+    expect(row).toContain('Not installed · Open to install');
+    expect(row).toMatch(/status-neutral">Not installed</);
+    expect(row).not.toContain('role="switch"');
+  });
+
+  it('switches an installed Tailscale without a separate state chip', () => {
+    const installed = { ...tailscale, installed: true, version: '1.104.1' };
+    const on = tailscaleRow(
+      page({ profiles: [], selected_id: null }, 'disabled', {
+        ...installed,
+        running: true,
+        backend_state: 'Running',
+      }),
+    );
+    expect(on).toContain('<p class="text-sm text-muted-foreground">Connected</p>');
+    expect(on).not.toContain('data-slot="badge"');
+    expect(switchState(on, 'vpn-tailscale-switch')).toEqual({ checked: true, disabled: false });
+    const off = tailscaleRow(page({ profiles: [], selected_id: null }, 'disabled', installed));
+    expect(off).toContain('>Off</p>');
+    expect(switchState(off, 'vpn-tailscale-switch')).toEqual({ checked: false, disabled: false });
   });
 });

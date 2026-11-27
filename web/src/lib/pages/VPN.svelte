@@ -1,9 +1,8 @@
 <script lang="ts">
 import { onDestroy } from 'svelte';
-import Switch from '$lib/components/ui/switch/switch.svelte';
 import '../api/client';
 import { getVpnProfiles } from '../api/gen';
-import { changeTailscale, fetchTailscale, tailscalePhase } from '../api/tailscale';
+import { fetchTailscale, tailscalePhase } from '../api/tailscale';
 import { fetchVpnStatus } from '../api/vpn-status';
 import { formatUptime } from '../format';
 import { m } from '../paraglide/messages.js';
@@ -12,11 +11,11 @@ import CardGrid from '../ui/CardGrid.svelte';
 import LinkRow from '../ui/LinkRow.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
-import { notify } from '../ui/notify';
 import PageHeader from '../ui/PageHeader.svelte';
 import Section from '../ui/Section.svelte';
 import Status from '../ui/Status.svelte';
 import { createTunnelControl, tunnelStates } from '../vpn-tunnel.svelte';
+import TailscaleSwitch from './TailscaleSwitch.svelte';
 import { tailscaleStates } from './tailscale-states';
 import VPNDNSRow from './VPNDNSRow.svelte';
 import VPNKillSwitchRow from './VPNKillSwitchRow.svelte';
@@ -32,18 +31,6 @@ const profiles = createLoader(async (signal) => {
 });
 const tailscale = createLoader(fetchTailscale, 10000);
 const tunnel = createTunnelControl(() => status.retry());
-let tsPending = $state(false);
-
-async function switchTailscale(on: boolean) {
-  if (tsPending) return;
-  tsPending = true;
-  notify.progress(m.tailscale_applying(), 'tailscale');
-  const result = await changeTailscale(on ? 'on' : 'off');
-  tsPending = false;
-  if ('error' in result) notify.error(result.error, 'tailscale');
-  else notify.success(m.tailscale_done(), 'tailscale');
-  await tailscale.retry();
-}
 onDestroy(() => {
   status.stop();
   profiles.stop();
@@ -63,6 +50,13 @@ const wireguardHint = $derived.by(() => {
       : '';
   return `${state} · ${profile.name}${age}`;
 });
+
+const tailscaleHint = $derived.by(() => {
+  const st = tailscale.data;
+  if (!st) return undefined;
+  if (!st.installed) return `${m.tailscale_state_absent()} · ${m.tailscale_install_hint()}`;
+  return tailscaleStates[tailscalePhase(st)].label();
+});
 </script>
 
 <div class="flex flex-col gap-6">
@@ -80,23 +74,18 @@ const wireguardHint = $derived.by(() => {
           </LoadState>
         {/snippet}
       </LinkRow>
-      <LinkRow
-        href={href('vpn-tailscale')}
-        label={m.nav_vpn_tailscale()}
-        description={m.tailscale_vpn_row()}
-      >
+      <LinkRow href={href('vpn-tailscale')} label={m.nav_vpn_tailscale()} description={tailscaleHint}>
         {#snippet control()}
-          {#if tailscale.data}
-            {@const st = tailscale.data}
-            {@const state = tailscaleStates[tailscalePhase(st)]}
-            {#if st.running}<Status kind={state.kind}>{state.label()}</Status>{/if}
-            {#if st.installed}
-              <Switch id="vpn-tailscale-switch" aria-label={m.tailscale_running_label()} disabled={tsPending || st.busy}
-                bind:checked={() => st.running, (on) => void switchTailscale(on)} />
-            {:else}
-              <Status kind="neutral">{state.label()}</Status>
+          <LoadState status={tailscale.status} retry={tailscale.retry} stale={tailscale.data !== undefined}>
+            {#if tailscale.data}
+              {@const st = tailscale.data}
+              {#if st.installed}
+                <TailscaleSwitch id="vpn-tailscale-switch" status={st} disabled={tailscale.status.state !== 'ready'} refresh={tailscale.retry} />
+              {:else}
+                <Status kind="neutral">{m.tailscale_state_absent()}</Status>
+              {/if}
             {/if}
-          {/if}
+          </LoadState>
         {/snippet}
       </LinkRow>
     </div>

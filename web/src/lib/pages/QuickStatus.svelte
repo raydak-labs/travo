@@ -1,10 +1,11 @@
 <script lang="ts">
-import type { TunnelStatus } from '../api/gen';
+import type { TailscaleStatus, TunnelStatus } from '../api/gen';
+import { tailscalePhase } from '../api/tailscale';
 import { formatBitRate } from '../format';
 import { m } from '../paraglide/messages.js';
 import { href } from '../router';
 import type { TopologyModel } from '../topology';
-import { internetChip, tailscaleChip } from '../topology-labels';
+import { internetChip } from '../topology-labels';
 import LinkRow from '../ui/LinkRow.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import type { LoadStatus } from '../ui/loader.svelte';
@@ -12,25 +13,32 @@ import Section from '../ui/Section.svelte';
 import SettingsRow from '../ui/SettingsRow.svelte';
 import Status from '../ui/Status.svelte';
 import { type TunnelControl, tunnelStates } from '../vpn-tunnel.svelte';
+import TailscaleSwitch from './TailscaleSwitch.svelte';
+import { tailscaleStates } from './tailscale-states';
 import VPNTunnelSwitch from './VPNTunnelSwitch.svelte';
 
 // The things people check and toggle most: clients, live traffic, Tailscale, the VPN tunnel.
-type Part = 'connectivity' | 'clients' | 'throughput' | 'tailscale';
+type Part = 'connectivity' | 'clients' | 'throughput';
 let {
   model,
   status,
   vpn,
   tunnel,
+  tailscale,
 }: {
   model: TopologyModel;
   status: Record<Part, LoadStatus>;
   vpn: { status: LoadStatus; data?: TunnelStatus; retry: () => void };
   tunnel: TunnelControl;
+  tailscale: { status: LoadStatus; data?: TailscaleStatus; retry: () => void };
 } = $props();
 
 const active = $derived(model.sources.find((s) => s.state === 'active'));
 // Stale per row: a known value whose source is reloading or failed stays, dimmed and marked.
 const stale = (part: Part, known: boolean) => known && status[part].state !== 'ready';
+const tailscaleDescription = $derived(
+  tailscale.data ? tailscaleStates[tailscalePhase(tailscale.data)].label() : undefined,
+);
 </script>
 
 {#snippet staleMark(on: boolean)}
@@ -73,14 +81,16 @@ const stale = (part: Part, known: boolean) => known && status[part].state !== 'r
       {/snippet}
     </SettingsRow>
     {#if model.tailscale !== 'absent'}
-      {@const chip = tailscaleChip[model.tailscale]}
-      <SettingsRow label={m.tailscale_title()}>
+      <LinkRow href={href('vpn-tailscale')} label={m.tailscale_title()} description={tailscaleDescription}>
         {#snippet control()}
-          {@const old = stale('tailscale', true)}
-          <a href={href('vpn-tailscale')} class={old ? 'opacity-60' : ''}><Status kind={chip.kind}>{chip.label()}</Status></a>
-          {@render staleMark(old)}
+          <LoadState status={tailscale.status} retry={tailscale.retry} stale={tailscale.data !== undefined}>
+            {#if tailscale.data?.installed}
+              <TailscaleSwitch id="dashboard-tailscale-switch" status={tailscale.data}
+                disabled={tailscale.status.state !== 'ready'} refresh={tailscale.retry} />
+            {/if}
+          </LoadState>
         {/snippet}
-      </SettingsRow>
+      </LinkRow>
     {/if}
     <LinkRow
       href={href('vpn')}
