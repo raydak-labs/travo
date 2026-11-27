@@ -44,8 +44,8 @@ let {
         <Collapsible.Trigger class="group grid min-w-0 flex-1 cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-0.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/50">
           {@render chevron()}
           <span class="flex min-w-0 items-center gap-2">
-            <span class="min-w-0 truncate font-medium">{network.ssid}</span>
-            <Status kind="info">{bandsBadge(network.bands)}</Status>
+            <span class="min-w-0 font-medium break-all">{network.ssid}</span>
+            <span class="shrink-0"><Status kind="info">{bandsBadge(network.bands)}</Status></span>
           </span>
           <span data-slot="scan-row-meta" class="col-start-2 flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
             <span class="inline-flex items-center gap-1"><Signal aria-hidden="true" class="size-3 shrink-0" />{signalLabel(network.best_signal_dbm)}</span>

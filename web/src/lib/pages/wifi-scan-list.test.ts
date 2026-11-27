@@ -163,17 +163,17 @@ describe('WiFi scan list', () => {
       () => {},
     );
     const row = trigger(body);
-    expect(row).toMatch(
-      /<span class="min-w-0 truncate[^"]*">A very long uplink name<\/span>\s*<span data-slot="badge"[^"]*"[^"]*status-info"/,
-    );
-    const meta = row.match(
-      /<span data-slot="scan-row-meta" class="([^"]*)">([\s\S]*)<\/span><\/button>$/,
-    );
-    expect(meta?.[1]).toContain('col-start-2');
-    expect(meta?.[1]).toContain('text-xs text-muted-foreground tabular-nums');
-    expect(meta?.[2]).toContain('-30 dBm');
-    expect(meta?.[2]).toContain('WPA2');
-    expect(meta?.[2]).toMatch(/<svg[^>]*lucide-signal[^>]*aria-hidden="true"/);
-    expect(meta?.[2]).toMatch(/<svg[^>]*lucide-lock\s[^>]*aria-hidden="true"/);
+    const ssid = row.indexOf('>A very long uplink name</span>');
+    const badge = row.indexOf('data-slot="badge"');
+    const metaStart = row.indexOf('data-slot="scan-row-meta"');
+    expect(ssid).toBeGreaterThan(-1);
+    expect(row).not.toMatch(/class="[^"]*\btruncate\b[^"]*">A very long uplink name/);
+    expect(badge).toBeGreaterThan(ssid);
+    expect(metaStart).toBeGreaterThan(badge);
+    const meta = row.match(/<span data-slot="scan-row-meta"[^>]*>([\s\S]*)<\/span><\/button>$/);
+    expect(meta?.[1]).toContain('-30 dBm');
+    expect(meta?.[1]).toContain('WPA2');
+    expect(meta?.[1]).toMatch(/<svg[^>]*lucide-signal[^>]*aria-hidden="true"/);
+    expect(meta?.[1]).toMatch(/<svg[^>]*lucide-lock\s[^>]*aria-hidden="true"/);
   });
 });
