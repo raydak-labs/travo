@@ -1260,6 +1260,7 @@
   "firmware_choose": "Choose image",
   "firmware_no_file": "No file chosen",
   "menu_open": "Open menu",
+  "menu_github": "GitHub",
   "uplink_card_address": "Address",
   "uplink_card_network": "Network",
   "uplink_card_link": "Connection",

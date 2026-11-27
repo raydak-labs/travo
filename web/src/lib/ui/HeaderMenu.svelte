@@ -1,5 +1,6 @@
 <script lang="ts">
 import EllipsisVertical from '@lucide/svelte/icons/ellipsis-vertical';
+import ExternalLink from '@lucide/svelte/icons/external-link';
 import LogOut from '@lucide/svelte/icons/log-out';
 import MoonStar from '@lucide/svelte/icons/moon-star';
 import Power from '@lucide/svelte/icons/power';
@@ -19,11 +20,12 @@ let {
   version,
   mobile = false,
   logout,
-}: { version?: string; mobile?: boolean; logout: () => void } = $props();
+  open = $bindable(false),
+}: { version?: string; mobile?: boolean; logout: () => void; open?: boolean } = $props();
 const confirm = createConfirm();
 </script>
 
-<DropdownMenu.Root>
+<DropdownMenu.Root bind:open>
   <DropdownMenu.Trigger>
     {#snippet child({ props })}
       <Button {...props} variant="ghost" size="icon" aria-label={m.menu_open()}>
@@ -31,7 +33,7 @@ const confirm = createConfirm();
       </Button>
     {/snippet}
   </DropdownMenu.Trigger>
-  <DropdownMenu.Content align="end" class="w-56">
+  <DropdownMenu.Content align="end" class="w-56" portalProps={{ disabled: typeof window === 'undefined' }}>
     <DropdownMenu.Label class="flex items-center gap-2">
       <img src={logo} alt="" class="size-5" />
       <span>{m.app_name()}</span>
@@ -47,6 +49,14 @@ const confirm = createConfirm();
     <DropdownMenu.Item onSelect={logout}>
       <LogOut aria-hidden="true" />
       {m.logout()}
+    </DropdownMenu.Item>
+    <DropdownMenu.Item>
+      {#snippet child({ props })}
+        <a {...props} href="https://github.com/raydak-labs/travo" target="_blank" rel="noopener noreferrer">
+          <span>{m.menu_github()}</span>
+          <ExternalLink aria-hidden="true" class="ml-auto text-muted-foreground" />
+        </a>
+      {/snippet}
     </DropdownMenu.Item>
     <DropdownMenu.Separator />
     <DropdownMenu.Item variant="destructive" disabled={restart.state !== 'idle'} onSelect={() => void restart.ask(confirm)}>
