@@ -5,10 +5,12 @@ import { describe, expect, it } from 'vitest';
 import CardGrid from './CardGrid.svelte';
 import EmptyState from './EmptyState.svelte';
 import GroupHeading from './GroupHeading.svelte';
+import HeaderToggle from './HeaderToggle.svelte';
 import PageHeader from './PageHeader.svelte';
 import Section from './Section.svelte';
 import SelectField from './SelectField.svelte';
 import SettingsRow from './SettingsRow.svelte';
+import { switchState } from './switch-html.test-helper';
 
 const snippet = (html: string) => createRawSnippet(() => ({ render: () => html }));
 const tags = (body: string, tag: string) =>
@@ -28,6 +30,13 @@ describe('PageHeader', () => {
     expect(body).toContain('About WiFi');
     expect(body).toContain('<button>Refresh</button>');
     expect(tags(body, 'h2')).toBe(0);
+  });
+
+  it('centres the actions vertically in their row', () => {
+    const { body } = render(PageHeader, {
+      props: { title: 'WiFi', actions: snippet('<button>Refresh</button>') },
+    });
+    expect(body).toMatch(/<div class="[^"]*\bitems-center\b[^"]*"><button>Refresh/);
   });
 
   it('leaves out description and actions when not given', () => {
@@ -87,6 +96,37 @@ describe('CardGrid', () => {
     const { body } = render(CardGrid, { props: { children: snippet('<section></section>') } });
     expect(body).toContain('items-stretch');
     expect(body).not.toContain('items-start');
+  });
+});
+
+describe('HeaderToggle', () => {
+  const toggle = (props: Partial<{ checked: boolean; disabled: boolean; stale: boolean }> = {}) =>
+    render(HeaderToggle, {
+      props: {
+        id: 'tunnel',
+        label: 'Tunnel',
+        status: 'Connected',
+        kind: 'ok',
+        checked: true,
+        title: 'Last handshake 1m ago',
+        onchange: () => {},
+        ...props,
+      },
+    }).body.replace(/<!--[^>]*-->/g, '');
+
+  it('combines the label, the state chip and the switch in one control', () => {
+    const body = toggle();
+    expect(body).toMatch(/<div data-slot="header-toggle"[^>]*title="Last handshake 1m ago"/);
+    expect(body).toMatch(/<label[^>]*for="tunnel"[^>]*>Tunnel<\/label>/);
+    expect(body).toMatch(/status-ok[^>]*>Connected</);
+    expect(body).not.toContain('status-stale');
+    expect(switchState(body, 'tunnel')).toEqual({ checked: true, disabled: false });
+  });
+
+  it('marks a stale state and shows an off, disabled switch', () => {
+    const body = toggle({ checked: false, disabled: true, stale: true });
+    expect(body).toMatch(/status-stale[^>]*>Last known value</);
+    expect(switchState(body, 'tunnel')).toEqual({ checked: false, disabled: true });
   });
 });
 

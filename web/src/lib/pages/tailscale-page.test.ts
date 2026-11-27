@@ -58,4 +58,18 @@ describe('Tailscale page', () => {
     expect(switchState(body, 'tailscale-running')).toBeNull();
     expect(body).toContain('Install');
   });
+
+  it('puts the Tailscale label, state and switch in one header toggle', () => {
+    const body = page(base).replace(/<!--[^>]*-->/g, '');
+    const header = body.slice(body.indexOf('data-slot="header-toggle"'), body.indexOf('</header>'));
+    expect(header).toMatch(/<label[^>]*for="tailscale-running"[^>]*>Tailscale<\/label>/);
+    expect(header).toContain('Connected');
+    expect(header.indexOf('tailscale-running"')).toBeLessThan(header.indexOf('Log out'));
+  });
+
+  it('busy: the header toggle says so and its switch is disabled', () => {
+    const body = page({ ...base, busy: true }).replace(/<!--[^>]*-->/g, '');
+    expect(body).toMatch(/data-slot="header-toggle"[\s\S]*status-info">Change in progress</);
+    expect(switchState(body, 'tailscale-running')).toEqual({ checked: true, disabled: true });
+  });
 });

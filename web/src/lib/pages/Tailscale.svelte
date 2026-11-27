@@ -6,7 +6,6 @@ import LogOut from '@lucide/svelte/icons/log-out';
 import { onDestroy } from 'svelte';
 import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
-import Switch from '$lib/components/ui/switch/switch.svelte';
 import type { TailscaleSettings } from '../api/gen';
 import {
   changeTailscale,
@@ -17,13 +16,13 @@ import {
 import { m } from '../paraglide/messages.js';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import HeaderToggle from '../ui/HeaderToggle.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import { notify } from '../ui/notify';
 import PageHeader from '../ui/PageHeader.svelte';
 import Section from '../ui/Section.svelte';
 import SettingsRow from '../ui/SettingsRow.svelte';
-import Status from '../ui/Status.svelte';
 import TailscaleOptions from './TailscaleOptions.svelte';
 import { tailscaleStates } from './tailscale-states';
 
@@ -76,17 +75,16 @@ const phaseStatus = tailscaleStates;
         {#if !st.installed}
           <Button variant="outline" size="sm" type="button" disabled={pending !== undefined || st.busy} onclick={() => change('install')}><Download aria-hidden="true" />{m.tailscale_install()}</Button>
         {:else}
-          {#if st.busy}<Status kind="info">{m.tailscale_busy()}</Status>{/if}
+          <HeaderToggle id="tailscale-running" label={m.tailscale_title()}
+            status={st.busy ? m.tailscale_busy() : phaseStatus[phase].label()} kind={st.busy ? 'info' : phaseStatus[phase].kind}
+            checked={st.running} disabled={pending !== undefined || st.busy} onchange={(on) => void change(on ? 'on' : 'off')} />
           {#if st.running}
-            <Status kind={phaseStatus[phase].kind}>{phaseStatus[phase].label()}</Status>
             {#if phase === 'connected'}
               <Button variant="outline" size="sm" type="button" disabled={pending !== undefined || st.busy} onclick={logout}><LogOut aria-hidden="true" />{m.tailscale_logout()}</Button>
             {:else if phase === 'login' || phase === 'off'}
               <Button variant="outline" size="sm" type="button" disabled={pending !== undefined || st.busy} onclick={() => change('login')}><LogIn aria-hidden="true" />{phase === 'login' ? m.tailscale_login() : m.tailscale_connect()}</Button>
             {/if}
           {/if}
-          <Switch id="tailscale-running" aria-label={m.tailscale_running_label()} disabled={pending !== undefined || st.busy}
-            bind:checked={() => st.running, (on) => void change(on ? 'on' : 'off')} />
         {/if}
       {/if}
     {/snippet}

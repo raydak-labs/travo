@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TunnelStatus } from '../api/gen';
 import { fetchKillSwitch, fetchSplit, fetchVpnDns, fetchVpnStatus } from '../api/vpn-status';
 import type { LoadStatus } from '../ui/loader.svelte';
+import { switchState } from '../ui/switch-html.test-helper';
 import WireGuard from './WireGuard.svelte';
 
 const { createLoader, dns, kill, profiles, tunnel } = vi.hoisted(() => ({
@@ -74,5 +75,21 @@ describe('WireGuard tunnel status', () => {
     const body = vpn({ ...snapshot('connected'), stale: true });
     expect(body).toContain('Last known value');
     expect(body).toContain('Connected');
+  });
+
+  it('puts the tunnel label, state and switch in one header toggle', () => {
+    const body = vpn(snapshot('connected')).replace(/<!--[^>]*-->/g, '');
+    const header = body.slice(body.indexOf('data-slot="header-toggle"'), body.indexOf('</header>'));
+    expect(header).toMatch(/<label[^>]*for="wireguard-tunnel-switch"[^>]*>Tunnel<\/label>/);
+    expect(header).toContain('Connected');
+    expect(switchState(header, 'wireguard-tunnel-switch')).toEqual({
+      checked: true,
+      disabled: false,
+    });
+  });
+
+  it('disables the header switch while the tunnel state is stale', () => {
+    const body = vpn({ ...snapshot('connected'), stale: true });
+    expect(switchState(body, 'wireguard-tunnel-switch')).toEqual({ checked: true, disabled: true });
   });
 });
