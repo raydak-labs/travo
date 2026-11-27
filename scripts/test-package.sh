@@ -122,6 +122,13 @@ out=$(docker exec -u 65534 "$NAME" sh -c 'sh /tmp/tg/install.sh 2>&1; echo rc=$?
 echo "$out" | grep -qx 'rc=1' || fail "non-root install not refused with exit 1: $out"
 echo "$out" | grep -q 'root' || fail "non-root refusal has no reason: $out"
 echo "ok: non-root refused: $(echo "$out" | head -n 1)"
+for bad_host in -bad bad- bad.host ''; do
+  out=$(dx "sh /tmp/tg/install.sh --hostname '$bad_host' 2>&1; echo rc=\$?")
+  echo "$out" | grep -qx 'rc=2' || fail "invalid --hostname '$bad_host' not refused with exit 2: $out"
+done
+out=$(dx 'sh /tmp/tg/install.sh --uninstall --keep-hostname 2>&1; echo rc=$?')
+echo "$out" | grep -qx 'rc=2' || fail "--uninstall --keep-hostname not refused with exit 2: $out"
+echo "ok: invalid hostname flags refused"
 dx '[ ! -e /usr/bin/travo ]' || fail "a refused install left files behind"
 
 # Signature cases 1 and 2 (3 is the install below). Each runs install.sh and prints rc=<exit code>.
@@ -133,14 +140,16 @@ dx '[ ! -e /usr/bin/travo ]' || fail "a refused install left files behind"
 echo "ok: refused: $(echo "$out" | head -n 1)"
 
 step "signature: --insecure installs without writing the key"
-dx 'sh /tmp/tg-nosig/install.sh --insecure --keep-lan'
+dx 'sh /tmp/tg-nosig/install.sh --insecure --keep-lan --keep-hostname'
 # shellcheck disable=SC2016 # expands in the container
 dx '[ "$(uci -q get network.lan.ipaddr)" = 192.168.1.1/24 ]' || fail "--keep-lan changed the LAN address"
+# shellcheck disable=SC2016 # expands in the container
+dx '[ "$(uci -q get system.@system[0].hostname)" = OpenWrt ]' || fail "--keep-hostname changed the hostname"
 dx '[ -x /usr/bin/travo ]' || fail "--insecure install did not install"
 dx '[ ! -e /etc/travo/minisign.pub ]' || fail "--insecure install wrote the trusted key"
 dx 'sh /tmp/tg-nosig/install.sh --uninstall --purge'
 dx '[ ! -e /usr/bin/travo ] && [ ! -e /etc/travo ]' || fail "uninstall/purge left files"
-echo "ok: --insecure installed, no key written"
+echo "ok: --insecure installed, no key written, --keep-hostname kept OpenWrt"
 
 step "install"
 listeners >"$tmp/listeners-before.txt"
@@ -149,15 +158,17 @@ listeners >"$tmp/listeners-before.txt"
 # shellcheck disable=SC2016 # expands in the container
 dx 'for r in 0:5g 1:2g; do printf "config wifi-device radio%s\n\toption band %s\n\nconfig wifi-iface default_radio%s\n\toption device radio%s\n\toption network lan\n\toption mode ap\n\toption ssid OpenWrt\n\toption encryption none\n\toption disabled 1\n\n" "${r%:*}" "${r#*:}" "${r%:*}" "${r%:*}"; done > /etc/config/wireless'
 [ "$(dx 'uci -q get network.lan.ipaddr')" = 192.168.1.1/24 ] || fail "container LAN is not the factory address"
+[ "$(dx 'uci -q get system.@system[0].hostname')" = OpenWrt ] || fail "container hostname is not the factory default"
 docker exec -e TRAVO_WIFI_PASSWORD="it's a test" "$NAME" sh /tmp/tg/install.sh
 [ "$(dx 'uci -q get network.lan.ipaddr')" = 192.168.50.1/24 ] || fail "first install did not move the LAN to 192.168.50.1/24"
+[ "$(dx 'uci -q get system.@system[0].hostname')" = travo ] || fail "first install did not set the hostname to travo"
 for r in 0 1; do
   [ "$(dx "uci -q get wireless.default_radio$r.ssid") $(dx "uci -q get wireless.default_radio$r.encryption") $(dx "uci -q get wireless.default_radio$r.disabled")" = "Travo sae-mixed 0" ] ||
     fail "first install did not set up default_radio$r"
   [ "$(dx "uci -q get wireless.default_radio$r.key")" = "it's a test" ] || fail "WiFi key of default_radio$r differs"
 done
 dx 'uci changes' | grep -q . && fail "first install left uncommitted UCI changes"
-echo "ok: first install moved the LAN to 192.168.50.1/24 and set up WiFi Travo on both radios"
+echo "ok: first install moved the LAN to 192.168.50.1/24, set hostname to travo and set up WiFi Travo on both radios"
 # The detached reload restarts travo once (new certificate for the new address); wait for it.
 pid=$(dx 'pidof travo')
 attempts=0
@@ -286,5 +297,22 @@ echo "$out" | grep -qx 'rc=1' || fail "symlink not refused with exit 1: $out"
 echo "$out" | grep -q 'other than regular files' || fail "refusal does not name the symlink: $out"
 dx '[ ! -e /usr/bin/travo ]' || fail "a refused install left files behind"
 echo "ok: refused: $(echo "$out" | head -n 1)"
+
+step "hostname: custom hostname preserved and --hostname overrides factory"
+dx 'uci set system.@system[0].hostname=my-router && uci commit system'
+dx 'sh /tmp/tg/install.sh --keep-lan'
+[ "$(dx 'uci -q get system.@system[0].hostname')" = my-router ] || fail "first install overwrote custom hostname"
+[ "$(dx 'uci -q get travo.main.host_allow')" = my-router.lan ] || fail "host_allow did not match custom hostname"
+dx 'uci changes' | grep -q . && fail "custom hostname install left uncommitted UCI changes"
+dx 'sh /tmp/tg/install.sh --uninstall --purge'
+dx 'uci set system.@system[0].hostname=OpenWrt && uci commit system'
+out=$(dx 'sh /tmp/tg/install.sh --keep-lan --hostname TravelBox')
+echo "$out" | grep -q 'Hostname: TravelBox\.' || fail "install summary did not report the new hostname: $out"
+[ "$(dx 'uci -q get system.@system[0].hostname')" = TravelBox ] || fail "--hostname did not set TravelBox"
+[ "$(dx 'uci -q get travo.main.host_allow')" = travelbox.lan ] || fail "host_allow did not update to travelbox.lan"
+dx 'uci changes' | grep -q . && fail "--hostname install left uncommitted UCI changes"
+wait_health "after hostname-only first install" 80
+dx 'sh /tmp/tg/install.sh --uninstall --purge'
+echo "ok: custom hostname preserved and --hostname applied without dropping SSH"
 
 step "package test passed"

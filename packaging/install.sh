@@ -7,10 +7,12 @@
 #        | --insecure (install without a signature check) | --rotate-key (accept a new signing key)
 #        | --adguard-bundle FILE (offline AdGuard Home package from the same release, docs/adr/0020)
 #        | --lan CIDR (router address on a first install, default 192.168.50.1/24) | --keep-lan
+#        | --hostname NAME (router hostname on a first install, default travo) | --keep-hostname
 #        | --wifi (ask for the WiFi password) | --wifi-name NAME (default Travo).
 # First install on a factory router (docs/adr/0034): the LAN moves off OpenWrt's 192.168.1.1/24,
-# which hotel and home networks often use too, and with --wifi or TRAVO_WIFI_PASSWORD the WiFi
-# comes up as one WPA2/WPA3 network on every band. Both only replace OpenWrt's factory values.
+# which hotel and home networks often use too, the hostname moves off OpenWrt to travo, and with
+# --wifi or TRAVO_WIFI_PASSWORD the WiFi comes up as one WPA2/WPA3 network on every band.
+# All three only replace OpenWrt's factory values.
 # Before installing it verifies $here/checksums.txt.sig over checksums.txt with usign (docs/adr/0007).
 # Test hooks: TRAVO_TEST_STOP_AFTER_SWAP=1 exits after moving LuCI.
 # TRAVO_TEST_HOLD_80=1 starts a listener that blocks travo from taking port 80.
@@ -30,7 +32,7 @@ die() {
 }
 
 usage() {
-  echo "usage: install.sh [--force] [--insecure] [--rotate-key] [--port N] [--adguard-bundle FILE] [--lan CIDR | --keep-lan] [--wifi] [--wifi-name NAME] | --uninstall [--purge]" >&2
+  echo "usage: install.sh [--force] [--insecure] [--rotate-key] [--port N] [--adguard-bundle FILE] [--lan CIDR | --keep-lan] [--hostname NAME | --keep-hostname] [--wifi] [--wifi-name NAME] | --uninstall [--purge]" >&2
   exit 2
 }
 
@@ -222,10 +224,20 @@ install() {
 FACTORY_LAN=192.168.1.1/24
 DEFAULT_LAN=192.168.50.1/24
 DEFAULT_SSID=Travo
+FACTORY_HOSTNAME=OpenWrt
+DEFAULT_HOSTNAME=travo
 
 # Quotes a value for `uci batch`. The value travels through printf (a builtin), never argv.
 uci_quote() {
   printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+# RFC 1123 label (1-63 chars).
+valid_hostname() {
+  [ -n "$1" ] && [ "${#1}" -le 63 ] || return 1
+  case "$1" in
+    -*|*-|*[!a-zA-Z0-9-]*) return 1 ;;
+  esac
 }
 
 # ipv4/prefix with every octet 0-255 and a prefix of 8-30.
@@ -304,19 +316,33 @@ read_wifi_key() {
   [ "$wifi_key" = "$again" ] || die "the two passwords differ"
 }
 
-# After a healthy install: the factory LAN and WiFi get Travo's defaults. UCI is committed first;
-# the network reload runs detached after this script ends, since it drops an SSH session on the
-# LAN. Travo restarts afterwards so its HTTPS certificate names the new address.
+# Apply Travo defaults over factory LAN, hostname and WiFi. LAN/WiFi reloads run detached
+# so SSH isn't dropped mid-script; Travo restarts after to refresh its TLS cert and host_allow.
 first_run() {
   [ "$first_install" = 1 ] || return 0
   new_lan=
-  if [ "$keep_lan" = 0 ] && [ "$(uci -q get network.lan.ipaddr)" = "$FACTORY_LAN" ]; then
+  if [ "$keep_lan" = 0 ] && [ "$(uci -q get network.lan.ipaddr || true)" = "$FACTORY_LAN" ]; then
     if uplink_overlaps "$lan_target"; then
       echo "install.sh: an uplink already uses addresses in $lan_target; the LAN stays $FACTORY_LAN (pass --lan)" >&2
     else
       new_lan=$lan_target
       printf 'del_list network.lan.ipaddr=%s\nadd_list network.lan.ipaddr=%s\n' "$FACTORY_LAN" "$new_lan" |
         uci batch || die "could not stage the LAN address"
+    fi
+  fi
+  new_hostname=
+  host_allow_changed=0
+  if [ "$keep_hostname" = 0 ] && [ "$hostname_target" != "$FACTORY_HOSTNAME" ] &&
+     [ "$(uci -q get system.@system[0].hostname || true)" = "$FACTORY_HOSTNAME" ]; then
+    new_hostname=$hostname_target
+    printf 'set system.@system[0].hostname=%s\n' "$(uci_quote "$new_hostname")" |
+      uci batch || die "could not stage the hostname"
+    if [ "$(uci -q get "$NAME.main.host_allow" || true)" = openwrt.lan ]; then
+      # shellcheck disable=SC2018,SC2019 # BusyBox tr has no [:upper:]; hostnames are ASCII
+      new_host_allow=$(printf '%s' "$new_hostname" | tr 'A-Z' 'a-z').lan
+      printf 'set %s.main.host_allow=%s\n' "$NAME" "$(uci_quote "$new_host_allow")" |
+        uci batch || die "could not stage host_allow"
+      host_allow_changed=1
     fi
   fi
   wifi_on=0
@@ -328,15 +354,29 @@ first_run() {
       echo "install.sh: the WiFi is not as OpenWrt ships it (or has no access point); it stays as it is" >&2
     fi
   fi
-  [ -n "$new_lan" ] || [ "$wifi_on" = 1 ] || return 0
+  [ -n "$new_lan" ] || [ -n "$new_hostname" ] || [ "$wifi_on" = 1 ] || return 0
   # Commit only what changed: a router without radios has no wireless config to commit.
   [ -z "$new_lan" ] || uci commit network || die "could not save the LAN address"
+  [ -z "$new_hostname" ] || uci commit system || die "could not save the hostname"
+  [ "$host_allow_changed" = 0 ] || uci commit "$NAME" || die "could not save host_allow"
   [ "$wifi_on" = 0 ] || uci commit wireless || die "could not save the WiFi settings"
   [ -z "$new_lan" ] || echo "The router's address becomes ${new_lan%/*}: open http://${new_lan%/*}/ once your device has a new address (unplug and replug the cable, or rejoin the WiFi)."
+  [ -z "$new_hostname" ] || echo "Hostname: $new_hostname."
   [ "$wifi_on" = 0 ] || echo "WiFi: $wifi_name on every band (WPA2/WPA3)."
-  echo "Applying the network settings now; this SSH session may drop."
-  # 9>&-: the detached job must not keep the installer's lock.
-  (sleep 2; reload_config; sleep 15; /etc/init.d/$NAME restart) </dev/null >/dev/null 2>&1 9>&- &
+  if [ -n "$new_lan" ] || [ "$wifi_on" = 1 ]; then
+    echo "Applying the network settings now; this SSH session may drop."
+    # 9>&-: the detached job must not keep the installer's lock.
+    (sleep 2; reload_config; sleep 15; /etc/init.d/$NAME restart) </dev/null >/dev/null 2>&1 9>&- &
+  else
+    reload_config || /etc/init.d/system reload || echo "install.sh: warning: could not reload hostname config" >&2
+    if [ "$host_allow_changed" = 1 ]; then
+      if /etc/init.d/$NAME restart 9>&-; then
+        wait_healthy "$version" || echo "install.sh: warning: $NAME did not come back after hostname update" >&2
+      else
+        echo "install.sh: warning: /etc/init.d/$NAME restart failed after hostname update" >&2
+      fi
+    fi
+  fi
 }
 
 uninstall() {
@@ -385,10 +425,11 @@ uninstall() {
   echo "$NAME removed"
 }
 
-force=0 purge=0 insecure=0 rotate=0 new_key=0 mode=install keep_lan=0 ask_wifi=0
+force=0 purge=0 insecure=0 rotate=0 new_key=0 mode=install keep_lan=0 keep_hostname=0 hostname_set=0 ask_wifi=0
 alternate_port=
 adguard_bundle=
 lan_target=$DEFAULT_LAN
+hostname_target=$DEFAULT_HOSTNAME
 wifi_name=$DEFAULT_SSID
 wifi_key=
 while [ "$#" -gt 0 ]; do
@@ -417,6 +458,13 @@ while [ "$#" -gt 0 ]; do
       lan_target=$1
       ;;
     --keep-lan) keep_lan=1 ;;
+    --hostname)
+      shift
+      { [ "$#" -gt 0 ] && valid_hostname "$1" && [ "$1" != "$FACTORY_HOSTNAME" ]; } || usage
+      hostname_target=$1
+      hostname_set=1
+      ;;
+    --keep-hostname) keep_hostname=1 ;;
     --wifi) ask_wifi=1 ;;
     --wifi-name)
       shift
@@ -428,7 +476,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 [ "$purge" = 0 ] || [ "$mode" = uninstall ] || usage
-[ "$mode" = install ] || { [ "$insecure" = 0 ] && [ "$rotate" = 0 ] && [ -z "$alternate_port" ] && [ -z "$adguard_bundle" ] && [ "$ask_wifi" = 0 ]; } || usage
+[ "$mode" = install ] || { [ "$insecure" = 0 ] && [ "$rotate" = 0 ] && [ -z "$alternate_port" ] && [ -z "$adguard_bundle" ] && [ "$keep_hostname" = 0 ] && [ "$hostname_set" = 0 ] && [ "$ask_wifi" = 0 ]; } || usage
 
 [ "$(id -u)" = 0 ] || die "must run as root"
 mkdir -p /var/lock
