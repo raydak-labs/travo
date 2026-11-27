@@ -132,14 +132,28 @@ function installHttpSeams() {
 }
 const writeCount = (path) =>
   `window.calls.filter(c=>c.path===${JSON.stringify(path)} && c.method==='POST').length`;
+async function reopenJoinNeighbor2() {
+  await key('Enter');
+  await wait(`!!document.querySelector('[role="dialog"] [aria-label="Join Neighbor2"]')`);
+  await click('[aria-label="Join Neighbor2"]');
+  await wait(`!!document.querySelector('[role="dialog"] input')`);
+}
 async function wifi(width, scheme) {
   await chrome.open(`${base}/#/`, { width, height: 844, scheme });
-  await click('a[href="#/wifi"]:not(nav a)');
+  await click('a[href="#/internet?connect"]:not(nav a)');
   await wait(
-    `!!Array.from(document.querySelectorAll('button')).find(e=>e.textContent.trim()==='Scan')`,
+    `location.hash==='#/internet' && !!document.querySelector('[role="dialog"] [aria-label="Join Neighbor2"]')`,
+  );
+  await key('Escape');
+  await wait(`!document.querySelector('[role="dialog"]')`);
+  await activate('Connect to WiFi', ' ');
+  await wait(
+    `!!Array.from(document.querySelectorAll('[role="dialog"] button')).find(e=>e.textContent.trim()==='Scan' && !e.disabled)`,
   );
   await activate('Scan', ' ');
-  await wait(`!!document.querySelector('[aria-label="Join Neighbor2"]')`);
+  await wait(
+    `!!document.querySelector('[role="dialog"] [aria-label="Join Neighbor2"]') && !!Array.from(document.querySelectorAll('[role="dialog"] button')).find(e=>e.textContent.trim()==='Scan' && !e.disabled)`,
+  );
   await click('[aria-label="Join Neighbor2"]');
   await wait(`!!document.querySelector('[role="dialog"] input')`);
   await check(
@@ -172,11 +186,10 @@ async function wifi(width, scheme) {
   await key('Escape');
   await wait(`!document.querySelector('[role="dialog"]')`);
   await check(
-    `document.activeElement.getAttribute('aria-label')==='Join Neighbor2'`,
-    'Escape restores join trigger',
+    `document.activeElement.textContent.trim()==='Connect to WiFi'`,
+    'Escape restores Connect to WiFi trigger',
   );
-  await key('Enter');
-  await wait(`!!document.querySelector('[role="dialog"] input')`);
+  await reopenJoinNeighbor2();
   await check(
     `document.querySelector('[role="dialog"] input').value === ''`,
     'Escape cleared secret',
@@ -185,11 +198,10 @@ async function wifi(width, scheme) {
   await activate('Cancel', ' ');
   await wait(`!document.querySelector('[role="dialog"]')`);
   await check(
-    `document.activeElement.getAttribute('aria-label')==='Join Neighbor2'`,
-    'Cancel restores trigger',
+    `document.activeElement.textContent.trim()==='Connect to WiFi'`,
+    'Cancel restores Connect to WiFi trigger',
   );
-  await key('Enter');
-  await wait(`!!document.querySelector('[role="dialog"] input')`);
+  await reopenJoinNeighbor2();
   await check(
     `document.querySelector('[role="dialog"] input').value === ''`,
     'Cancel cleared secret',
@@ -204,7 +216,9 @@ async function wifi(width, scheme) {
   await wait(`document.body.textContent.includes('Change confirmed')`);
   await noOverflow();
   await chrome.evaluate('history.back()');
-  await wait(`location.hash==='#/' && !!document.querySelector('a[href="#/wifi"]:not(nav a)')`);
+  await wait(
+    `location.hash==='#/' && !!document.querySelector('a[href="#/internet?connect"]:not(nav a)')`,
+  );
   if (width === 390) {
     await click('[aria-controls="sidebar"]');
     await wait(`!!document.querySelector('[data-slot="sheet-content"]')`);
@@ -233,17 +247,27 @@ async function wifi(width, scheme) {
   }
   console.log(`keyboard/Join/Back/drawer ${width} ${scheme}: pass`);
 }
+async function openRestartConfirm() {
+  await wait(`!!document.querySelector('header button[aria-label="Open menu"]')`);
+  await chrome.evaluate(`document.querySelector('header button[aria-label="Open menu"]').focus()`);
+  await key('Enter');
+  await wait(`!!document.querySelector('[data-slot="dropdown-menu-content"]')`);
+  await chrome.evaluate(`(() => {
+    const item = [...document.querySelectorAll('[data-slot="dropdown-menu-item"]')]
+      .find((el) => el.textContent.includes('Restart router'));
+    item.click();
+  })()`);
+  await wait(`!!document.querySelector('[role="alertdialog"]')`);
+}
 async function systemAndVpn(width, scheme) {
   await chrome.open(`${base}/#/system`, { width, height: 844, scheme });
-  await activate('Restart router', ' ');
-  await wait(`!!document.querySelector('[role="alertdialog"]')`);
+  await openRestartConfirm();
   await check(`${writeCount('/api/v1/system/reboot')} === 0`, 'reboot confirmation does not write');
   await chrome.screenshot(`${out}/reboot-confirm-${width}-${scheme}.png`);
   await activate('Cancel');
   await wait(`!document.querySelector('[role="alertdialog"]')`);
   await check(`${writeCount('/api/v1/system/reboot')} === 0`, 'reboot Cancel does not write');
-  await activate('Restart router');
-  await wait(`!!document.querySelector('[role="alertdialog"]')`);
+  await openRestartConfirm();
   await activate('Restart router');
   await wait(`!document.querySelector('[role="alertdialog"]')`);
   await wait(
@@ -252,6 +276,10 @@ async function systemAndVpn(width, scheme) {
   await check(
     `${writeCount('/api/v1/system/reboot')} === 1`,
     'reboot submits only after confirmation',
+  );
+  await chrome.open(`${base}/#/system/firmware`, { width, height: 844, scheme });
+  await wait(
+    `!!Array.from(document.querySelectorAll('button')).find(e=>e.textContent.trim()==='Apply update')`,
   );
   await activate('Apply update', ' ');
   await wait(`!!document.querySelector('[role="alertdialog"]')`);
@@ -270,22 +298,31 @@ async function systemAndVpn(width, scheme) {
   await wait(`document.body.textContent.includes('Version 0.1.1 installed.')`);
   await check(`${writeCount('/api/v1/system/update/apply')} === 1`, 'update submits exactly once');
   await noOverflow();
-  await chrome.open(`${base}/#/vpn`, { width, height: 844, scheme });
+  await chrome.open(`${base}/#/vpn/wireguard`, { width, height: 844, scheme });
   await wait(`document.body.textContent.includes('Test profile')`);
+  await activate('Add profile', ' ');
+  await wait(`!!document.querySelector('[role="dialog"] textarea')`);
   await check(
-    `Array.from(document.querySelectorAll('button')).find(e=>e.textContent.trim()==='Import profile').disabled`,
+    `document.querySelector('[role="dialog"] button[type="submit"]').disabled`,
     'empty VPN import disabled',
   );
   await check(
-    `(([t]) => t.required && t.spellcheck === false)([...document.querySelectorAll('textarea')].slice(-1))`,
+    `(([t]) => t.required && t.spellcheck === false)([document.querySelector('[role="dialog"] textarea')])`,
     'VPN textarea contract',
   );
-  await activate('Enable tunnel');
+  await key('Escape');
+  await wait(`!document.querySelector('[role="dialog"]')`);
+  const toggleTunnel = async () => {
+    await wait(`!!document.querySelector('#wireguard-tunnel-switch:not([disabled])')`);
+    await chrome.evaluate(`document.querySelector('#wireguard-tunnel-switch').focus()`);
+    await key(' ');
+  };
+  await toggleTunnel();
   await wait(`document.body.textContent.includes('Keep this change?')`);
   await chrome.screenshot(`${out}/vpn-pending-${width}-${scheme}.png`);
   await activate('Roll back', ' ');
   await wait(`document.body.textContent.includes('Tunnel change rolled back.')`);
-  await activate('Enable tunnel');
+  await toggleTunnel();
   await wait(`document.body.textContent.includes('Keep this change?')`);
   await activate('Keep change');
   await wait(`document.body.textContent.includes('Tunnel change confirmed.')`);
