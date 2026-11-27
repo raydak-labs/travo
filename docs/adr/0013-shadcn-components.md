@@ -1,6 +1,6 @@
 # 0013 Copied shadcn-svelte components
 
-Status: accepted
+Status: accepted; gzip budgets removed by [0036](0036-no-ui-size-limits.md)
 
 Use the shadcn-svelte CLI to install the components the SPA renders. The pinned
 devDependency is 1.8.1. Reapply with
