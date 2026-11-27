@@ -76,35 +76,32 @@ let trafficOpen = $state(false);
     <CaptivePortalCard info={connectivity.data} refresh={connectivity.retry} />
   {/if}
 
-  <div class="flex flex-col gap-3">
-    <GroupHeading level={2} label={m.dashboard_group_connections()} />
-    <!-- The map needs width; phones and narrow windows get the same facts from the cards below. -->
-    <div class="hidden lg:block">
-      <Section title={m.topology_title()}>
-        <TopologyDiagram
-          model={topology}
-          uplinks={events.uplinks.data}
-          ipv6={ipv6.data?.enabled}
-          resources={resources.data}
-          status={{
-            uplinks: events.uplinks.status,
-            connectivity: connectivity.status,
-            throughput: throughput.status,
-            clients: events.clients.status,
-            vpn: vpn.status,
-          }}
-        />
-      </Section>
-    </div>
-
-    <!-- From lg the map carries the uplinks (details on hover), so the cards are phone-only. -->
-    <div class="lg:hidden">
-      <UplinkCards
-        sources={topology.sources}
-        uplinks={events.uplinks}
-        status={{ connectivity: connectivity.status, throughput: throughput.status }}
+  <!-- The map needs width; phones and narrow windows get the same facts from the cards below. -->
+  <div class="hidden lg:block">
+    <Section title={m.topology_title()}>
+      <TopologyDiagram
+        model={topology}
+        uplinks={events.uplinks.data}
+        ipv6={ipv6.data?.enabled}
+        resources={resources.data}
+        status={{
+          uplinks: events.uplinks.status,
+          connectivity: connectivity.status,
+          throughput: throughput.status,
+          clients: events.clients.status,
+          vpn: vpn.status,
+        }}
       />
-    </div>
+    </Section>
+  </div>
+
+  <!-- From lg the map carries the uplinks (details on hover), so the cards are phone-only. -->
+  <div class="lg:hidden">
+    <UplinkCards
+      sources={topology.sources}
+      uplinks={events.uplinks}
+      status={{ connectivity: connectivity.status, throughput: throughput.status }}
+    />
   </div>
 
   <div class="flex flex-col gap-3">

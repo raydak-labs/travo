@@ -39,7 +39,7 @@ const pages: [string, () => string, string[]][] = [
   [
     'Dashboard',
     () => render(Dashboard, { props: { events: dashboardEvents as never } }).body,
-    ['Connections', 'Status', 'Traffic'],
+    ['Status', 'Traffic'],
   ],
   [
     'Internet',
@@ -74,5 +74,10 @@ describe('page category headings', () => {
     expect(levels[0]).toBe(1);
     for (let i = 1; i < levels.length; i++)
       expect(levels[i]).toBeLessThanOrEqual((levels[i - 1] ?? 0) + 1);
+  });
+
+  it('Dashboard opens with the network map card, no group heading above it', () => {
+    const body = render(Dashboard, { props: { events: dashboardEvents as never } }).body;
+    expect(headings(body).filter((h) => h.level === 2)[0]?.text).toBe('Network map');
   });
 });
