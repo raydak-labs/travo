@@ -2,6 +2,52 @@
 
 Versions 0.1.0 to 0.5.0 below are releases of travo-greenfield, the rewrite that became Travo 0.11.0. Travo 0.10.3 and earlier are described in their [GitHub releases](https://github.com/raydak-labs/travo/releases); their code is on the `legacy` branch.
 
+## [0.14.0](https://github.com/raydak-labs/travo/compare/v0.13.0...v0.14.0) (2026-11-27)
+
+
+### Features
+
+* **scripts:** attach only marked screenshots and box chosen selectors ([968dbe7](https://github.com/raydak-labs/travo/commit/968dbe7cc9d4049f77c9f598523942bd99fcfc3d))
+* **web:** add category headings to multi-category pages ([86ecc70](https://github.com/raydak-labs/travo/commit/86ecc70b14e34a43726e7af4f7222af690b65068))
+* **web:** add GitHub repository link to header menu ([596a42f](https://github.com/raydak-labs/travo/commit/596a42f8a7c346640b046cb93c9480300dd543e1))
+* **web:** add Notice for page-level messages with tone icons ([08fc5bd](https://github.com/raydak-labs/travo/commit/08fc5bd63b787c8236d7ffd39a5e814742ef7965))
+* **web:** add Tailscale switch to Dashboard Quick status and align VPN row ([0e0aa9a](https://github.com/raydak-labs/travo/commit/0e0aa9a8b460ea5e89075053062ec07aaa2f8ef5))
+* **web:** drop the UI size limits ([32656b9](https://github.com/raydak-labs/travo/commit/32656b9e41e2f572f9da331c501528cf035b49c4))
+* **web:** move long AdGuard descriptions behind an InfoTip ([96e6241](https://github.com/raydak-labs/travo/commit/96e6241a68ddbf268328004cd804b4886b96b86a))
+* **web:** polish WiFi connect dialog scan header and results list ([96af474](https://github.com/raydak-labs/travo/commit/96af47405388af3a1c243aeb2d7ced84134d6db9))
+* **web:** stretch cards to equal height per row ([5e5fb13](https://github.com/raydak-labs/travo/commit/5e5fb13d4adfe8220e94ce0c21ebd365f0b33c6b))
+* **web:** unify page-header toggle control and align header actions ([db2e6c3](https://github.com/raydak-labs/travo/commit/db2e6c30c2e567a1c16b8755abe9647ef1ce8e0a))
+
+
+### Bug Fixes
+
+* **scripts:** refuse a screenshot-diff flag without a value ([fc9d3ee](https://github.com/raydak-labs/travo/commit/fc9d3ee808ce8529d5f173591a857f02b7ddd95f))
+* **scripts:** say a marked element is not visible, not that none matched ([c8418c9](https://github.com/raydak-labs/travo/commit/c8418c9e98c143a13a20e7e2de52b273f2406110))
+* **scripts:** warn about screenshot marks that box nothing ([90c2843](https://github.com/raydak-labs/travo/commit/90c284325597bc63208c1b97d69339b51140ff3d))
+* **web:** address review notes on header toggle and docs ([784676d](https://github.com/raydak-labs/travo/commit/784676ddcfda26f55ae868bd080ff7f377825495))
+* **web:** bring the e2e component flows back in line with the UI ([03de135](https://github.com/raydak-labs/travo/commit/03de13584d65bebcfdc80005ad5a76a678786a3f))
+* **web:** drop the group heading above the dashboard network map ([ab032bb](https://github.com/raydak-labs/travo/commit/ab032bb309028fdb2c7b6789a877f8d2b884ff87))
+* **web:** keep the Tailscale result toast when its switch remounts ([47ee48b](https://github.com/raydak-labs/travo/commit/47ee48b8485dc43661f1fcd2e5c4bfb9db5051cd))
+* **web:** keep tight spacing in the LAN address move notice ([39747db](https://github.com/raydak-labs/travo/commit/39747db468a96b2b3302a38c8aa66462a3cf08c8))
+* **web:** let the page own the Tailscale control, not the switch ([2469777](https://github.com/raydak-labs/travo/commit/2469777ea34e51d5a0aeb9737d94ac994c2544cc))
+* **web:** make the shadcn open and close animations work ([ffabf1d](https://github.com/raydak-labs/travo/commit/ffabf1d2752eefd9de91d59668bc8dab2b0387cd))
+* **web:** name the InfoTip popover and cover its keyboard flow ([f5b1e6b](https://github.com/raydak-labs/travo/commit/f5b1e6bbadfbc1673a3ad7343438cc12955aaf3b))
+* **web:** render WiFi scan rows on two fixed lines ([d3eeba7](https://github.com/raydak-labs/travo/commit/d3eeba7900061a0dfd1087f5733cb944c73bdb3e))
+* **web:** show long SSIDs in full in the scan list ([0bd171f](https://github.com/raydak-labs/travo/commit/0bd171f9dde3f4296aaee92625facfbeb4d71e14))
+
+
+### Refactoring
+
+* **web:** reuse the Tailscale control on the Tailscale page ([bca2241](https://github.com/raydak-labs/travo/commit/bca224185015818a4e9dd5860bcff2852ec1d3cd))
+
+
+### Documentation
+
+* correct the size-limit history and drop stale budget notes ([d67164c](https://github.com/raydak-labs/travo/commit/d67164c03caea4ccc36602dc79858f2b2f8bab76))
+* document web component and library reuse policy ([9e1134a](https://github.com/raydak-labs/travo/commit/9e1134a9c5a0cfcbfd7c9ae79cb69a23e2da1134))
+* record operating modes as out of scope ([71785a2](https://github.com/raydak-labs/travo/commit/71785a2690c9b9a2d4a45ec4b07b84bb3a4ac2aa))
+* state the measured size headroom in ADR 0036 ([0955889](https://github.com/raydak-labs/travo/commit/0955889e4bad3518c608827077578db78b1a6e7c))
+
 ## [0.13.0](https://github.com/raydak-labs/travo/compare/v0.12.0...v0.13.0) (2026-11-27)
 
 
