@@ -4,6 +4,7 @@ import { tailscalePhase } from '../api/tailscale';
 import { formatBitRate } from '../format';
 import { m } from '../paraglide/messages.js';
 import { href } from '../router';
+import type { TailscaleControl } from '../tailscale-control.svelte';
 import type { TopologyModel } from '../topology';
 import { internetChip } from '../topology-labels';
 import LinkRow from '../ui/LinkRow.svelte';
@@ -25,12 +26,14 @@ let {
   vpn,
   tunnel,
   tailscale,
+  tailscaleControl,
 }: {
   model: TopologyModel;
   status: Record<Part, LoadStatus>;
   vpn: { status: LoadStatus; data?: TunnelStatus; retry: () => void };
   tunnel: TunnelControl;
   tailscale: { status: LoadStatus; data?: TailscaleStatus; retry: () => void };
+  tailscaleControl: TailscaleControl;
 } = $props();
 
 const active = $derived(model.sources.find((s) => s.state === 'active'));
@@ -86,7 +89,7 @@ const tailscaleDescription = $derived(
           <LoadState status={tailscale.status} retry={tailscale.retry} stale={tailscale.data !== undefined}>
             {#if tailscale.data?.installed}
               <TailscaleSwitch id="dashboard-tailscale-switch" status={tailscale.data}
-                disabled={tailscale.status.state !== 'ready'} refresh={tailscale.retry} />
+                control={tailscaleControl} disabled={tailscale.status.state !== 'ready'} />
             {/if}
           </LoadState>
         {/snippet}

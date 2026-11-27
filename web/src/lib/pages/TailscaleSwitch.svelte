@@ -1,25 +1,22 @@
 <script lang="ts">
-import { onDestroy } from 'svelte';
 import Switch from '$lib/components/ui/switch/switch.svelte';
 import type { TailscaleStatus } from '../api/gen';
 import { m } from '../paraglide/messages.js';
-import { createTailscaleToggle } from '../tailscale-toggle.svelte';
+import type { TailscaleControl } from '../tailscale-control.svelte';
 
 let {
   id,
   status,
+  control,
   disabled = false,
-  refresh,
 }: {
   id: string;
   status: TailscaleStatus;
+  control: TailscaleControl;
   disabled?: boolean;
-  refresh: () => void | Promise<void>;
 } = $props();
-
-const control = createTailscaleToggle(() => refresh());
-onDestroy(control.stop);
 </script>
 
-<Switch {id} aria-label={m.tailscale_running_label()} disabled={control.pending || disabled || status.busy}
-  bind:checked={() => status.running, (on) => void control.toggle(on)} />
+<Switch {id} aria-label={m.tailscale_running_label()}
+  disabled={control.pending !== undefined || disabled || status.busy}
+  bind:checked={() => status.running, (on) => void control.change(on ? 'on' : 'off')} />

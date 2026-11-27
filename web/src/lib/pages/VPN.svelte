@@ -7,6 +7,7 @@ import { fetchVpnStatus } from '../api/vpn-status';
 import { formatUptime } from '../format';
 import { m } from '../paraglide/messages.js';
 import { href } from '../router';
+import { createTailscaleControl } from '../tailscale-control.svelte';
 import CardGrid from '../ui/CardGrid.svelte';
 import LinkRow from '../ui/LinkRow.svelte';
 import LoadState from '../ui/LoadState.svelte';
@@ -31,11 +32,13 @@ const profiles = createLoader(async (signal) => {
 });
 const tailscale = createLoader(fetchTailscale, 10000);
 const tunnel = createTunnelControl(() => status.retry());
+const tailscaleControl = createTailscaleControl(() => tailscale.retry());
 onDestroy(() => {
   status.stop();
   profiles.stop();
   tailscale.stop();
   tunnel.stop();
+  tailscaleControl.stop();
 });
 
 const wireguardHint = $derived.by(() => {
@@ -80,7 +83,7 @@ const tailscaleHint = $derived.by(() => {
             {#if tailscale.data}
               {@const st = tailscale.data}
               {#if st.installed}
-                <TailscaleSwitch id="vpn-tailscale-switch" status={st} disabled={tailscale.status.state !== 'ready'} refresh={tailscale.retry} />
+                <TailscaleSwitch id="vpn-tailscale-switch" status={st} control={tailscaleControl} disabled={tailscale.status.state !== 'ready'} />
               {:else}
                 <Status kind="neutral">{m.tailscale_state_absent()}</Status>
               {/if}

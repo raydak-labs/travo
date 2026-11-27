@@ -9,6 +9,7 @@ import { captiveCardVisible } from '../captive';
 import type { dashboardEvents } from '../dashboard-events.svelte';
 import { m } from '../paraglide/messages.js';
 import { connectHref } from '../router';
+import { createTailscaleControl } from '../tailscale-control.svelte';
 import { topologyModel } from '../topology';
 import CardGrid from '../ui/CardGrid.svelte';
 import GroupHeading from '../ui/GroupHeading.svelte';
@@ -42,6 +43,7 @@ const vpn = createLoader(fetchVpnStatus, 10000);
 // IPv6 is a setting, not live state: read it once for the map badge.
 const ipv6 = createLoader(fetchIPv6);
 const tunnel = createTunnelControl(() => vpn.retry());
+const tailscaleControl = createTailscaleControl(() => events.tailscale.retry());
 const topology = $derived(
   topologyModel({
     uplinks: events.uplinks.data,
@@ -57,6 +59,7 @@ onDestroy(() => {
   vpn.stop();
   ipv6.stop();
   tunnel.stop();
+  tailscaleControl.stop();
 });
 
 let trafficOpen = $state(false);
@@ -117,6 +120,7 @@ let trafficOpen = $state(false);
         {vpn}
         {tunnel}
         {tailscale}
+        {tailscaleControl}
       />
       <SystemCard {resources} alerts={events.alerts.data?.alerts ?? []} />
     </CardGrid>
