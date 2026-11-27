@@ -6,6 +6,7 @@ import Switch from '$lib/components/ui/switch/switch.svelte';
 import { type AdGuardAction, adguardUrl, changeAdGuard, fetchAdGuard } from '../api/adguard';
 import { m } from '../paraglide/messages.js';
 import CardGrid from '../ui/CardGrid.svelte';
+import InfoTip from '../ui/InfoTip.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import Notice from '../ui/Notice.svelte';
@@ -81,7 +82,10 @@ const proxy = adguardUrl(window.location);
           </Notice>
         {/if}
         {#if !st.installed}
-          <p class="text-sm text-muted-foreground">{m.adguard_absent_body()}</p>
+          <div class="flex items-center gap-1">
+            <p class="text-sm text-muted-foreground">{m.adguard_absent_short()}</p>
+            <InfoTip topic={m.adguard_title()} text={m.adguard_absent_body()} />
+          </div>
           <Button variant="outline" size="sm" type="button" class="self-start" disabled={pending !== undefined || st.busy} onclick={() => change('install', true)}>{m.adguard_install()}</Button>
         {:else}
           <div>

@@ -20,6 +20,9 @@ describe('DoH card', () => {
     const body = render(DoHCard).body;
     expect(body).toContain('Encrypted upstream');
     expect(body).toContain('Cloudflare');
+    expect(body).toContain('Encrypts the lookups AdGuard Home sends upstream.');
+    expect(body).toContain('aria-label="More about DNS over HTTPS"');
+    expect(body).not.toContain('captive-portal bypass');
   });
 
   it('validates like the daemon', () => {

@@ -6,17 +6,21 @@ import Content from '$lib/components/ui/card/card-content.svelte';
 import Description from '$lib/components/ui/card/card-description.svelte';
 import Footer from '$lib/components/ui/card/card-footer.svelte';
 import Header from '$lib/components/ui/card/card-header.svelte';
+import InfoTip from './InfoTip.svelte';
 
 // One card surface per page section; its title is the section's h2 (PageHeader owns the h1).
 let {
   title,
   description,
+  info,
   actions,
   footer,
   children,
 }: {
   title: string;
   description?: string;
+  /** The longer explanation behind an info button beside the title. */
+  info?: string;
   actions?: Snippet;
   /** Bottom right of the card: the one Save of an edit form. */
   footer?: Snippet;
@@ -28,7 +32,14 @@ const headingId = $props.id();
 <!-- Phones get the compact card spacing so content keeps most of the 390 px width. -->
 <Root role="region" aria-labelledby={headingId} class="h-full gap-4 max-sm:[--card-spacing:--spacing(4)]">
   <Header>
-    <h2 id={headingId} class="text-base leading-normal font-semibold">{title}</h2>
+    {#if info}
+      <div class="flex items-center gap-1">
+        <h2 id={headingId} class="text-base leading-normal font-semibold">{title}</h2>
+        <InfoTip topic={title} text={info} />
+      </div>
+    {:else}
+      <h2 id={headingId} class="text-base leading-normal font-semibold">{title}</h2>
+    {/if}
     {#if description}<Description>{description}</Description>{/if}
     {#if actions}<Action class="flex flex-wrap gap-2">{@render actions()}</Action>{/if}
   </Header>

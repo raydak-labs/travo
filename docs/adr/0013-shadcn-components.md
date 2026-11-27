@@ -8,9 +8,9 @@ devDependency is 1.8.1. Reapply with
 That writes the registry source into `web/src/lib/components/ui`. The installed
 set is button, input, label, textarea, card, badge, alert, skeleton, table,
 collapsible, dialog, sheet, alert-dialog, and sonner (#170), dropdown-menu and select
-(#330), switch, hover-card and checkbox (UI structure v2). The registry switch and checkbox style their states with
+(#330), switch, hover-card and checkbox (UI structure v2), popover (InfoTip). The registry switch and checkbox style their states with
 `data-checked:` / `data-unchecked:`, which bits-ui 2.21 does not set; the copies use
-`data-[state=checked]:` / `data-[state=unchecked]:` instead, so reapply that after a reinstall. Adding a component
+`data-[state=checked]:` / `data-[state=unchecked]:` instead, and popover-content uses `data-[state=open]:` / `data-[state=closed]:` for the same reason, so reapply that after a reinstall. Adding a component
 re-offers `button`; keep the app's button (disabled anchor rule below) instead of
 overwriting it. The sonner wrapper takes the app's `data-theme` value as `theme`
 instead of `mode-watcher`, which is not installed. Pages use these through the
