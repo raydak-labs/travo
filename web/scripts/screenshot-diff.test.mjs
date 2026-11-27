@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { attachable, boxes, indexLines, pairUp, parseArgs } from './screenshot-diff.mjs';
+import {
+  attachable,
+  boxes,
+  indexLines,
+  markWarnings,
+  pairUp,
+  parseArgs,
+} from './screenshot-diff.mjs';
 import { parseMarks, rectsPath, shotKey, toShotRects } from './screenshot-marks.mjs';
 
 describe('screenshot diff', () => {
@@ -93,6 +100,21 @@ describe('screenshot diff', () => {
     const marks = { dashboard: ['main'] };
     expect(attachable('dashboard-1280-light.png', marks)).toBe(true);
     expect(attachable('system-reboot-dialog-1280-light.png', marks)).toBe(false);
+  });
+
+  it('warns about marks that box nothing', () => {
+    const marks = { dashboard: ['main'], wifi: ['#nope'], typo: ['main'] };
+    const shots = ['dashboard-1280-light.png', 'wifi-1280-light.png', 'wifi-1280-light.marks.json'];
+    expect(
+      markWarnings(marks, shots, [
+        { name: 'dashboard-1280-light.png', attached: true, regions: 1 },
+        { name: 'wifi-1280-light.png', attached: true, regions: 0 },
+      ]),
+    ).toEqual([
+      'marks key "typo" matches no screenshot',
+      'wifi-1280-light.png: no marked selector matched an element, so nothing is boxed',
+    ]);
+    expect(markWarnings(undefined, shots, [])).toEqual([]);
   });
 
   it('lists unattached changes in the index so they can be explained', () => {

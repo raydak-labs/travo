@@ -100,6 +100,20 @@ export function indexLines({ changed, added, removed, unchanged, marked }) {
   ];
 }
 
+/** Marks that box nothing: a key no shot has, or an attached shot whose selectors matched no element. */
+export function markWarnings(marks, shotNames, attached) {
+  if (marks === undefined) return [];
+  const keys = new Set(shotNames.map(shotKey));
+  return [
+    ...Object.keys(marks)
+      .filter((key) => !keys.has(key))
+      .map((key) => `marks key "${key}" matches no screenshot`),
+    ...attached
+      .filter((c) => c.regions === 0)
+      .map((c) => `${c.name}: no marked selector matched an element, so nothing is boxed`),
+  ];
+}
+
 const BLOCK = 8;
 
 // Runs in the page: decodes both PNGs, lists changed 8 px blocks.
@@ -200,7 +214,7 @@ async function main() {
       const rects = [marks ? markedRects(args.head, name) : []];
       const png = await chrome.evaluate(composeJs(a, null, w, h, rects, ['New']));
       writeFileSync(join(args.out, name), Buffer.from(png, 'base64'));
-      fresh.push({ name, attached: true });
+      fresh.push({ name, attached: true, regions: rects[0].length });
     }
   } finally {
     chrome.close();
@@ -214,6 +228,9 @@ async function main() {
   });
   writeFileSync(join(args.out, 'index.md'), lines.join('\n'));
   console.log(lines[2]);
+  const attached = [...changed, ...fresh].filter((c) => c.attached);
+  for (const warning of markWarnings(marks, readdirSync(args.head), attached))
+    console.warn(`warning: ${warning}`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
