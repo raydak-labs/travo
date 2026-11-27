@@ -1,5 +1,4 @@
 <script lang="ts">
-import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import * as Dialog from '$lib/components/ui/dialog';
 import Input from '$lib/components/ui/input/input.svelte';
@@ -7,6 +6,7 @@ import Label from '$lib/components/ui/label/label.svelte';
 import type { ApiTokenCreated } from '../api/gen';
 import { copyText } from '../clipboard';
 import { m } from '../paraglide/messages.js';
+import Notice from '../ui/Notice.svelte';
 
 // Shows a freshly created token's secret exactly once. Closing drops it from memory.
 let { created, close }: { created: ApiTokenCreated | undefined; close: () => void } = $props();
@@ -45,7 +45,7 @@ function onOpenChange(open: boolean) {
       </Label>
     {/if}
     {#if copied === false}
-      <Alert class="status status-danger">{m.tokens_copy_failed()}</Alert>
+      <Notice tone="danger">{m.tokens_copy_failed()}</Notice>
     {/if}
     <div class="flex justify-end gap-2">
       <Button variant="outline" type="button" onclick={copy}>

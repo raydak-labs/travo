@@ -1,5 +1,4 @@
 <script lang="ts">
-import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
@@ -7,6 +6,7 @@ import { phraseMatches, RESET_PHRASE, requestFactoryReset } from '../api/factory
 import { m } from '../paraglide/messages.js';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import Notice from '../ui/Notice.svelte';
 import { notify } from '../ui/notify';
 import Section from '../ui/Section.svelte';
 
@@ -39,7 +39,7 @@ async function reset(event: SubmitEvent) {
 
 <Section title={m.reset_section()} description={started ? undefined : m.reset_intro()}>
   {#if started}
-    <Alert class="status status-danger" role="status" aria-live="polite">{m.reset_started()}</Alert>
+    <Notice tone="danger" role="status" aria-live="polite">{m.reset_started()}</Notice>
   {:else}
     <form class="flex flex-wrap items-end justify-between gap-3" onsubmit={reset}>
       <Label class="grid w-full max-w-sm gap-1">

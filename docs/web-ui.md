@@ -78,6 +78,7 @@ reimplementation only when it fits `web/scripts/size-budget.mjs` and the ADRs
 | `HeaderToggle` | The on/off switch of a page's subject in the `PageHeader` actions: label, state chip (and stale chip) and `Switch` in one bordered control, as high as a small button. |
 | `GroupHeading` | The only subheading. `level={2}` names a page-level category group above its `Section`s or `CardGrid` (Dashboard, Internet, LAN, Diagnostics); the default `level={3}` names a group inside a section or a summary tile. Heading levels never skip. |
 | `SummaryBand` / `SummaryTile` | The flat status tiles between the header and the first section. Each tile has its own load fallback, so one failed value never blanks the others. |
+| `Notice` | A page-level message: a tone (`info`, `ok`, `warn`, `danger`) with its icon, an optional `title`, the text and optional `actions` (right of the text from `sm`, below it on phones). `info` and `ok` are `role="status"`; `warn` and `danger` are `role="alert"` unless the caller passes a calmer role. Page-level messages always use `Notice`, never the raw shadcn `Alert` or the `.status` chip classes. |
 | `EmptyState` | "Nothing here yet" content: icon, title, optional text and the add action. A failed load is never empty: `LoadState` shows that. |
 
 ### Width

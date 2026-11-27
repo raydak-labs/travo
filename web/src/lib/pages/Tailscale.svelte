@@ -4,7 +4,6 @@ import ExternalLink from '@lucide/svelte/icons/external-link';
 import LogIn from '@lucide/svelte/icons/log-in';
 import LogOut from '@lucide/svelte/icons/log-out';
 import { onDestroy } from 'svelte';
-import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import { fetchTailscale, tailscalePhase } from '../api/tailscale';
 import { m } from '../paraglide/messages.js';
@@ -14,6 +13,7 @@ import { createConfirm } from '../ui/confirm.svelte';
 import HeaderToggle from '../ui/HeaderToggle.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import Notice from '../ui/Notice.svelte';
 import PageHeader from '../ui/PageHeader.svelte';
 import Section from '../ui/Section.svelte';
 import SettingsRow from '../ui/SettingsRow.svelte';
@@ -71,7 +71,7 @@ const phaseStatus = tailscaleStates;
       {@const st = ts.data}
       {@const phase = tailscalePhase(st)}
       {#if st.installed && st.prefs.accept_dns}
-        <Alert class="text-danger" role="alert">{m.tailscale_accept_dns_warning()}</Alert>
+        <Notice tone="danger">{m.tailscale_accept_dns_warning()}</Notice>
       {/if}
       {#if !st.installed}
         <Section title={m.tailscale_about_title()} description={m.tailscale_absent_body()} />

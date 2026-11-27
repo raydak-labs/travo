@@ -1,6 +1,5 @@
 <script lang="ts">
 import FileUp from '@lucide/svelte/icons/file-up';
-import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import Input from '$lib/components/ui/input/input.svelte';
 import Label from '$lib/components/ui/label/label.svelte';
@@ -19,6 +18,7 @@ import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import Notice from '../ui/Notice.svelte';
 import { notify } from '../ui/notify';
 import Section from '../ui/Section.svelte';
 import SettingsRow from '../ui/SettingsRow.svelte';
@@ -84,7 +84,7 @@ async function flash(event: SubmitEvent) {
 
 <Section title={m.firmware_title()}>
   {#if started || status.data?.pending}
-    <Alert class="status status-danger" role="status" aria-live="polite">{m.firmware_started()}</Alert>
+    <Notice tone="danger" role="status" aria-live="polite">{m.firmware_started()}</Notice>
   {:else}
     <p class="text-muted-foreground">{m.firmware_intro()}</p>
     <LoadState status={status.status} retry={status.retry} stale={status.data !== undefined}>
@@ -122,7 +122,7 @@ async function flash(event: SubmitEvent) {
           <dt class="text-muted-foreground">{m.firmware_sha()}</dt>
           <dd class="break-all font-mono text-sm">{image.sha256}</dd>
         </dl>
-        <Alert class="status status-warn" role="note">
+        <Notice tone="warn" role="note">
           {#if !image.packages_known}
             {m.firmware_packages_unknown()}
           {:else if image.dropped_packages.length === 0}
@@ -133,7 +133,7 @@ async function flash(event: SubmitEvent) {
               {#each image.dropped_packages as name (name)}<li class="break-all">{name}</li>{/each}
             </ul>
           {/if}
-        </Alert>
+        </Notice>
         {#if image.validation.valid}
           <form class="flex flex-col gap-3" onsubmit={flash}>
             <label class="flex items-center gap-2">
