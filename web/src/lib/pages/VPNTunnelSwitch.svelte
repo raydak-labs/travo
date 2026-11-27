@@ -4,6 +4,8 @@ import type { TunnelStatus } from '../api/gen';
 import { m } from '../paraglide/messages.js';
 import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
+import HeaderToggle from '../ui/HeaderToggle.svelte';
+import type { StatusKind } from '../ui/status';
 import { transactionToast } from '../ui/transaction-toast.svelte';
 import { controlPhase, type TunnelControl, tunnelEnabled } from '../vpn-tunnel.svelte';
 
@@ -14,7 +16,15 @@ let {
   snapshot,
   control,
   canEnable,
-}: { id: string; snapshot: TunnelStatus; control: TunnelControl; canEnable: boolean } = $props();
+  header,
+}: {
+  id: string;
+  snapshot: TunnelStatus;
+  control: TunnelControl;
+  canEnable: boolean;
+  /** In a PageHeader: the switch with its label and state chip as one HeaderToggle. */
+  header?: { label: string; status: string; kind: StatusKind; title?: string };
+} = $props();
 
 transactionToast(
   'vpn-tunnel',
@@ -38,10 +48,21 @@ async function change(on: boolean) {
 }
 </script>
 
-<Switch
-  {id}
-  aria-label={m.vpn_tunnel()}
-  bind:checked={() => enabled, (on) => void change(on)}
-  disabled={control.busy || snapshot.stale || (!enabled && !canEnable)}
-/>
+{#if header}
+  <HeaderToggle
+    {id}
+    {...header}
+    stale={snapshot.stale}
+    checked={enabled}
+    disabled={control.busy || snapshot.stale || (!enabled && !canEnable)}
+    onchange={(on) => void change(on)}
+  />
+{:else}
+  <Switch
+    {id}
+    aria-label={m.vpn_tunnel()}
+    bind:checked={() => enabled, (on) => void change(on)}
+    disabled={control.busy || snapshot.stale || (!enabled && !canEnable)}
+  />
+{/if}
 <ConfirmDialog {confirm} />

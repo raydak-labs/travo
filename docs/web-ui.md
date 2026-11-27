@@ -67,10 +67,11 @@ a heading or row spacing. Controls are the copied shadcn-svelte components
 
 | Component | Use it for |
 |---|---|
-| `PageHeader` | The top of every page: `title` (the page's one `h1`), optional `description` and `actions` (right of the title from `sm`, below it on phones). |
+| `PageHeader` | The top of every page: `title` (the page's one `h1`), optional `description` and `actions` (vertically centred in one row, right of the title from `sm`, below it on phones). |
 | `Section` | Each block of the page: one card surface with an `h2` `title`, optional `description`, `actions` (top right of the card) and `footer` (bottom right: the Save of an edit form). There is no other card wrapper. |
 | `SettingsRow` | One setting, fact or form field inside a `Section`: `label` and `description` left, the `control` snippet right from `sm`, stacked on phones. Pass `for` when the control has an id. Consecutive rows get a divider by themselves. |
 | `LinkRow` | A `SettingsRow` that opens another page: the whole row is the link and ends in a chevron; an optional switch or value sits before the chevron and does not follow the link. |
+| `HeaderToggle` | The on/off switch of a page's subject in the `PageHeader` actions: label, state chip (and stale chip) and `Switch` in one bordered control, as high as a small button. |
 | `GroupHeading` | The only subheading (`h3`), for a group inside a section or a summary tile. |
 | `SummaryBand` / `SummaryTile` | The flat status tiles between the header and the first section. Each tile has its own load fallback, so one failed value never blanks the others. |
 | `EmptyState` | "Nothing here yet" content: icon, title, optional text and the add action. A failed load is never empty: `LoadState` shows that. |
@@ -89,7 +90,7 @@ what stays narrow is the control:
   many rows stay outside it at full width (DNS names, data usage, interfaces).
 - A page whose subject can be switched on or off carries that switch, its state chip and its
   one main action in the **page header** (WireGuard: tunnel; Tailscale: on/off plus Log in or
-  Log out; AdGuard Home: running). No card repeats them; cards hold only what adds to it.
+  Log out; AdGuard Home: running). The switch and its chip are one `HeaderToggle`. No card repeats them; cards hold only what adds to it.
 - A card whose only control is one switch (all LEDs, night mode) puts the switch in its header
   and the state in its description, instead of a row that repeats the card title.
 
