@@ -4,14 +4,10 @@ import Button from '$lib/components/ui/button/button.svelte';
 import * as Popover from '$lib/components/ui/popover';
 import { m } from '../paraglide/messages.js';
 
-let {
-  topic,
-  text,
-  open = $bindable(false),
-}: { topic: string; text: string; open?: boolean } = $props();
+let { topic, text }: { topic: string; text: string } = $props();
 </script>
 
-<Popover.Root bind:open>
+<Popover.Root>
   <Popover.Trigger>
     {#snippet child({ props })}
       <Button {...props} variant="ghost" size="icon-xs" type="button" class="text-muted-foreground"
@@ -20,5 +16,5 @@ let {
       </Button>
     {/snippet}
   </Popover.Trigger>
-  <Popover.Content class="w-72 max-w-[calc(100vw-2rem)] text-sm leading-relaxed">{text}</Popover.Content>
+  <Popover.Content role="dialog" aria-label={topic} class="w-72 max-w-[calc(100vw-2rem)] text-sm leading-relaxed">{text}</Popover.Content>
 </Popover.Root>
