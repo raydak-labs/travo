@@ -137,7 +137,7 @@ async function change(action: 'import' | 'select' | 'delete', id = '', label = n
         {@const snapshot = status.data}
         {@const badge = tunnelStates[snapshot.state]}
         <VPNTunnelSwitch id="wireguard-tunnel-switch" {snapshot} control={tunnel} canEnable={Boolean(profiles.data?.selected_id)}
-          header={{ label: m.vpn_tunnel(), status: badge.label(), kind: badge.kind, title: tunnelHint ?? '' }} />
+          header={{ label: m.vpn_tunnel(), status: badge.label(), kind: badge.kind, title: tunnelHint }} />
       {/if}
     {/snippet}
   </PageHeader>
