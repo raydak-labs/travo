@@ -100,7 +100,7 @@ export function indexLines({ changed, added, removed, unchanged, marked }) {
   ];
 }
 
-/** Marks that box nothing: a key no shot has, or an attached shot whose selectors matched no element. */
+/** Marks that box nothing: a key no shot has, or an attached shot in which no marked element is visible. */
 export function markWarnings(marks, shotNames, attached) {
   if (marks === undefined) return [];
   const keys = new Set(shotNames.map(shotKey));
@@ -110,7 +110,7 @@ export function markWarnings(marks, shotNames, attached) {
       .map((key) => `marks key "${key}" matches no screenshot`),
     ...attached
       .filter((c) => c.regions === 0)
-      .map((c) => `${c.name}: no marked selector matched an element, so nothing is boxed`),
+      .map((c) => `${c.name}: no marked element is visible in the head shot`),
   ];
 }
 

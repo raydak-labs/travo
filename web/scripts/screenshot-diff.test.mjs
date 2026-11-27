@@ -112,7 +112,7 @@ describe('screenshot diff', () => {
       ]),
     ).toEqual([
       'marks key "typo" matches no screenshot',
-      'wifi-1280-light.png: no marked selector matched an element, so nothing is boxed',
+      'wifi-1280-light.png: no marked element is visible in the head shot',
     ]);
     expect(markWarnings(undefined, shots, [])).toEqual([]);
   });
