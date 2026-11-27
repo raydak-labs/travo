@@ -30,7 +30,7 @@ description = "Install web dependencies from the lockfile (shared so parallel ta
 run = "pnpm -C web install --frozen-lockfile"
 
 [tasks."check:web"]
-description = "Web: biome, svelte-check, vitest, build, size budget"
+description = "Web: biome, svelte-check, vitest, build, size report"
 depends = ["web:install", "gen"] # gen first: check reads src/lib/api/gen
 run = "pnpm -C web check"
 

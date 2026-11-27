@@ -204,7 +204,7 @@ Record each check as pass or fail in SPIKES.md ("Captive portal joint session") 
 
 ## Web
 
-`pnpm -C web check`: Biome, svelte-check, Vitest (pure logic and server-rendered components), build, UI size budget. Visual and keyboard behaviour (theme, drawer, focus) is checked in headless Chrome at 390 px and 1280 px before a UI PR.
+`pnpm -C web check`: Biome, svelte-check, Vitest (pure logic and server-rendered components), build, UI size report. Visual and keyboard behaviour (theme, drawer, focus) is checked in headless Chrome at 390 px and 1280 px before a UI PR.
 
 **Screenshots.** A PR that changes what the UI shows carries before/after images of the views it means to change, and only those:
 

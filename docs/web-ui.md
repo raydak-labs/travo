@@ -66,8 +66,8 @@ a heading or row spacing. Controls are the copied shadcn-svelte components
 ([ADR 0013](adr/0013-shadcn-components.md)); a hand-made control needs a measured reason there.
 Reuse these and the copied shadcn-svelte components instead of adding a duplicate; a new component
 is only for behaviour none of them provides. An established library beats a hand-rolled
-reimplementation only when it fits `web/scripts/size-budget.mjs` and the ADRs
-([ADR 0004](adr/0004-frontend-stack.md), [ADR 0013](adr/0013-shadcn-components.md)).
+reimplementation when the ADRs allow it
+([ADR 0004](adr/0004-frontend-stack.md), [ADR 0013](adr/0013-shadcn-components.md), [ADR 0036](adr/0036-no-ui-size-limits.md)).
 
 | Component | Use it for |
 |---|---|
@@ -228,7 +228,7 @@ first. The page header holds Connect to WiFi as an outline action.
 ## Page rules
 
 - Svelte 5 SPA, dark by default without a flash (a stored choice can switch to light), English via Paraglide.
-- Size budgets (`web/scripts/size-budget.mjs`): shell ≤ 128 KB gzip, route chunk ≤ 24 KB, total ≤ 320 KB. One chunk per route: a page imports its cards statically ([ADR 0004](adr/0004-frontend-stack.md)).
+- Size report (`web/scripts/size-report.mjs`): prints shell, total and per-chunk gzip sizes on every build with no enforced limit ([ADR 0036](adr/0036-no-ui-size-limits.md)). One chunk per route: a page imports its cards statically ([ADR 0004](adr/0004-frontend-stack.md)).
 - Use the copied shadcn-svelte primitives for applicable controls. Keep the app wrapper contracts, semantic tokens and localization; record measured exceptions in [ADR 0013](adr/0013-shadcn-components.md).
 - Responsive and mobile-first, route-level code split, vector assets. No CDN or external fonts: the router is often offline.
 - Call only the generated API client; no hand-typed endpoints.

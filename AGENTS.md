@@ -4,7 +4,7 @@ Travel-router web UI and API (Go daemon + Svelte SPA) that runs on OpenWrt next 
 
 ## Verify
 
-`mise run check` green before every commit (Go, web, generated client, size). After API changes run `mise run gen` and commit the result. Hardware-only behaviour is gated by the playbook in `docs/testing.md`.
+`mise run check` green before every commit (Go, web, generated client, binary size). After API changes run `mise run gen` and commit the result. Hardware-only behaviour is gated by the playbook in `docs/testing.md`.
 
 ## Local environment
 
@@ -68,7 +68,7 @@ Same PR, only what the change touches:
 - Names explain what, comments explain why.
 - Refactors keep behaviour and land in their own commit.
 - All OpenWrt access goes through the `Device` / `PackageManager` ports; all live-state changes through the transaction module; all DNS changes through the layer stack.
-- Web: reuse the `web/src/lib/ui/` wrappers and copied shadcn-svelte components before adding a new one (`docs/web-ui.md`, `docs/adr/0013-shadcn-components.md`); prefer an established library over hand-rolled code only when it fits `web/scripts/size-budget.mjs` and the ADRs.
+- Web: reuse the `web/src/lib/ui/` wrappers and copied shadcn-svelte components before adding a new one (`docs/web-ui.md`, `docs/adr/0013-shadcn-components.md`); prefer an established library over hand-rolled code when the ADRs allow it.
 
 ## Stewardship
 

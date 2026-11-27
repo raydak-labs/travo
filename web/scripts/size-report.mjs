@@ -3,14 +3,11 @@ import { join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const KB = 1024;
-const SHELL_LIMIT = 128 * KB;
-const CHUNK_LIMIT = 24 * KB;
-const TOTAL_LIMIT = 320 * KB;
 const TOTAL_ASSET = /\.(html|js|css|svg)$/;
 
 function resolveAsset(reference, importer = 'index.html') {
   if (/^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(reference)) return undefined;
-  const url = new URL(reference, `https://size-budget.invalid/${importer}`);
+  const url = new URL(reference, `https://size-report.invalid/${importer}`);
   return decodeURIComponent(url.pathname.slice(1));
 }
 
@@ -36,8 +33,8 @@ function addStaticImports(source, importer, add) {
   }
 }
 
-/** Check gzip byte sizes without reading the filesystem. Names are relative to dist/. */
-export function checkBudget({ files, html, sources }) {
+/** Measure gzip byte sizes without reading the filesystem. Names are relative to dist/. */
+export function reportSizes({ files, html, sources }) {
   const shellFiles = new Set(['index.html']);
   const pendingScripts = [];
   const addShellFile = (name) => {
@@ -62,20 +59,7 @@ export function checkBudget({ files, html, sources }) {
     .map(([name, bytes]) => ({ name, bytes }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  const violations = [];
-  if (shell > SHELL_LIMIT) {
-    violations.push(`shell ${shell} B exceeds ${SHELL_LIMIT} B (128 KB gzip)`);
-  }
-  for (const { name, bytes } of chunks) {
-    if (bytes > CHUNK_LIMIT) {
-      violations.push(`chunk ${name} ${bytes} B exceeds ${CHUNK_LIMIT} B (24 KB gzip)`);
-    }
-  }
-  if (total > TOTAL_LIMIT) {
-    violations.push(`total ${total} B exceeds ${TOTAL_LIMIT} B (320 KB gzip)`);
-  }
-
-  return { shell, total, chunks, violations };
+  return { shell, total, chunks };
 }
 
 function* walk(dir) {
@@ -103,14 +87,12 @@ function formatKB(bytes) {
 
 function main() {
   const dist = fileURLToPath(new URL('../dist/', import.meta.url));
-  const result = checkBudget(readDist(dist));
-  console.log(`shell ${formatKB(result.shell)} / 128 KB gzip (${result.shell} B)`);
-  console.log(`total ${formatKB(result.total)} / 320 KB gzip (${result.total} B)`);
+  const result = reportSizes(readDist(dist));
+  console.log(`shell ${formatKB(result.shell)} gzip (${result.shell} B)`);
+  console.log(`total ${formatKB(result.total)} gzip (${result.total} B)`);
   for (const { name, bytes } of result.chunks) {
-    console.log(`chunk ${name} ${formatKB(bytes)} / 24 KB gzip (${bytes} B)`);
+    console.log(`chunk ${name} ${formatKB(bytes)} gzip (${bytes} B)`);
   }
-  for (const violation of result.violations) console.error(`size budget: ${violation}`);
-  if (result.violations.length > 0) process.exitCode = 1;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main();
