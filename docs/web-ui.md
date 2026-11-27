@@ -94,7 +94,8 @@ what stays narrow is the control:
   many rows stay outside it at full width (DNS names, data usage, interfaces).
 - A page whose subject can be switched on or off carries that switch, its state chip and its
   one main action in the **page header** (WireGuard: tunnel; Tailscale: on/off plus Log in or
-  Log out; AdGuard Home: running). The switch and its chip are one `HeaderToggle`. No card repeats them; cards hold only what adds to it.
+  Log out; AdGuard Home: running). WireGuard and Tailscale render the switch and its chip as one
+  `HeaderToggle`. No card repeats them; cards hold only what adds to it.
 - A card whose only control is one switch (all LEDs, night mode) puts the switch in its header
   and the state in its description, instead of a row that repeats the card title.
 

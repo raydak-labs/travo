@@ -5,7 +5,6 @@ import { m } from '../paraglide/messages.js';
 import Status from './Status.svelte';
 import type { StatusKind } from './status';
 
-// A page subject's on/off switch in the PageHeader: label, state chip and switch in one control.
 let {
   id,
   label,
@@ -29,7 +28,7 @@ let {
 } = $props();
 </script>
 
-<div data-slot="header-toggle" class="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-card px-2.5 text-sm shadow-xs" {title}>
+<div data-slot="header-toggle" class="inline-flex min-h-8 max-w-full flex-wrap items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1 text-sm shadow-xs" {title}>
   <Label for={id} class={disabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}>{label}</Label>
   <Status {kind}>{status}</Status>
   {#if stale}<Status kind="stale">{m.load_stale()}</Status>{/if}

@@ -63,6 +63,7 @@ describe('Dashboard cards', () => {
     dashboardEvents.throughput.data = throughput;
     dashboardEvents.uplinks.data = uplinks;
     dashboardEvents.clients.data = clients;
+    dashboardEvents.tailscale.data = undefined;
   });
   afterEach(() => vi.unstubAllGlobals());
 
@@ -95,7 +96,6 @@ describe('Dashboard cards', () => {
       checked: true,
       disabled: false,
     });
-    dashboardEvents.tailscale.data = undefined;
   });
 
   it('marks partial client counts as incomplete and keeps them', () => {
