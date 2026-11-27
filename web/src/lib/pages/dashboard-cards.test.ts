@@ -72,6 +72,15 @@ describe('Dashboard cards', () => {
     expect(part).not.toContain('Last known value');
   });
 
+  it('sets Quick status and System side by side in one equal-height card row', () => {
+    const body = dashboard();
+    const grid = body.lastIndexOf('<div class="grid', body.indexOf('Quick status'));
+    const row = body.slice(grid, body.indexOf('>', grid));
+    expect(row).toContain('items-stretch');
+    expect(row).toContain('lg:grid-cols-2');
+    expect(body.slice(grid)).toMatch(/Quick status[\s\S]*Resources/);
+  });
+
   it('marks partial client counts as incomplete and keeps them', () => {
     dashboardEvents.clients.data = { ...clients, partial: true };
     const part = quick(dashboard());

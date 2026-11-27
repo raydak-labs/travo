@@ -84,7 +84,8 @@ what stays narrow is the control:
 - **Fields** have a fixed width in the row's control slot (`w-28` for numbers and times, `w-64`
   for names, addresses and keys); they never stretch with the card.
 - **Cards per row:** related short cards of one topic sit in a `CardGrid`: up to 3 per row from
-  `xl`, 2 from `lg`, 1 below. A new topic starts a new row. Long lists, tables and forms with
+  `xl`, 2 from `lg`, 1 below. Cards in a row stretch to equal height, with the `Section` footer
+  anchored at the bottom. A new topic starts a new row. Long lists, tables and forms with
   many rows stay outside it at full width (DNS names, data usage, interfaces).
 - A page whose subject can be switched on or off carries that switch, its state chip and its
   one main action in the **page header** (WireGuard: tunnel; Tailscale: on/off plus Log in or

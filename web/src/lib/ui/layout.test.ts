@@ -2,6 +2,7 @@ import Inbox from '@lucide/svelte/icons/inbox';
 import { createRawSnippet } from 'svelte';
 import { render } from 'svelte/server';
 import { describe, expect, it } from 'vitest';
+import CardGrid from './CardGrid.svelte';
 import EmptyState from './EmptyState.svelte';
 import GroupHeading from './GroupHeading.svelte';
 import PageHeader from './PageHeader.svelte';
@@ -56,6 +57,19 @@ describe('Section', () => {
     expect(body).toContain('<p>ROWS</p>');
   });
 
+  it('fills the row height and pins the footer to the bottom', () => {
+    const { body } = render(Section, {
+      props: {
+        title: 'WAN',
+        children: snippet('<p>ROWS</p>'),
+        footer: snippet('<button>Save</button>'),
+      },
+    });
+    expect(body).toMatch(/<div[^>]*data-slot="card"[^>]*class="[^"]*\bh-full\b/);
+    expect(body).toMatch(/<div[^>]*data-slot="card-content"[^>]*class="[^"]*\bflex-1\b/);
+    expect(body).toMatch(/<div[^>]*data-slot="card-footer"[^>]*class="[^"]*\bmt-auto\b/);
+  });
+
   it('puts actions in the card action slot', () => {
     const { body } = render(Section, {
       props: {
@@ -65,6 +79,14 @@ describe('Section', () => {
       },
     });
     expect(body).toMatch(/data-slot="card-action"[^>]*><button>Scan<\/button>/);
+  });
+});
+
+describe('CardGrid', () => {
+  it('stretches the cards of a row to equal height', () => {
+    const { body } = render(CardGrid, { props: { children: snippet('<section></section>') } });
+    expect(body).toContain('items-stretch');
+    expect(body).not.toContain('items-start');
   });
 });
 

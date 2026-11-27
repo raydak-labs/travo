@@ -10,6 +10,7 @@ import type { dashboardEvents } from '../dashboard-events.svelte';
 import { m } from '../paraglide/messages.js';
 import { connectHref } from '../router';
 import { topologyModel } from '../topology';
+import CardGrid from '../ui/CardGrid.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import PageHeader from '../ui/PageHeader.svelte';
 import Section from '../ui/Section.svelte';
@@ -99,7 +100,7 @@ let trafficOpen = $state(false);
     />
   </div>
 
-  <div class="grid items-start gap-4 lg:grid-cols-2">
+  <CardGrid cols={2}>
     <QuickStatus
       model={topology}
       status={{
@@ -112,7 +113,7 @@ let trafficOpen = $state(false);
       {tunnel}
     />
     <SystemCard {resources} alerts={events.alerts.data?.alerts ?? []} />
-  </div>
+  </CardGrid>
 
   <Section title={m.dashboard_throughput()} description={m.dashboard_traffic_description()}>
     <Collapsible.Root bind:open={trafficOpen}>

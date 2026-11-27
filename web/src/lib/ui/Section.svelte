@@ -26,13 +26,13 @@ const headingId = $props.id();
 </script>
 
 <!-- Phones get the compact card spacing so content keeps most of the 390 px width. -->
-<Root role="region" aria-labelledby={headingId} class="gap-4 max-sm:[--card-spacing:--spacing(4)]">
+<Root role="region" aria-labelledby={headingId} class="h-full gap-4 max-sm:[--card-spacing:--spacing(4)]">
   <Header>
     <h2 id={headingId} class="text-base leading-normal font-semibold">{title}</h2>
     {#if description}<Description>{description}</Description>{/if}
     {#if actions}<Action class="flex flex-wrap gap-2">{@render actions()}</Action>{/if}
   </Header>
   <!-- Empty blocks (closed aria-live regions) take no gap; content that renders nothing hides. -->
-  {#if children}<Content class="gap-4 [&:not(:has(>:not(:empty)))]:hidden [&>:empty]:hidden">{@render children()}</Content>{/if}
-  {#if footer}<Footer class="justify-end gap-2 [&:not(:has(>*))]:hidden">{@render footer()}</Footer>{/if}
+  {#if children}<Content class="flex-1 gap-4 [&:not(:has(>:not(:empty)))]:hidden [&>:empty]:hidden">{@render children()}</Content>{/if}
+  {#if footer}<Footer class="mt-auto justify-end gap-2 [&:not(:has(>*))]:hidden">{@render footer()}</Footer>{/if}
 </Root>
