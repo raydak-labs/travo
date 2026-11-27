@@ -8,7 +8,7 @@ Travel-router web UI and API (Go daemon + Svelte SPA) that runs on OpenWrt next 
 
 ## Local environment
 
-Local env vars (e.g. router IP, password) live in gitignored `mise.local.toml`. Check for it and run commands via `mise`; never commit it or log its secrets.
+Local env vars (e.g. router IP, password) live in gitignored `mise.local.toml`. Check for it and run commands via `mise exec --` / `mise run` so they pick it up; never commit it or log its secrets.
 
 ## Stack
 
