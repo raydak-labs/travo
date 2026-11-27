@@ -32,6 +32,7 @@ func TestSeedCopiesMatchCaptures(t *testing.T) {
 		"diag-traceroute-ok.txt":            "diagnostics/traceroute-ok.txt",
 		"diag-lookup-ok.txt":                "diagnostics/lookup-ok.txt",
 		"diag-lookup-nxdomain.txt":          "diagnostics/lookup-nxdomain.txt",
+		"uci-export-sqm.txt":                "sqm/uci-export-sqm.txt",
 	} {
 		orig, err := os.ReadFile("../../../testdata/device/axt1800-25.12.6/" + capture)
 		if err != nil {

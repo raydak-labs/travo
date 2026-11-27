@@ -17,6 +17,7 @@ const SIGNED_IN_ROUTES = [
   '/clients',
   '/services',
   '/services/adguard',
+  '/services/sqm',
   '/network/lan',
   '/network/port-forwards',
   '/network/ipv6',

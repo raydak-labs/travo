@@ -182,6 +182,8 @@ type Deps struct {
 	DDNS DDNS
 	// Catalog is the optional services catalog; nil answers 503 catalog_unavailable.
 	Catalog Catalog
+	// SQM is essential SQM queue settings (sqm-scripts); nil answers 503 sqm_unavailable.
+	SQM SQM
 	// LAN is the router's lan address (ADR 0028); nil answers 503 lan_unavailable.
 	LAN LANAddress
 	// PortForwards is firewall redirects wan -> lan; nil answers 503 port_forwards_unavailable.
@@ -288,6 +290,7 @@ func New(d Deps) (http.Handler, huma.API) {
 	s.registerIPv6(a)
 	s.registerDDNS(a)
 	s.registerCatalog(a)
+	s.registerSQM(a)
 	s.registerLAN(a)
 	s.registerPortForwards(a)
 	s.registerReboot(a)
@@ -364,6 +367,8 @@ func schemaNamer(t reflect.Type, hint string) string {
 		return "DDNS" + name
 	case "github.com/raydak-labs/travo/internal/catalog":
 		return "Catalog" + name
+	case "github.com/raydak-labs/travo/internal/sqm":
+		return "SQM" + name
 	case "github.com/raydak-labs/travo/internal/portfwd":
 		return "Port" + name
 	case "github.com/raydak-labs/travo/internal/lanaddress":

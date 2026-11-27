@@ -148,7 +148,7 @@ Sidebar only, every top-level entry with an icon. Everyday pages first:
 - **WiFi**: the networks the router offers. Access points, guest network, schedule.
 - **VPN** ▸ WireGuard · Tailscale
 - Clients
-- **Services** ▸ one page per installed service that has settings here (AdGuard Home; SQM later)
+- **Services** ▸ one page per installed service that has settings here (AdGuard Home, SQM)
 - **Network** ▸ LAN (address, DHCP server, DNS names) · Port forwards · IPv6 & DDNS · Diagnostics
   (tools, interfaces, firewall zones)
 - **System** ▸ Hardware · Logs · Firmware (Travo and OpenWrt updates, firmware upgrade, factory
@@ -169,9 +169,12 @@ under `nav:v2`.
 - **Tailscale:** status, login and options. Target: off until the user switches it on here (the
   package's post-install start undone by the install flow); needs a daemon on/off action first.
 - **Services overview:** installed services first (status and one action pinned to the card
-  bottom: Configure, or Open in LuCI for services without a page here), then Available with
+  bottom: Configure for AdGuard Home and SQM, or Open in LuCI for services without a page here), then Available with
   Install. A service page leaves the nav when its package is absent (a failed check is not
   absent).
+- **SQM:** essential queue settings form (enable, uplink interface, download/upload kbit/s, qdisc,
+  script, link layer adaptation and per-packet overhead) saved together via the section footer,
+  with a secondary Open in LuCI link in the page header for advanced options.
 - **System overview:** a fact strip (model, OpenWrt, uptime, Travo version), the device settings
   form and details. Restart and the app version are only in the header menu.
 - **Hardware:** the LEDs and buttons the router really has (read from sysfs and the device

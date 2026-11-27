@@ -10,6 +10,7 @@ export type Route =
   | 'clients'
   | 'services'
   | 'services-adguard'
+  | 'services-sqm'
   | 'network-lan'
   | 'network-port-forwards'
   | 'network-ipv6'
@@ -33,6 +34,7 @@ const PATHS: Record<Route, string> = {
   clients: '/clients',
   services: '/services',
   'services-adguard': '/services/adguard',
+  'services-sqm': '/services/sqm',
   'network-lan': '/network/lan',
   'network-port-forwards': '/network/port-forwards',
   'network-ipv6': '/network/ipv6',
@@ -63,7 +65,7 @@ export type NavGroup = 'vpn' | 'services' | 'network' | 'system';
 /** Children of each collapsible nav group, in nav order. */
 export const NAV_GROUPS: Record<NavGroup, readonly Route[]> = {
   vpn: ['vpn-wireguard', 'vpn-tailscale'],
-  services: ['services-adguard'],
+  services: ['services-adguard', 'services-sqm'],
   network: ['network-lan', 'network-port-forwards', 'network-ipv6', 'network-diagnostics'],
   system: ['system-hardware', 'system-logs', 'system-firmware', 'system-access'],
 };
