@@ -8,7 +8,9 @@
       "!openapi.json",
       "!src/lib/api/gen",
       "!src/lib/paraglide",
-      "!project.inlang/cache"
+      "!project.inlang/cache",
+      "!screenshots",
+      "!screenshots-diff"
     ]
   },
   "formatter": {
