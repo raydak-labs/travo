@@ -175,9 +175,17 @@ describe('EmptyState', () => {
 });
 
 describe('GroupHeading', () => {
-  it('is an h3', () => {
+  it('is an h3 by default', () => {
     const { body } = render(GroupHeading, { props: { label: 'Guest network' } });
     expect(body).toMatch(/<h3[^>]*>Guest network<\/h3>/);
+  });
+
+  it('is an h2 at page level', () => {
+    const { body } = render(GroupHeading, {
+      props: { label: 'Connections', level: 2, id: 'connections' },
+    });
+    expect(body).toMatch(/<h2 id="connections"[^>]*>Connections<\/h2>/);
+    expect(tags(body, 'h3')).toBe(0);
   });
 });
 

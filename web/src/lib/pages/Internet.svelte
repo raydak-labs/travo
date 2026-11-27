@@ -5,6 +5,7 @@ import Button from '$lib/components/ui/button/button.svelte';
 import { m } from '../paraglide/messages.js';
 import { href, wantsConnect } from '../router';
 import CardGrid from '../ui/CardGrid.svelte';
+import GroupHeading from '../ui/GroupHeading.svelte';
 import PageHeader from '../ui/PageHeader.svelte';
 import DataUsageCard from './DataUsageCard.svelte';
 import FailoverCard from './FailoverCard.svelte';
@@ -32,11 +33,20 @@ onMount(() => {
       </Button>
     {/snippet}
   </PageHeader>
-  <WiFi part="uplink" bind:connectOpen />
-  <CardGrid cols={2}>
-    <WANCard />
-    <USBTetherCard />
-    <FailoverCard />
-  </CardGrid>
-  <DataUsageCard />
+  <div class="flex flex-col gap-3">
+    <GroupHeading level={2} label={m.internet_group_wifi()} />
+    <WiFi part="uplink" bind:connectOpen />
+  </div>
+  <div class="flex flex-col gap-3">
+    <GroupHeading level={2} label={m.internet_group_uplinks()} />
+    <CardGrid cols={2}>
+      <WANCard />
+      <USBTetherCard />
+      <FailoverCard />
+    </CardGrid>
+  </div>
+  <div class="flex flex-col gap-3">
+    <GroupHeading level={2} label={m.internet_group_usage()} />
+    <div class="flex flex-col gap-6"><DataUsageCard /></div>
+  </div>
 </div>

@@ -1,6 +1,7 @@
 <script lang="ts">
 import { m } from '../paraglide/messages.js';
 import CardGrid from '../ui/CardGrid.svelte';
+import GroupHeading from '../ui/GroupHeading.svelte';
 import PageHeader from '../ui/PageHeader.svelte';
 import DHCPServerCard from './DHCPServerCard.svelte';
 import DNSNamesCard from './DNSNamesCard.svelte';
@@ -11,9 +12,15 @@ import LANAddressCard from './LANAddressCard.svelte';
 
 <div class="flex flex-col gap-6">
   <PageHeader title={m.nav_network_lan()} description={m.network_lan_description()} />
-  <CardGrid cols={2}>
-    <LANAddressCard />
-    <DHCPServerCard />
-  </CardGrid>
-  <DNSNamesCard />
+  <div class="flex flex-col gap-3">
+    <GroupHeading level={2} label={m.network_lan_group_addressing()} />
+    <CardGrid cols={2}>
+      <LANAddressCard />
+      <DHCPServerCard />
+    </CardGrid>
+  </div>
+  <div class="flex flex-col gap-3">
+    <GroupHeading level={2} label={m.network_lan_group_dns()} />
+    <DNSNamesCard />
+  </div>
 </div>
