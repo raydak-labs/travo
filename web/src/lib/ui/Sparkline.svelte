@@ -1,10 +1,9 @@
 <script lang="ts">
 import { type Frame, type Sample, sparklinePath } from '../stats-history';
 
-// Hand-written on purpose (#232): the shadcn-svelte chart (layerchart) measured 74 KB gzip
-// against the 16 KB chunk budget. If richer charts (axes, tooltips, stacking) are wanted
-// later, switch to a chart library (shadcn-svelte chart / layerchart, or uPlot) and revisit
-// the size budget then instead of growing this component.
+// Hand-written on purpose (#232): the shadcn-svelte chart (layerchart) measured 74 KB gzip.
+// If richer charts (axes, tooltips, stacking) are wanted later, switch to a chart library
+// (shadcn-svelte chart / layerchart, or uPlot) instead of growing this component.
 let {
   samples,
   frame,
