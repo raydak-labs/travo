@@ -368,10 +368,13 @@ first_run() {
     # 9>&-: the detached job must not keep the installer's lock.
     (sleep 2; reload_config; sleep 15; /etc/init.d/$NAME restart) </dev/null >/dev/null 2>&1 9>&- &
   else
-    reload_config || /etc/init.d/system reload 2>/dev/null || true
+    reload_config || /etc/init.d/system reload || echo "install.sh: warning: could not reload hostname config" >&2
     if [ "$host_allow_changed" = 1 ]; then
-      /etc/init.d/$NAME restart 9>&- || die "/etc/init.d/$NAME restart failed"
-      wait_healthy "$version" || die "$NAME did not come back after hostname update"
+      if /etc/init.d/$NAME restart 9>&-; then
+        wait_healthy "$version" || echo "install.sh: warning: $NAME did not come back after hostname update" >&2
+      else
+        echo "install.sh: warning: /etc/init.d/$NAME restart failed after hostname update" >&2
+      fi
     fi
   fi
 }
@@ -457,7 +460,7 @@ while [ "$#" -gt 0 ]; do
     --keep-lan) keep_lan=1 ;;
     --hostname)
       shift
-      { [ "$#" -gt 0 ] && valid_hostname "$1"; } || usage
+      { [ "$#" -gt 0 ] && valid_hostname "$1" && [ "$1" != "$FACTORY_HOSTNAME" ]; } || usage
       hostname_target=$1
       hostname_set=1
       ;;

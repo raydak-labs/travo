@@ -313,6 +313,6 @@ echo "$out" | grep -q 'Hostname: TravelBox\.' || fail "install summary did not r
 dx 'uci changes' | grep -q . && fail "--hostname install left uncommitted UCI changes"
 wait_health "after hostname-only first install" 80
 dx 'sh /tmp/tg/install.sh --uninstall --purge'
-echo "ok: custom hostname preserved and --hostname applied without network reload"
+echo "ok: custom hostname preserved and --hostname applied without dropping SSH"
 
 step "package test passed"
