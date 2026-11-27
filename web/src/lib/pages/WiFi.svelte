@@ -365,25 +365,32 @@ async function scan() {
 
 <Dialog.Root bind:open={connectOpen}>
 <Dialog.Content portalProps={{ disabled: typeof window === "undefined" }}
- class="flex max-h-[85vh] w-[min(92vw,36rem)] flex-col gap-4 rounded-lg border border-border bg-surface p-5 text-fg">
-  <div class="flex items-center justify-between gap-3 pr-8">
+ class="flex max-h-[85vh] w-[min(92vw,36rem)] flex-col gap-4 rounded-lg border border-border bg-surface p-4 text-fg">
+  <div class="flex min-h-8 items-center justify-between gap-3 pr-10">
     <Dialog.Title level={2} class="text-lg font-semibold">{m.wifi_connect()}</Dialog.Title>
     {#if scanStatus.state !== 'error'}
       <Button variant="outline" size="sm" type="button" disabled={scanStatus.state === 'loading'}
         aria-busy={scanStatus.state === 'loading'} onclick={scan}>
-        <RefreshCw aria-hidden="true" />{scanStatus.state === 'loading' ? m.wifi_scanning() : m.wifi_scan_again()}
+        <RefreshCw aria-hidden="true" class={scanStatus.state === 'loading' ? 'animate-spin' : ''} />{m.wifi_scan()}
       </Button>
     {/if}
   </div>
   <Dialog.Description class="text-sm text-muted-foreground">{m.wifi_connect_description()}</Dialog.Description>
   <div class="min-h-0 overflow-y-auto">
-    <LoadState status={scanStatus} retry={scan} stale={scanData !== undefined}>
-      {#if scanData}
-        <WiFiScanList result={scanData} join={(network) => { connectOpen = false; joinTrigger = connectTrigger; selected = network; }} {busy} />
-      {:else}
+    {#if !scanData && scanStatus.state === 'loading'}
+      <!-- The Scan button keeps a short label, so the first scan says here that it takes a while. -->
+      <div role="status" aria-live="polite" aria-busy="true">
         <EmptyState icon={Radar} title={m.wifi_scanning()} />
-      {/if}
-    </LoadState>
+      </div>
+    {:else}
+      <LoadState status={scanStatus} retry={scan} stale={scanData !== undefined}>
+        {#if scanData}
+          <WiFiScanList result={scanData} join={(network) => { connectOpen = false; joinTrigger = connectTrigger; selected = network; }} {busy} />
+        {:else}
+          <EmptyState icon={Radar} title={m.wifi_scanning()} />
+        {/if}
+      </LoadState>
+    {/if}
   </div>
 </Dialog.Content>
 </Dialog.Root>
