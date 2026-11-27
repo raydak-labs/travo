@@ -11,6 +11,7 @@ import { m } from '../paraglide/messages.js';
 import { connectHref } from '../router';
 import { topologyModel } from '../topology';
 import CardGrid from '../ui/CardGrid.svelte';
+import GroupHeading from '../ui/GroupHeading.svelte';
 import { createLoader } from '../ui/loader.svelte';
 import PageHeader from '../ui/PageHeader.svelte';
 import Section from '../ui/Section.svelte';
@@ -72,63 +73,74 @@ let trafficOpen = $state(false);
     <CaptivePortalCard info={connectivity.data} refresh={connectivity.retry} />
   {/if}
 
-  <!-- The map needs width; phones and narrow windows get the same facts from the cards below. -->
-  <div class="hidden lg:block">
-    <Section title={m.topology_title()}>
-      <TopologyDiagram
-        model={topology}
-        uplinks={events.uplinks.data}
-        ipv6={ipv6.data?.enabled}
-        resources={resources.data}
-        status={{
-          uplinks: events.uplinks.status,
-          connectivity: connectivity.status,
-          throughput: throughput.status,
-          clients: events.clients.status,
-          vpn: vpn.status,
-        }}
+  <div class="flex flex-col gap-3">
+    <GroupHeading level={2} label={m.dashboard_group_connections()} />
+    <!-- The map needs width; phones and narrow windows get the same facts from the cards below. -->
+    <div class="hidden lg:block">
+      <Section title={m.topology_title()}>
+        <TopologyDiagram
+          model={topology}
+          uplinks={events.uplinks.data}
+          ipv6={ipv6.data?.enabled}
+          resources={resources.data}
+          status={{
+            uplinks: events.uplinks.status,
+            connectivity: connectivity.status,
+            throughput: throughput.status,
+            clients: events.clients.status,
+            vpn: vpn.status,
+          }}
+        />
+      </Section>
+    </div>
+
+    <!-- From lg the map carries the uplinks (details on hover), so the cards are phone-only. -->
+    <div class="lg:hidden">
+      <UplinkCards
+        sources={topology.sources}
+        uplinks={events.uplinks}
+        status={{ connectivity: connectivity.status, throughput: throughput.status }}
       />
-    </Section>
+    </div>
   </div>
 
-  <!-- From lg the map carries the uplinks (details on hover), so the cards are phone-only. -->
-  <div class="lg:hidden">
-    <UplinkCards
-      sources={topology.sources}
-      uplinks={events.uplinks}
-      status={{ connectivity: connectivity.status, throughput: throughput.status }}
-    />
+  <div class="flex flex-col gap-3">
+    <GroupHeading level={2} label={m.dashboard_group_status()} />
+    <CardGrid cols={2}>
+      <QuickStatus
+        model={topology}
+        status={{
+          connectivity: connectivity.status,
+          clients: events.clients.status,
+          throughput: throughput.status,
+        }}
+        {vpn}
+        {tunnel}
+        {tailscale}
+      />
+      <SystemCard {resources} alerts={events.alerts.data?.alerts ?? []} />
+    </CardGrid>
   </div>
 
-  <CardGrid cols={2}>
-    <QuickStatus
-      model={topology}
-      status={{
-        connectivity: connectivity.status,
-        clients: events.clients.status,
-        throughput: throughput.status,
-      }}
-      {vpn}
-      {tunnel}
-      {tailscale}
-    />
-    <SystemCard {resources} alerts={events.alerts.data?.alerts ?? []} />
-  </CardGrid>
+  <div class="flex flex-col gap-3">
+    <GroupHeading level={2} label={m.dashboard_group_traffic()} />
+    <div class="flex flex-col gap-6">
+      <Section title={m.dashboard_throughput()} description={m.dashboard_traffic_description()}>
+        <Collapsible.Root bind:open={trafficOpen}>
+          <Collapsible.Trigger>
+            {#snippet child({ props })}
+              <Button {...props} variant="outline" size="sm" type="button">
+                {trafficOpen ? m.dashboard_traffic_hide() : m.dashboard_traffic_show()}
+              </Button>
+            {/snippet}
+          </Collapsible.Trigger>
+          <Collapsible.Content class="mt-4">
+            <InterfaceTraffic {throughput} />
+          </Collapsible.Content>
+        </Collapsible.Root>
+      </Section>
 
-  <Section title={m.dashboard_throughput()} description={m.dashboard_traffic_description()}>
-    <Collapsible.Root bind:open={trafficOpen}>
-      <Collapsible.Trigger>
-        {#snippet child({ props })}
-          <Button {...props} variant="outline" size="sm" type="button">
-            {trafficOpen ? m.dashboard_traffic_hide() : m.dashboard_traffic_show()}
-          </Button>
-        {/snippet}
-      </Collapsible.Trigger>
-      <Collapsible.Content class="mt-4">
-        <InterfaceTraffic {throughput} />
-      </Collapsible.Content>
-    </Collapsible.Root>
-  </Section>
-
-  <StatsHistoryCard />
+      <StatsHistoryCard />
+    </div>
+  </div>
 </div>

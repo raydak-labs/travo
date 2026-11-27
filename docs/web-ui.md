@@ -72,7 +72,7 @@ a heading or row spacing. Controls are the copied shadcn-svelte components
 | `SettingsRow` | One setting, fact or form field inside a `Section`: `label` and `description` left, the `control` snippet right from `sm`, stacked on phones. Pass `for` when the control has an id. Consecutive rows get a divider by themselves. |
 | `LinkRow` | A `SettingsRow` that opens another page: the whole row is the link and ends in a chevron; an optional switch or value sits before the chevron and does not follow the link. |
 | `HeaderToggle` | The on/off switch of a page's subject in the `PageHeader` actions: label, state chip (and stale chip) and `Switch` in one bordered control, as high as a small button. |
-| `GroupHeading` | The only subheading (`h3`), for a group inside a section or a summary tile. |
+| `GroupHeading` | The only subheading. `level={2}` names a page-level category group above its `Section`s or `CardGrid` (Dashboard, Internet, LAN, Diagnostics); the default `level={3}` names a group inside a section or a summary tile. Heading levels never skip. |
 | `SummaryBand` / `SummaryTile` | The flat status tiles between the header and the first section. Each tile has its own load fallback, so one failed value never blanks the others. |
 | `EmptyState` | "Nothing here yet" content: icon, title, optional text and the add action. A failed load is never empty: `LoadState` shows that. |
 
@@ -135,7 +135,7 @@ Scale, applied by these components and the shell:
 
 - Shell padding `p-4`, `md:p-6`.
 - The page root is `flex flex-col gap-6`: header, summary band and sections are `gap-6` apart; content inside a section is `gap-4`; a `SettingsRow` is `py-3`.
-- `h1` `text-xl font-semibold`; `h2` `text-base font-semibold`; `h3` `text-sm font-medium text-muted-foreground`; descriptions `text-sm text-muted-foreground`.
+- `h1` `text-xl font-semibold`; `Section` `h2` `text-base font-semibold`; `GroupHeading` (`h2` at page level, `h3` inside a section) `text-sm font-medium text-muted-foreground`; descriptions `text-sm text-muted-foreground`.
 - Below `sm` (640 px) everything stacks; from `sm` rows and headers sit side by side.
 
 A single-section page gives its section a title that does not repeat the page title.
