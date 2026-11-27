@@ -252,7 +252,7 @@ async function openRestartConfirm() {
   await chrome.evaluate(`document.querySelector('header button[aria-label="Open menu"]').focus()`);
   await key('Enter');
   await wait(`!!document.querySelector('[data-slot="dropdown-menu-content"]')`);
-  const onRestart = `document.activeElement?.textContent.includes('Restart router')`;
+  const onRestart = `!!document.activeElement?.matches('[data-slot="dropdown-menu-item"]') && document.activeElement.textContent.includes('Restart router')`;
   for (let i = 0; i < 10 && !(await chrome.evaluate(onRestart)); i++) await key('ArrowDown');
   await check(onRestart, 'Restart router is reachable from the keyboard');
   await key('Enter');
