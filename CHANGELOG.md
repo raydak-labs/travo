@@ -2,6 +2,26 @@
 
 Versions 0.1.0 to 0.5.0 below are releases of travo-greenfield, the rewrite that became Travo 0.11.0. Travo 0.10.3 and earlier are described in their [GitHub releases](https://github.com/raydak-labs/travo/releases); their code is on the `legacy` branch.
 
+## [0.13.0](https://github.com/raydak-labs/travo/compare/v0.12.0...v0.13.0) (2026-11-27)
+
+
+### Features
+
+* **packaging:** set factory hostname to travo on first install ([#308](https://github.com/raydak-labs/travo/issues/308)) ([84166d1](https://github.com/raydak-labs/travo/commit/84166d161c2ed33a5df77218c2cd123df239d4c1))
+* **sqm:** add essential SQM settings API and page ([#309](https://github.com/raydak-labs/travo/issues/309)) ([15b4b8d](https://github.com/raydak-labs/travo/commit/15b4b8dc2abf719c3e447ba505f386cc47157fca))
+* **web:** detect browser timezone mismatch and notify to update ([#307](https://github.com/raydak-labs/travo/issues/307)) ([1feca4d](https://github.com/raydak-labs/travo/commit/1feca4d4957b97c39ba9495bd8eddac8538d07eb))
+
+
+### Bug Fixes
+
+* **sqm:** restart sqm init script after commit and record [#302](https://github.com/raydak-labs/travo/issues/302) hardware pass ([#310](https://github.com/raydak-labs/travo/issues/310)) ([5f093c2](https://github.com/raydak-labs/travo/commit/5f093c2fd81f0772e57714783a6bc8e1fdab8260))
+* **wifi:** join displaces a duplicate AP when no radio is free ([#298](https://github.com/raydak-labs/travo/issues/298)) ([fe1162c](https://github.com/raydak-labs/travo/commit/fe1162ca77945098f5d8770792000c611c54aefc))
+
+
+### Documentation
+
+* document mise.local.toml for local env vars in AGENTS.md ([#306](https://github.com/raydak-labs/travo/issues/306)) ([fc57ac6](https://github.com/raydak-labs/travo/commit/fc57ac63cfe35badab7e5238734836814a0406bf))
+
 ## [0.12.0](https://github.com/raydak-labs/travo/compare/v0.11.0...v0.12.0) (2026-11-26)
 
 
