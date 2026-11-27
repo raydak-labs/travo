@@ -1,7 +1,6 @@
 <script lang="ts">
 import ExternalLink from '@lucide/svelte/icons/external-link';
 import { onDestroy } from 'svelte';
-import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import Switch from '$lib/components/ui/switch/switch.svelte';
 import { type AdGuardAction, adguardUrl, changeAdGuard, fetchAdGuard } from '../api/adguard';
@@ -9,6 +8,7 @@ import { m } from '../paraglide/messages.js';
 import CardGrid from '../ui/CardGrid.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import Notice from '../ui/Notice.svelte';
 import { notify } from '../ui/notify';
 import PageHeader from '../ui/PageHeader.svelte';
 import Section from '../ui/Section.svelte';
@@ -73,11 +73,12 @@ const proxy = adguardUrl(window.location);
       {#if adguard.data}
         {@const st = adguard.data}
         {#if st.fail_open_since}
-          <Alert class="text-danger" role="alert">
-            <p class="font-semibold">{m.adguard_fail_open_title()}</p>
-            <p>{m.adguard_fail_open_body()}</p>
-            <Button variant="outline" size="sm" type="button" class="mt-2" disabled={pending !== undefined} onclick={() => change('dns', true)}>{m.adguard_reenable()}</Button>
-          </Alert>
+          <Notice tone="danger" title={m.adguard_fail_open_title()}>
+            {m.adguard_fail_open_body()}
+            {#snippet actions()}
+              <Button variant="outline" size="sm" type="button" disabled={pending !== undefined} onclick={() => change('dns', true)}>{m.adguard_reenable()}</Button>
+            {/snippet}
+          </Notice>
         {/if}
         {#if !st.installed}
           <p class="text-sm text-muted-foreground">{m.adguard_absent_body()}</p>

@@ -1,6 +1,5 @@
 <script lang="ts">
 import { onDestroy } from 'svelte';
-import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import Input from '$lib/components/ui/input/input.svelte';
 import { setLanAddress } from '../api/gen';
@@ -17,6 +16,7 @@ import ConfirmDialog from '../ui/ConfirmDialog.svelte';
 import { createConfirm } from '../ui/confirm.svelte';
 import LoadState from '../ui/LoadState.svelte';
 import { createLoader } from '../ui/loader.svelte';
+import Notice from '../ui/Notice.svelte';
 import { notify } from '../ui/notify';
 import Section from '../ui/Section.svelte';
 import SettingsRow from '../ui/SettingsRow.svelte';
@@ -116,22 +116,22 @@ const formId = $props.id();
 
 <Section title={m.lan_title()} description={m.lan_intro()}>
   {#if moving}
-    <Alert class="status status-warn flex flex-col gap-2" role="status">
+    <Notice tone="warn" role="status">
       {#if left > 0}
-        <span>{m.lan_moving({ seconds: left })}</span>
+        <p>{m.lan_moving({ seconds: left })}</p>
         <a class="font-medium underline" href={moving.url}>{moving.url}</a>
-        <span class="text-sm">{m.lan_moving_fallback({ old: moving.old })}</span>
+        <p class="text-sm">{m.lan_moving_fallback({ old: moving.old })}</p>
       {:else}
-        <span>{m.lan_moving_over({ old: moving.old })}</span>
+        {m.lan_moving_over({ old: moving.old })}
       {/if}
-    </Alert>
+    </Notice>
   {:else}
     <LoadState status={loader.status} retry={loader.retry} stale={loader.data !== undefined}>
       {#if loader.data}
         {#if loader.data.pending}
-          <Alert class="status status-warn" role="status">
+          <Notice tone="warn" role="status">
             {m.lan_pending({ address: loader.data.pending.address })}
-          </Alert>
+          </Notice>
         {/if}
         <form id={formId} onsubmit={save}>
           <SettingsRow label={m.lan_address()} for="{formId}-address" description={m.lan_subnet({ subnet: loader.data.subnet })}>

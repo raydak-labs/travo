@@ -1,5 +1,4 @@
 <script lang="ts">
-import Alert from '$lib/components/ui/alert/alert.svelte';
 import Button from '$lib/components/ui/button/button.svelte';
 import { fetchDeviceSettings, saveDeviceSettings } from '../api/system-settings';
 import { m } from '../paraglide/messages.js';
@@ -9,6 +8,7 @@ import {
   readBrowserTimezone,
   type TimezoneMismatch,
 } from '../timezone-mismatch';
+import Notice from './Notice.svelte';
 import { notify } from './notify';
 
 let { generation }: { generation: number } = $props();
@@ -80,21 +80,19 @@ function dismiss() {
 
 {#if mismatch}
   <section class="mb-4" aria-label={m.timezone_mismatch_region()}>
-    <Alert class="status status-info flex flex-wrap items-center justify-between gap-2">
-      <span class="min-w-0 flex-1">
-        {m.timezone_mismatch_body({
-          router: mismatch.routerZone || 'UTC',
-          browser: mismatch.browserZone,
-        })}
-      </span>
-      <div class="flex shrink-0 flex-wrap items-center gap-2">
+    <Notice tone="info">
+      {m.timezone_mismatch_body({
+        router: mismatch.routerZone || 'UTC',
+        browser: mismatch.browserZone,
+      })}
+      {#snippet actions()}
         <Button variant="outline" size="sm" type="button" disabled={busy} onclick={updateTimezone}>
           {busy ? m.timezone_mismatch_updating() : m.timezone_mismatch_update()}
         </Button>
         <Button variant="ghost" size="sm" type="button" disabled={busy} onclick={dismiss}>
           {m.timezone_mismatch_dismiss()}
         </Button>
-      </div>
-    </Alert>
+      {/snippet}
+    </Notice>
   </section>
 {/if}
