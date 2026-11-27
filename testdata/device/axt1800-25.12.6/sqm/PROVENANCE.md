@@ -16,4 +16,4 @@ apk extract --allow-untrusted --destination /tmp/sqm-ext/root /tmp/sqm-ext/sqm-s
 
 The package ships 5 scripts under `/usr/lib/sqm/*.qos`: `layer_cake.qos`, `piece_of_cake.qos`, `simple.qos`, `simplest.qos`, `simplest_tbf.qos`.
 
-Verbatim; nothing needed redaction.
+Verbatim; nothing needed redaction. Verified on 2026-11-27 against the live GL-AXT1800 (OpenWrt 25.12.6, `sqm-scripts-1.7.2-r1`): `uci export sqm` and `/etc/init.d/sqm` match identically (only a trailing blank line in live `uci export`).
