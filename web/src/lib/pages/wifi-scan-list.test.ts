@@ -152,4 +152,28 @@ describe('WiFi scan list', () => {
     expect(rows[1]).toMatch(/<svg[^>]*lucide-lock-open[^>]*aria-hidden="true"/);
     expect(rows[1]).toContain('-71 dBm');
   });
+
+  it('keeps SSID and band on line one and signal and security on line two', () => {
+    const body = view(
+      {
+        networks: [
+          network('A very long uplink name', ['2g', '5g'], [ap('5g', 'aa:bb:cc:dd:ee:ff', -30)]),
+        ],
+      },
+      () => {},
+    );
+    const row = trigger(body);
+    expect(row).toMatch(
+      /<span class="min-w-0 truncate[^"]*">A very long uplink name<\/span>\s*<span data-slot="badge"[^"]*"[^"]*status-info"/,
+    );
+    const meta = row.match(
+      /<span data-slot="scan-row-meta" class="([^"]*)">([\s\S]*)<\/span><\/button>$/,
+    );
+    expect(meta?.[1]).toContain('col-start-2');
+    expect(meta?.[1]).toContain('text-xs text-muted-foreground tabular-nums');
+    expect(meta?.[2]).toContain('-30 dBm');
+    expect(meta?.[2]).toContain('WPA2');
+    expect(meta?.[2]).toMatch(/<svg[^>]*lucide-signal[^>]*aria-hidden="true"/);
+    expect(meta?.[2]).toMatch(/<svg[^>]*lucide-lock\s[^>]*aria-hidden="true"/);
+  });
 });

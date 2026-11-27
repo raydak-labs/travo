@@ -41,11 +41,18 @@ let {
   {#each result.networks as network (network.ssid)}
     <Collapsible.Root class="border-t border-border py-2 first:border-t-0">
       <div class="flex items-center justify-between gap-3">
-        <Collapsible.Trigger class="group flex min-w-0 flex-1 cursor-pointer flex-wrap items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/50">
+        <Collapsible.Trigger class="group grid min-w-0 flex-1 cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-0.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/50">
           {@render chevron()}
-          <span class="font-medium break-all">{network.ssid}</span>
-          <Status kind="info">{bandsBadge(network.bands)}</Status>
-          <span class="text-sm text-muted-foreground">{signalLabel(network.best_signal_dbm)} · {securityLabel(network.security)}</span>
+          <span class="flex min-w-0 items-center gap-2">
+            <span class="min-w-0 truncate font-medium">{network.ssid}</span>
+            <Status kind="info">{bandsBadge(network.bands)}</Status>
+          </span>
+          <span data-slot="scan-row-meta" class="col-start-2 flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
+            <span class="inline-flex items-center gap-1"><Signal aria-hidden="true" class="size-3 shrink-0" />{signalLabel(network.best_signal_dbm)}</span>
+            <span class="inline-flex items-center gap-1">
+              {#if network.security === 'open'}<LockOpen aria-hidden="true" class="size-3 shrink-0" />{:else}<Lock aria-hidden="true" class="size-3 shrink-0" />{/if}{securityLabel(network.security)}
+            </span>
+          </span>
         </Collapsible.Trigger>
         {#if join}
           <Button variant="outline" size="sm"
