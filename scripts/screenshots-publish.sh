@@ -20,6 +20,12 @@ gh pr view "$pr" --json body --jq .body | awk '/^## Screenshots[[:space:]]*$/ { 
   echo
   sed -n '3p' "$src/index.md"
   echo
+  if grep -q ', not attached:' "$src/index.md"; then
+    echo "Changed but not attached (see the description):"
+    echo
+    grep ', not attached:' "$src/index.md"
+    echo
+  fi
   for f in "$src"/*.png; do
     n=$(basename "$f" .png)
     echo "**$n**"

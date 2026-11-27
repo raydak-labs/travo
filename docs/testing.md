@@ -206,11 +206,17 @@ Record each check as pass or fail in SPIKES.md ("Captive portal joint session") 
 
 `pnpm -C web check`: Biome, svelte-check, Vitest (pure logic and server-rendered components), build, UI size budget. Visual and keyboard behaviour (theme, drawer, focus) is checked in headless Chrome at 390 px and 1280 px before a UI PR.
 
-**Screenshots.** A PR that changes what the UI shows carries before/after images in its body:
+**Screenshots.** A PR that changes what the UI shows carries before/after images of the views it means to change, and only those:
 
-1. `mise run screenshots:compare` builds the screenshots of `origin/main` in a temporary worktree and of the branch, and writes every changed shot to `web/screenshots-diff/` as one image: Before on the left, After on the right, each changed region boxed in red; new pages appear as New, `index.md` lists changed, new, removed and unchanged shots. Pass a base and a name filter to widen it: `mise run screenshots:compare -- origin/main -390-light` (default `-1280-light`). The pixel diff runs in headless Chrome (`web/scripts/screenshot-diff.mjs`); a change below the noise threshold is not a change.
-2. Open the PR, then `mise run screenshots:publish -- <PR number>` attaches the images with `gh pr edit --attach` (GitHub-hosted attachments, nothing is pushed to the repository) under a "Screenshots" heading at the end of the PR body; the text above that heading stays. Re-run both after later visual commits: the section is replaced. gh attaches at most 50 files per call; narrow the compare filter if more changed.
-3. The reviewer reads the boxed regions against the PR description: every box is an intended change, and every intended change has a box.
+1. Write a marks file naming those shots (the file name without `-<width>-<theme>.png`) and, for each, the CSS selectors of what the reviewer should look at:
+   ```json
+   { "servicesadguard": ["main [data-slot=card-header]"], "internet-connect-dialog": ["[role=dialog] ul"] }
+   ```
+   Boxes mark only what you want to emphasise, not every changed pixel. An overlay or dialog whose only change is the page behind it is not listed.
+2. `mise run screenshots:compare -- origin/main <MATCH> <MARKS>` builds the screenshots of the base in a temporary worktree and of the branch; `web/scripts/screenshots.mjs` stores the marked elements' rects next to each marked PNG (env `SCREENSHOT_MARKS`). `web/scripts/screenshot-diff.mjs` then writes to `web/screenshots-diff/` only the marked shots that changed, each as Before | After with red boxes around the recorded rects (Before only where the selector exists in the base). MATCH is a regex on file names (default `-1280-light`), e.g. `'-1280-light|(servicesadguard|internet-connect-dialog)-390-light'`. Without MARKS every changed shot is attached with each changed pixel region boxed.
+3. `index.md` lists every changed, new, removed and unchanged shot; changed shots outside the marks file are listed as "changed, not attached". Each of those is an unintended change: explain it in the PR or fix it. The pixel diff runs in headless Chrome; a change below the noise threshold is not a change.
+4. Open the PR, then `mise run screenshots:publish -- <PR number>` attaches the images with `gh pr edit --attach` (GitHub-hosted attachments, nothing is pushed to the repository) under a "Screenshots" heading at the end of the PR body, with the not-attached list; the text above that heading stays. Re-run both after later visual commits: the section is replaced. gh attaches at most 50 files per call.
+5. The reviewer reads the boxed regions against the PR description: every box is an intended change, and every intended change has a box.
 
 `mise run screenshots` writes PNGs for UI PRs to `web/screenshots/`, including the shared overlays (`system-reboot-dialog`, `wifi-ap-disable-dialog`, `wifi-pending-toast`, `vpn-error-toast`; responses stubbed in the page, see `web/scripts/screenshots-overlays.mjs`); `web/scripts/cdp.mjs` is the shared headless-Chrome helper for browser checks. Dialog and toast keyboard flows: build, then `scripts/with-mock.sh -- node web/scripts/e2e-components.mjs`.
 
