@@ -7,7 +7,7 @@ ADRs record decisions and stay as written. A later decision that changes one is 
 | [0001](0001-clean-room-greenfield.md) | Clean-room rewrite beside old Travo: reuse lessons, not code |
 | [0002](0002-single-go-daemon-with-ports.md) | One Go daemon; all OpenWrt access behind `Device` / `PackageManager` ports |
 | [0003](0003-api-and-client-generation.md) | Huma generates OpenAPI 3.1, hey-api generates the TypeScript client (validation narrowed by 0031) |
-| [0004](0004-frontend-stack.md) | Svelte 5 SPA with hash routing, Paraglide `en` only |
+| [0004](0004-frontend-stack.md) | Svelte 5 SPA with hash routing, Paraglide `en` only (UI size limits removed by 0036) |
 | [0005](0005-transactions-and-watchdog.md) | Own transaction layer with an out-of-process rollback watchdog |
 | [0006](0006-adguard-package-and-topology.md) | AdGuard Home package on 127.0.0.1:5353 behind dnsmasq, fail-open, memory caps |
 | [0007](0007-distribution-and-self-update.md) | Release tarball, install script, signed self-update |
@@ -39,3 +39,4 @@ ADRs record decisions and stay as written. A later decision that changes one is 
 | [0033](0033-vpn-resolvers-recorded-on-wg0.md) | The tunnel transaction records the applied resolvers on wg0 |
 | [0034](0034-first-install-lan-and-wifi.md) | First install: LAN off 192.168.1.0/24, WiFi set up once |
 | [0035](0035-join-displace-duplicate-ap.md) | Join displaces a duplicate AP when no radio is free |
+| [0036](0036-no-ui-size-limits.md) | Drop frontend size limits; keep the build size report and Go binary budget |

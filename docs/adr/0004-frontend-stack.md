@@ -1,6 +1,6 @@
 # 0004 Frontend stack
 
-Status: accepted
+Status: accepted; UI size limits removed by [0036](0036-no-ui-size-limits.md)
 
 Svelte 5 + plain Vite static SPA, shadcn-svelte (only used components), hash routing, pre-gzipped assets, split gzip size budgets, system font stack, own SVG charts. Follows agent-presets `stack/embedded-ui.md`.
 

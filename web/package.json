@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build && node scripts/gzip-dist.mjs",
     "test": "vitest run",
-    "check": "biome check . && svelte-check --tsconfig ./tsconfig.json && vitest run && pnpm build && node scripts/size-budget.mjs"
+    "check": "biome check . && svelte-check --tsconfig ./tsconfig.json && vitest run && pnpm build && node scripts/size-report.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
