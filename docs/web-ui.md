@@ -64,6 +64,10 @@ also captures a dialog, the pending toast and a result toast.
 Pages are built from the wrappers in `web/src/lib/ui/`; a page never hand-rolls a card,
 a heading or row spacing. Controls are the copied shadcn-svelte components
 ([ADR 0013](adr/0013-shadcn-components.md)); a hand-made control needs a measured reason there.
+Reuse these and the copied shadcn-svelte components instead of adding a duplicate; a new component
+is only for behaviour none of them provides. An established library beats a hand-rolled
+reimplementation only when it fits `web/scripts/size-budget.mjs` and the ADRs
+([ADR 0004](adr/0004-frontend-stack.md), [ADR 0013](adr/0013-shadcn-components.md)).
 
 | Component | Use it for |
 |---|---|

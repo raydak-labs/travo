@@ -68,6 +68,7 @@ Same PR, only what the change touches:
 - Names explain what, comments explain why.
 - Refactors keep behaviour and land in their own commit.
 - All OpenWrt access goes through the `Device` / `PackageManager` ports; all live-state changes through the transaction module; all DNS changes through the layer stack.
+- Web: reuse the `web/src/lib/ui/` wrappers and copied shadcn-svelte components before adding a new one (`docs/web-ui.md`, docs/adr/0013); prefer an established library over hand-rolled code only when it fits `web/scripts/size-budget.mjs` and the ADRs.
 
 ## Stewardship
 
