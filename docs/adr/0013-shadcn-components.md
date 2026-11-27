@@ -15,6 +15,7 @@ re-offers `button`; keep the app's button (disabled anchor rule below) instead o
 overwriting it. The sonner wrapper takes the app's `data-theme` value as `theme`
 instead of `mode-watcher`, which is not installed. Pages use these through the
 confirm / toast pattern in [web-ui.md](../web-ui.md).
+The dialog, alert-dialog, sheet, dropdown-menu (content, sub-content, sub-trigger) and select content copies likewise use `data-[state=open]:` / `data-[state=closed]:` instead of `data-open:` / `data-closed:`, and `tw-animate-css` (imported in `web/src/app.css`) provides their animation utilities.
 
 Those files use `tailwind-variants` and `cn`. `web/src/lib/utils.ts` re-exports
 `cn`. An earlier probe at 95ecdf0 fit a 40 KB shell only by replacing that

@@ -42,7 +42,7 @@ async function waitForPageTarget(timeoutMs) {
 }
 
 /** Starts headless Chrome and connects to its first page. Call close() when done. */
-export async function launchChrome({ userDataDir } = {}) {
+export async function launchChrome({ userDataDir, reducedMotion = false } = {}) {
   const binary = findChrome();
   // Another browser on the debug port would be driven silently instead of ours.
   const taken = await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/version`).then(
@@ -139,9 +139,9 @@ export async function launchChrome({ userDataDir } = {}) {
       deviceScaleFactor: 2,
       mobile,
     });
-    await send('Emulation.setEmulatedMedia', {
-      features: [{ name: 'prefers-color-scheme', value: scheme }],
-    });
+    const features = [{ name: 'prefers-color-scheme', value: scheme }];
+    if (reducedMotion) features.push({ name: 'prefers-reduced-motion', value: 'reduce' });
+    await send('Emulation.setEmulatedMedia', { features });
     // App ignores the OS scheme. Inject the requested theme before the boot script.
     if (themeScript)
       await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: themeScript });
