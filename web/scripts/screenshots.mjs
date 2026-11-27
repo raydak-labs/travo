@@ -1,8 +1,10 @@
 // Writes PNG screenshots of the UI at mobile and desktop widths in light and dark scheme.
 // Expects the daemon and `vite preview` already running (see `mise run screenshots`).
-import { mkdirSync, rmSync } from 'node:fs';
+// SCREENSHOT_MARKS (a marks file, see screenshot-marks.mjs) also stores the marked elements' rects.
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { launchChrome } from './cdp.mjs';
+import { measureJs, readMarks, rectsPath, shotKey, toShotRects } from './screenshot-marks.mjs';
 import { shootOverlays } from './screenshots-overlays.mjs';
 
 const BASE_URL = process.env.SCREENSHOT_URL ?? `http://localhost:${process.env.WEB_PORT ?? 18092}`;
@@ -169,12 +171,27 @@ async function shootHistory(chrome) {
   await chrome.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
 }
 
+/** Before each marked shot, stores the rects of its selectors next to the PNG. */
+function recordMarks(chrome, marks) {
+  const capture = chrome.screenshot;
+  chrome.screenshot = async (path) => {
+    const selectors = marks[shotKey(path)];
+    if (selectors) {
+      const { rects, viewport, scale } = await chrome.evaluate(measureJs(selectors));
+      writeFileSync(rectsPath(path), JSON.stringify(toShotRects(rects, viewport, scale)));
+    }
+    await capture(path);
+  };
+}
+
 async function main() {
   // Start empty: a page that no longer exists must not leave an old shot behind (the
   // before/after comparison would report it as changed instead of removed).
   rmSync(OUT_DIR, { recursive: true, force: true });
   mkdirSync(OUT_DIR, { recursive: true });
+  const marks = readMarks(process.env.SCREENSHOT_MARKS);
   const chrome = await launchChrome();
+  if (marks) recordMarks(chrome, marks);
   try {
     await shootAll(chrome, ['/login']);
     const { identifier } = await chrome.send('Page.addScriptToEvaluateOnNewDocument', {

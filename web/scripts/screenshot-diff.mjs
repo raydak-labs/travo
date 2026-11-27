@@ -1,17 +1,20 @@
 // Compares two screenshot directories and writes, for every changed image, a side-by-side
 // "Before | After" PNG with red boxes around the changed regions, plus index.md listing changed,
-// new and removed shots. The pixel work runs in headless Chrome (canvas), so no npm dependency.
-// Usage: node web/scripts/screenshot-diff.mjs --base DIR --head DIR --out DIR [--match REGEX]
+// new and removed shots. With --marks only the shots named in the marks file are written, boxed
+// around the element rects screenshots.mjs recorded; the rest are listed as not attached.
+// The pixel work runs in headless Chrome (canvas), so no npm dependency.
+// Usage: node web/scripts/screenshot-diff.mjs --base DIR --head DIR --out DIR [--match REGEX] [--marks FILE]
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { launchChrome } from './cdp.mjs';
+import { readMarks, rectsPath, shotKey } from './screenshot-marks.mjs';
 
 /** Parses `--key value` pairs; unknown keys are an error so a typo never compares everything. */
 export function parseArgs(argv) {
   const out = { match: '.*' };
   for (let i = 0; i < argv.length; i += 2) {
     const key = argv[i]?.replace(/^--/, '');
-    if (!['base', 'head', 'out', 'match'].includes(key ?? ''))
+    if (!['base', 'head', 'out', 'match', 'marks'].includes(key ?? ''))
       throw new Error(`unknown flag ${argv[i]}`);
     out[key] = argv[i + 1];
   }
@@ -71,6 +74,32 @@ export function boxes(blocks, gap = 3) {
   return out;
 }
 
+/** Without a marks file every shot is attached; with one, only the shots it names. */
+export function attachable(name, marks) {
+  return marks === undefined || Object.hasOwn(marks, shotKey(name));
+}
+
+/** index.md: every changed, new and removed shot, so an unintended change stays visible. */
+export function indexLines({ changed, added, removed, unchanged, marked }) {
+  const regions = (n) => `${n} region${n === 1 ? '' : 's'}`;
+  const attached = [...changed, ...added].filter((c) => c.attached).length;
+  return [
+    `# Screenshot changes`,
+    '',
+    `Changed: ${changed.length}, new: ${added.length}, removed: ${removed.length}, unchanged: ${unchanged}.` +
+      (marked ? ` Attached: ${attached} (marked shots only).` : ''),
+    '',
+    ...changed.map((c) =>
+      c.attached
+        ? `- changed: ${c.name} (${regions(c.regions)})`
+        : `- changed, not attached: ${c.name}`,
+    ),
+    ...added.map((c) => (c.attached ? `- new: ${c.name}` : `- new, not attached: ${c.name}`)),
+    ...removed.map((n) => `- removed: ${n}`),
+    '',
+  ];
+}
+
 const BLOCK = 8;
 
 // Runs in the page: decodes both PNGs, lists changed 8 px blocks.
@@ -96,8 +125,8 @@ const changedBlocksJs = (a, b) => `(async () => {
   return { w, h, blocks };
 })()`;
 
-// Runs in the page: draws Before | After with the boxes on both, at half scale.
-const composeJs = (a, b, w, h, rects, labels) => `(async () => {
+// Runs in the page: draws Before | After, each with its own boxes, at half scale.
+const composeJs = (a, b, w, h, rectsPerImage, labels) => `(async () => {
   const load = (src) => new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.src = src; });
   const imgs = await Promise.all(${JSON.stringify([a, b].filter(Boolean))}.map(load));
   const s = 0.5, head = 56, pad = 24, cw = ${w} * s, ch = ${h} * s;
@@ -112,15 +141,20 @@ const composeJs = (a, b, w, h, rects, labels) => `(async () => {
     g.drawImage(img, x, head, img.width * s, img.height * s);
     g.strokeStyle = '#d1d5db'; g.lineWidth = 1; g.strokeRect(x - 0.5, head - 0.5, cw + 1, ch + 1);
     g.strokeStyle = '#ef4444'; g.lineWidth = 4;
-    for (const r of ${JSON.stringify(rects)}) g.strokeRect(x + r.x * s - 4, head + r.y * s - 4, r.w * s + 8, r.h * s + 8);
+    for (const r of ${JSON.stringify(rectsPerImage)}[k]) g.strokeRect(x + r.x * s - 4, head + r.y * s - 4, r.w * s + 8, r.h * s + 8);
   });
   return c.toDataURL('image/png').split(',')[1];
 })()`;
 
 const dataUrl = (path) => `data:image/png;base64,${readFileSync(path).toString('base64')}`;
+const markedRects = (dir, name) => {
+  const path = rectsPath(join(dir, name));
+  return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : [];
+};
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  const marks = readMarks(args.marks);
   const { both, added, removed } = pairUp(
     readdirSync(args.base),
     readdirSync(args.head),
@@ -130,6 +164,7 @@ async function main() {
   mkdirSync(args.out, { recursive: true });
   const chrome = await launchChrome();
   const changed = [];
+  const fresh = [];
   try {
     await chrome.send('Page.navigate', { url: 'about:blank' });
     for (const name of both) {
@@ -137,39 +172,48 @@ async function main() {
       const b = dataUrl(join(args.head, name));
       const { w, h, blocks } = await chrome.evaluate(changedBlocksJs(a, b));
       if (blocks.length === 0) continue;
-      const rects = boxes(blocks).map((r) => ({
-        x: r.x0 * BLOCK,
-        y: r.y0 * BLOCK,
-        w: (r.x1 - r.x0 + 1) * BLOCK,
-        h: (r.y1 - r.y0 + 1) * BLOCK,
-      }));
+      if (!attachable(name, marks)) {
+        changed.push({ name, attached: false });
+        continue;
+      }
+      const rects = marks
+        ? [markedRects(args.base, name), markedRects(args.head, name)]
+        : Array(2).fill(
+            boxes(blocks).map((r) => ({
+              x: r.x0 * BLOCK,
+              y: r.y0 * BLOCK,
+              w: (r.x1 - r.x0 + 1) * BLOCK,
+              h: (r.y1 - r.y0 + 1) * BLOCK,
+            })),
+          );
       const png = await chrome.evaluate(composeJs(a, b, w, h, rects, ['Before', 'After']));
       writeFileSync(join(args.out, name), Buffer.from(png, 'base64'));
-      changed.push({ name, regions: rects.length });
+      changed.push({ name, attached: true, regions: rects[1].length });
     }
     for (const name of added) {
+      if (!attachable(name, marks)) {
+        fresh.push({ name, attached: false });
+        continue;
+      }
       const a = dataUrl(join(args.head, name));
       const { w, h } = await chrome.evaluate(changedBlocksJs(a, a));
-      const png = await chrome.evaluate(composeJs(a, null, w, h, [], ['New']));
+      const rects = [marks ? markedRects(args.head, name) : []];
+      const png = await chrome.evaluate(composeJs(a, null, w, h, rects, ['New']));
       writeFileSync(join(args.out, name), Buffer.from(png, 'base64'));
+      fresh.push({ name, attached: true });
     }
   } finally {
     chrome.close();
   }
-  const lines = [
-    `# Screenshot changes`,
-    '',
-    `Changed: ${changed.length}, new: ${added.length}, removed: ${removed.length}, unchanged: ${both.length - changed.length}.`,
-    '',
-    ...changed.map(
-      (c) => `- changed: ${c.name} (${c.regions} region${c.regions === 1 ? '' : 's'})`,
-    ),
-    ...added.map((n) => `- new: ${n}`),
-    ...removed.map((n) => `- removed: ${n}`),
-    '',
-  ];
+  const lines = indexLines({
+    changed,
+    added: fresh,
+    removed,
+    unchanged: both.length - changed.length,
+    marked: marks !== undefined,
+  });
   writeFileSync(join(args.out, 'index.md'), lines.join('\n'));
-  console.log(lines.slice(2, 3).join(''));
+  console.log(lines[2]);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -153,7 +153,7 @@ depends = ["web:install"]
 run = "pnpm -C web build && scripts/with-mock.sh -- node web/scripts/screenshots.mjs"
 
 [tasks."screenshots:compare"]
-description = "Before/after screenshots against BASE (default origin/main): web/screenshots-diff/"
+description = "Before/after screenshots against BASE (default origin/main), optional MATCH and MARKS file: web/screenshots-diff/"
 depends = ["web:install"]
 run = "scripts/screenshots-compare.sh"
 
